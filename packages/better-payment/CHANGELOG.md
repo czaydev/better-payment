@@ -6,6 +6,13 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.5.2
+
+### Added
+
+- `localizedErrors`: Russian (`ru`) messages. `Accept-Language: ru-RU` picks Russian in the
+  handler. Thanks to @ius-sharma (#117).
+
 ## 0.5.1
 
 ### Added

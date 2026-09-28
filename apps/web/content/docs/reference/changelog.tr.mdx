@@ -7,9 +7,15 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
   Sürüm geçmişi sıfırlandı. `0.0.1`, yeniden yazılan paketin ilk sürümüdür. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bunları kullanmayın. Gerekçe ve adım adım geçiş rehberi için [0.0.1'deki yenilikler](/docs/whats-new) sayfasına bakın.
 </Callout>
 
-## 0.5.1
+## 0.5.2
 
 ### Eklenenler [#added]
+
+- **[Hata mesajları için dil desteği](/docs/plugins/localized-errors):** Rusça (`ru`). Handler'da `Accept-Language: ru-RU` Rusça'yı seçer. Katkısı için [@ius-sharma](https://github.com/ius-sharma)'ya teşekkürler.
+
+## 0.5.1
+
+### Eklenenler [#added-1]
 
 - **[Hata mesajları için dil desteği](/docs/plugins/localized-errors):** Almanca (`de`). Handler'da `Accept-Language: de-DE` Almanca'yı seçer. Katkısı için [@ius-sharma](https://github.com/ius-sharma)'ya teşekkürler.
 
@@ -26,7 +32,7 @@ Plugin'ler ve tipli ödeme olayları. **Geriye uyumsuz:** `new BetterPayment()` 
 - `BetterPayment` sınıfının yerini `betterPayment({ providers, plugins })` aldı; sağlayıcılar `iyzico()`, `paytr()`, `akbank()` ve `parampos()` ile oluşturuluyor. `enabled` alanı kaldırıldı.
 - `providers` içindeki her anahtar bir sağlayıcı kimliğidir; `payment.<id>` sağlayıcıya göre tiplidir. `getEnabledProviders()` `string[]` döner.
 
-### Eklenenler [#added-1]
+### Eklenenler [#added-2]
 
 - **[Plugin'ler](/docs/concepts/plugins):** sağlayıcı işlemleri için before/after hook'ları, tipli metotlar, handler endpoint'leri ve hata kodları. [Kendi plugin'inizi](/docs/guides/writing-plugins) birkaç satırda yazın.
 - **[Ödeme olayları](/docs/concepts/events):** her sağlayıcı ve akış için tek bir tipli dinleyici; yalnızca doğrulanmış sonuçlar için yayınlanır.
@@ -37,7 +43,7 @@ Plugin'ler ve tipli ödeme olayları. **Geriye uyumsuz:** `new BetterPayment()` 
 
 Sandbox olmadan test ve tek satırlık framework entegrasyonu. Mevcut 0.3.0 kodu çalışmaya devam eder.
 
-### Eklenenler [#added-2]
+### Eklenenler [#added-3]
 
 - **[`better-payment/testing`](/docs/concepts/testing):** uygulama testleri için kimlik bilgisi ve ağ erişimi gerektirmeyen, bellek içi bir sağlayıcı olan `MockProvider`. Sihirli kart numaraları retleri, 3D Secure hatalarını, kaybolan yanıtları ve başarısız iadeleri kapsar; 3D Secure callback'leri gerçek handler'dan geçer.
 - **[Framework adapter'ları](/docs/integrations/frameworks):** `better-payment/next`, `better-payment/express`, `better-payment/fastify` ve `better-payment/hono` handler'ı tek satırda bağlar; `toFetchHandler` Workers, Deno ve Bun'u kapsar.
@@ -51,7 +57,7 @@ Sandbox olmadan test ve tek satırlık framework entegrasyonu. Mevcut 0.3.0 kodu
 
 Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden çalışmaya devam eder.
 
-### Eklenenler [#added-3]
+### Eklenenler [#added-4]
 
 - **[Edge ortamı desteği](/docs/integrations/edge):** aynı paket Node.js 20+, Vercel Edge, Cloudflare Workers, Deno ve Bun'da çalışır. Yalnızca `fetch` ve WebCrypto kullanır.
 - Özel bir fetch uygulaması (proxy, test stub'ları) için **[`fetch` seçeneği](/docs/concepts/configuration#custom-fetch)**.
@@ -66,7 +72,7 @@ Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden
 
 Ön provizyon ve kayıtlı kartlar. Mevcut 0.1.0 kodu çalışmaya devam eder. İki özellik de her gece gerçek iyzico sandbox'ına karşı test edilir.
 
-### Eklenenler [#added-4]
+### Eklenenler [#added-5]
 
 - **[Ön provizyon](/docs/payments/pre-authorization):** `authorize()` / `initThreeDSAuthorize()` tutarı bloke eder, `capture()` tahsil eder (kısmi capture desteklenir) ve `voidAuthorization()` serbest bırakır. iyzico, Parampos ve Akbank; PayTR henüz desteklenmiyor.
 - **[Kayıtlı kartlar](/docs/payments/stored-cards):** ödeme sırasında `saveCard` ile kartı kaydedin, sonra `storedCard: { customerToken, cardToken }` ile ödeme alın ve kartları `saveCard()`, `listCards()` ve `deleteCard()` ile yönetin. iyzico ve PayTR; Parampos ve Akbank henüz desteklenmiyor.
@@ -81,7 +87,7 @@ Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden
 
 Sıfırlamadan sonraki ilk özellik sürümü. Mevcut 0.0.1 kodu çalışmaya devam eder; davranış değişiklikleri "Değişenler" altında listelenir. iyzico entegrasyonu artık her gece gerçek iyzico sandbox'ına karşı test ediliyor.
 
-### Eklenenler [#added-5]
+### Eklenenler [#added-6]
 
 - **[Birleşik hata kodları](/docs/reference/error-codes):** her başarısız sonuç bir `code` taşır (`INSUFFICIENT_FUNDS`, `CARD_DECLINED`, `THREEDS_FAILED`, `INVALID_HASH`, ...). `errorCode` sağlayıcının ham kodunu korur.
 - Sağlayıcı çağrılmadan önce **[istek doğrulama](/docs/concepts/configuration#request-validation)**. Geçersiz istekler tüm geçersiz alanları listeleyerek `code: 'INVALID_REQUEST'` döner. `validate: false` ile kapatılabilir.
