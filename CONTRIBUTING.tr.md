@@ -442,6 +442,8 @@ node scripts/check-translations.mjs        # eksik çeviri, farklı kod bloğu, 
 node scripts/check-translations.mjs --fix  # başlık id'lerini ekler
 ```
 
+**Hata mesajı dilleri** (`localizedErrors`), `packages/better-payment/src/plugins/localized-errors/` altında her dil için bir dosyadır. Mesajları müşteriye doğal gelecek şekilde yazın. Paket boyutu kontrolüne (`pnpm --filter better-payment size`) sığdırmak için asla kısaltmayın: yeni bir dil sınırı aşarsa PR'da belirtin, sınırı bakımcılar yükseltir.
+
 ## Sürüm ve Yayın
 
 Proje [Changesets](https://github.com/changesets/changesets) kullanır.

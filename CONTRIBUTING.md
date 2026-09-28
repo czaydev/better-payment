@@ -153,6 +153,8 @@ node scripts/check-translations.mjs        # missing pages, different code block
 node scripts/check-translations.mjs --fix  # adds heading ids
 ```
 
+**Error message languages** (`localizedErrors`) are one file per language in `packages/better-payment/src/plugins/localized-errors/`. Write messages that read naturally for customers. Never shorten them to fit the bundle size check (`pnpm --filter better-payment size`): if a new language goes over the budget, say so in the pull request and a maintainer raises it.
+
 ## Releases
 
 Maintainers release with [Changesets](https://github.com/changesets/changesets): a release pull request consumes the changesets into `package.json` and `CHANGELOG.md`, and the **Publish to NPM** workflow publishes with npm trusted publishing (provenance, no tokens).
