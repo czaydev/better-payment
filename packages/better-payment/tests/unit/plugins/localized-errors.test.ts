@@ -78,7 +78,7 @@ describe('localizedErrors', () => {
     );
     expect(es.errors.message('EXPIRED_CARD', 'tr')).toBe('Kartın süresi dolmuş.');
     expect(es.errors.message('LIMIT_EXCEEDED', 'tr-TR')).toBe(errorMessages.tr.LIMIT_EXCEEDED);
-    expect(es.errors.locales).toEqual(['en', 'tr', 'de', 'es']);
+    expect(es.errors.locales).toEqual(['en', 'tr', 'de', 'ru', 'es']);
   });
 
   it('rejects a language without messages', () => {
@@ -166,6 +166,9 @@ describe('localizedErrors', () => {
       );
       expect(message(await pay(payment, { 'accept-language': 'de-DE,de;q=0.9,en;q=0.5' }))).toBe(
         errorMessages.de.INSUFFICIENT_FUNDS
+      );
+      expect(message(await pay(payment, { 'accept-language': 'ru-RU,ru;q=0.9,en;q=0.5' }))).toBe(
+        errorMessages.ru.INSUFFICIENT_FUNDS
       );
       expect(message(await pay(payment, { 'accept-language': 'es-ES, en;q=0.5' }))).toBe(
         errorMessages.en.INSUFFICIENT_FUNDS
