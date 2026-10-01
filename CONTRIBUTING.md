@@ -144,6 +144,7 @@ The website and docs are published in English (`/docs/...`) and Turkish (`/tr/do
 - Translate prose only. Code blocks stay byte-for-byte identical to the English page.
 - Keep the headings. Every Turkish heading keeps the English heading's id: `## Taksit [#installments]`.
 - Update both languages in the same pull request.
+- Mark new user-facing features with `<Since version="x.y.z" />` in both languages. Until `packages/better-payment/package.json` reaches that version, the badge automatically says that the feature is not released yet.
 
 Rules and glossary: [apps/web/TRANSLATIONS.md](apps/web/TRANSLATIONS.md). CI runs:
 

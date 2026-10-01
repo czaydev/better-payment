@@ -12,4 +12,5 @@ Closes #
 - [ ] Tests cover the change (and forged/invalid input for callbacks and signatures)
 - [ ] A changeset is included for user-facing changes (`pnpm changeset`)
 - [ ] Docs are updated in English **and** Turkish (`node apps/web/scripts/check-translations.mjs`), or no docs change is needed
+- [ ] New user-facing features include a `<Since version="x.y.z" />` badge in their docs, or no badge is needed
 - [ ] No credentials, card numbers or personal data in code, tests, fixtures or logs

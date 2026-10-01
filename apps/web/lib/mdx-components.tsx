@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { Callout } from "fumadocs-ui/components/callout";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import { Card, Cards } from "fumadocs-ui/components/card";
+import { Since, type SinceProps } from "@/components/docs/Since";
 import { localePath, type Locale } from "@/lib/i18n/config";
 
 export function getMDXComponents(components: MDXComponents, lang: Locale = "en"): MDXComponents {
@@ -19,5 +20,6 @@ export function getMDXComponents(components: MDXComponents, lang: Locale = "en")
     Tabs,
     Card,
     Cards,
+    Since: (props: SinceProps) => <Since {...props} lang={lang} />,
   };
 }

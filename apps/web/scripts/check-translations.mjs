@@ -9,8 +9,9 @@
 //   --fix adds or corrects the `[#id]` of Turkish headings.
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('../content/docs/', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../content/docs/', import.meta.url));
 const FIX = process.argv.includes('--fix');
 const LOCALE = 'tr';
 
