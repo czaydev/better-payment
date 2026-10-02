@@ -1,19 +1,25 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Manrope } from "next/font/google";
 import "../globals.css";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { LOCALES, SITE_URL, alternates, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { i18nUI } from "@/lib/i18n/ui";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Brand typography: Manrope for display and headings, Inter for text, JetBrains Mono for code
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin", "latin-ext"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin", "latin-ext"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin", "latin-ext"],
 });
 
@@ -42,11 +48,17 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
   return (
     <html
       lang={lang}
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${manrope.variable} ${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans antialiased">
-        <RootProvider i18n={i18nUI.provider(lang)}>{children}</RootProvider>
+        {/* The site is light only; dark mode is a separate follow-up */}
+        <RootProvider
+          i18n={i18nUI.provider(lang)}
+          theme={{ forcedTheme: "light", defaultTheme: "light", enableSystem: false }}
+        >
+          {children}
+        </RootProvider>
       </body>
     </html>
   );

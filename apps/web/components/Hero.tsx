@@ -1,5 +1,5 @@
 import { buttonVariants } from "@/lib/button-variants";
-import { ArrowRight, Star } from "lucide-react";
+import { ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import Code from "@/components/Code";
@@ -44,7 +44,7 @@ export default function Hero({
               <span className="font-mono text-foreground">{version}</span>
               <span className="w-px h-3 bg-border" />
               {t.badge}
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </Link>
 
             <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[3.9rem] font-bold tracking-[-0.03em] leading-[1.05] text-foreground">
@@ -62,7 +62,7 @@ export default function Hero({
                 href={localePath(lang, "/docs")}
                 className={cn(buttonVariants({ size: "lg" }), "gap-2 h-11 px-6 text-sm font-medium")}
               >
-                {t.getStarted} <ArrowRight className="w-3.5 h-3.5" />
+                {t.getStarted} <ChevronRight data-icon="chevron" className="w-4 h-4" />
               </Link>
               <a
                 href="https://github.com/czaydev/better-payment"
@@ -73,7 +73,7 @@ export default function Hero({
                   "gap-2 h-11 px-6 text-sm font-medium",
                 )}
               >
-                <Star className="w-3.5 h-3.5" />
+                <Star data-icon="brand" className="w-3.5 h-3.5" />
                 {t.star}
               </a>
             </div>

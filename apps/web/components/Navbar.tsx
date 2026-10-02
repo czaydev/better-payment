@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { useTheme } from "next-themes";
 import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
@@ -41,33 +40,6 @@ function LanguageSwitch({ lang, label }: { lang: Locale; label: string }) {
     >
       {other}
     </Link>
-  );
-}
-
-function ThemeToggle({ label }: { label: string }) {
-  const { theme, setTheme } = useTheme();
-  // false during SSR and hydration, true afterwards (the theme is only known on the client)
-  const mounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  if (!mounted) return <div className="w-8 h-8" />;
-  return (
-    <button
-      className={cn(
-        buttonVariants({ variant: "ghost", size: "icon" }),
-        "h-8 w-8 text-muted-foreground hover:text-foreground",
-      )}
-      aria-label={label}
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-    >
-      {theme === "dark" ? (
-        <Sun className="h-[15px] w-[15px]" />
-      ) : (
-        <Moon className="h-[15px] w-[15px]" />
-      )}
-    </button>
   );
 }
 
@@ -134,7 +106,6 @@ export default function Navbar({
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-1.5">
           <LanguageSwitch lang={lang} label={t.language} />
-          <ThemeToggle label={t.toggleTheme} />
           <Separator orientation="vertical" className="h-4 mx-1" />
           <a
             href="https://github.com/czaydev/better-payment"

@@ -25,6 +25,7 @@ export default async function Layout({ children, params }: LayoutProps<"/[lang]/
         url: localePath(lang, "/"),
       }}
       githubUrl="https://github.com/czaydev/better-payment"
+      themeSwitch={{ enabled: false }}
     >
       {children}
     </DocsLayout>

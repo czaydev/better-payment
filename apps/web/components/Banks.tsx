@@ -1,4 +1,4 @@
-import { Shield, Zap, CreditCard, Lock, ArrowRight } from "lucide-react";
+import { Shield, Zap, CreditCard, Lock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import Code from "@/components/Code";
@@ -99,7 +99,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:underline underline-offset-4 group w-fit"
               >
                 {t.viewDocs}
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
 

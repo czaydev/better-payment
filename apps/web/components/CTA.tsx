@@ -1,5 +1,5 @@
 import { buttonVariants } from "@/lib/button-variants";
-import { ArrowRight, GitBranch } from "lucide-react";
+import { ChevronRight, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -51,7 +51,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
                     "gap-2 h-11 px-7 text-sm font-medium whitespace-nowrap",
                   )}
                 >
-                  {t.readDocs} <ArrowRight className="w-3.5 h-3.5" />
+                  {t.readDocs} <ChevronRight data-icon="chevron" className="w-4 h-4" />
                 </Link>
                 <a
                   href="https://github.com/czaydev/better-payment"
@@ -62,7 +62,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
                     "gap-2 h-11 px-7 text-sm font-medium whitespace-nowrap",
                   )}
                 >
-                  <GitBranch className="w-4 h-4" /> {t.github}
+                  <GitBranch data-icon="brand" className="w-4 h-4" /> {t.github}
                 </a>
               </div>
             </div>

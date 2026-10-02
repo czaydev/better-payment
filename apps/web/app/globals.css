@@ -11,8 +11,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-manrope);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -37,75 +38,85 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Brand colours that have no shadcn role */
+  --color-tint: var(--bp-tint);
+  --color-lilac: var(--bp-lilac);
+  --color-line-strong: var(--bp-line-strong);
+  --color-success: var(--bp-success);
+  --color-success-soft: var(--bp-success-soft);
+  --color-warning: var(--bp-warning);
+  --color-warning-soft: var(--bp-warning-soft);
+  --color-danger: var(--bp-danger);
+  --color-danger-soft: var(--bp-danger-soft);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
+  --ease-brand: var(--bp-ease);
+  --ease-spring: var(--bp-spring);
 }
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
 }
 
+/*
+ * Light only. Palette "Signal Indigo" (vault: Branding/05 - Brand Lock).
+ * Fumadocs reads the same variables through fumadocs-ui/css/shadcn.css.
+ */
 :root {
-  /* Neutral palette: no hue, contrast carries the hierarchy */
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.95 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0 0);
-  --input: oklch(0.91 0 0);
-  --ring: oklch(0.7 0 0);
-  --radius: 0.5rem;
-  --sidebar: oklch(0.97 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.91 0 0);
-  --sidebar-ring: oklch(0.7 0 0);
-}
+  --background: #f8f8fc;
+  --foreground: #13132b;
+  --card: #ffffff;
+  --card-foreground: #13132b;
+  --popover: #ffffff;
+  --popover-foreground: #13132b;
+  --primary: #4338f2;
+  --primary-foreground: #ffffff;
+  --secondary: #eceaff;
+  --secondary-foreground: #4338f2;
+  --muted: #f0eff8;
+  --muted-foreground: #5a5a78;
+  --accent: #eceaff;
+  --accent-foreground: #13132b;
+  --destructive: #c8322b;
+  --border: #e4e3f0;
+  --input: #e4e3f0;
+  --ring: #4338f2;
+  --radius: 0.75rem;
+  --sidebar: #f8f8fc;
+  --sidebar-foreground: #13132b;
+  --sidebar-primary: #4338f2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eceaff;
+  --sidebar-accent-foreground: #4338f2;
+  --sidebar-border: #e4e3f0;
+  --sidebar-ring: #4338f2;
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.96 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.96 0 0);
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.96 0 0);
-  --primary: oklch(0.93 0 0);
-  --primary-foreground: oklch(0.18 0 0);
-  --secondary: oklch(0.25 0 0);
-  --secondary-foreground: oklch(0.93 0 0);
-  --muted: oklch(0.23 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.25 0 0);
-  --accent-foreground: oklch(0.93 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.55 0 0);
-  --sidebar: oklch(0.16 0 0);
-  --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.93 0 0);
-  --sidebar-primary-foreground: oklch(0.18 0 0);
-  --sidebar-accent: oklch(0.25 0 0);
-  --sidebar-accent-foreground: oklch(0.93 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0 0);
+  --bp-tint: #eceaff;
+  --bp-lilac: #a9a3ff;
+  --bp-line-strong: #cfcde6;
+  --bp-primary-hover: #3a2fe0;
+  --bp-success: #087a55;
+  --bp-success-soft: #e6f5ef;
+  --bp-warning: #a86207;
+  --bp-warning-soft: #fdf3e3;
+  --bp-danger: #c8322b;
+  --bp-danger-soft: #fdeceb;
+
+  /* Motion tokens (vault: Branding/06 - Bileşen ve Motion Spesifikasyonu) */
+  --bp-d-xs: 140ms;
+  --bp-d-sm: 240ms;
+  --bp-d-md: 450ms;
+  --bp-d-lg: 700ms;
+  --bp-d-xl: 900ms;
+  --bp-d-art: 1600ms;
+  --bp-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --bp-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bp-exit: cubic-bezier(0.4, 0, 1, 1);
+  --bp-rise: 18px;
 }
 
 @layer base {
@@ -114,5 +125,81 @@ html {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+}
+
+/*
+ * Buttons (K7a). `.btn-fx` sweeps a sheen once per hover or keyboard focus,
+ * `.btn-fx-idle` adds the slow idle sheen used by primary buttons.
+ * Icons opt into motion with data-icon="chevron" or data-icon="brand".
+ */
+@layer components {
+  .btn-fx {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    --bp-sheen: rgb(67 56 242 / 0.14);
+    --bp-sheen-soft: rgb(67 56 242 / 0.05);
+  }
+  .btn-fx::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      var(--bp-sheen) 47%,
+      var(--bp-sheen-soft) 53%,
+      transparent 68%
+    );
+    transform: translateX(-130%);
+  }
+  .btn-fx:is(:hover, :focus-visible)::after {
+    transform: translateX(130%);
+    transition: transform var(--bp-d-xl) var(--bp-ease);
+  }
+  .btn-fx [data-icon] {
+    transition: transform 0.35s var(--bp-spring);
+  }
+  .btn-fx:is(:hover, :focus-visible) [data-icon="chevron"] {
+    transform: translateX(4px);
+  }
+  .btn-fx:is(:hover, :focus-visible) [data-icon="brand"] {
+    transform: rotate(-8deg) scale(1.08);
+  }
+  .btn-fx-idle {
+    --bp-sheen: rgb(255 255 255 / 0.55);
+    --bp-sheen-soft: rgb(255 255 255 / 0.18);
+  }
+  .btn-fx-idle:not(:hover):not(:focus-visible)::after {
+    animation: bp-idle-sheen 4.5s var(--bp-ease) infinite 1.8s;
+  }
+}
+
+@keyframes bp-idle-sheen {
+  0% {
+    transform: translateX(-130%);
+  }
+  22%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-fx::after {
+    display: none;
+  }
+  .btn-fx [data-icon] {
+    transition: none;
+    transform: none !important;
   }
 }
