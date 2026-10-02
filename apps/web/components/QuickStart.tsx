@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import Code from "@/components/Code";
+import SectionHeading from "@/components/SectionHeading";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
 
@@ -48,27 +50,18 @@ const result = await payment.iyzico.initThreeDSPayment({
   },
 ];
 
-export default function QuickStart({ lang, t }: { lang: Locale; t: Dictionary["quickStart"] }) {
+export default function QuickStart({ lang, t, code }: { lang: Locale; t: Dictionary["quickStart"]; code: Dictionary["code"] }) {
   return (
     <section id="quickstart" className="py-24 px-5 sm:px-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-14 max-w-lg">
-          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-            {t.eyebrow}
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-tight">
-            {t.titleLine1}
-            <br />
-            <span className="text-muted-foreground font-medium">{t.titleLine2}</span>
-          </h2>
-        </div>
+        <SectionHeading line1={t.titleLine1} line2={t.titleLine2} className="mb-14" />
 
         <ol className="flex flex-col">
           {steps.map((step, idx) => (
             <li key={step.number} className="flex gap-6 sm:gap-8">
               <div className="flex flex-col items-center shrink-0 pt-1">
-                <div className="w-9 h-9 rounded-lg bg-card border border-border flex items-center justify-center">
-                  <span className="text-[10px] font-semibold text-foreground font-mono">
+                <div className="w-9 h-9 rounded-lg bg-tint flex items-center justify-center">
+                  <span className="text-[11px] font-semibold text-primary font-mono">
                     {step.number}
                   </span>
                 </div>
@@ -79,7 +72,7 @@ export default function QuickStart({ lang, t }: { lang: Locale; t: Dictionary["q
                 <h3 className="font-semibold text-foreground text-[15px] mb-4 mt-1.5">
                   {t.steps[idx]}
                 </h3>
-                <Code code={step.code} file={step.file} shell={step.shell} />
+                <Code code={step.code} file={step.file} shell={step.shell} copy={code} />
               </div>
             </li>
           ))}
@@ -88,10 +81,10 @@ export default function QuickStart({ lang, t }: { lang: Locale; t: Dictionary["q
         <div className="mt-12 pl-[calc(36px+1.5rem)] sm:pl-[calc(36px+2rem)]">
           <Link
             href={localePath(lang, "/docs")}
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary group"
           >
             {t.fullDocs}
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            <ChevronRight className="size-4 transition-transform duration-(--bp-d-md) ease-spring group-hover:translate-x-[3px]" />
           </Link>
         </div>
       </div>

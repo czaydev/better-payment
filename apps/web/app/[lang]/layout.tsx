@@ -33,11 +33,11 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
   const t = getDictionary(lang);
   return {
     metadataBase: new URL(SITE_URL),
-    title: { default: t.meta.title, template: `%s · better-payment` },
+    title: { default: t.meta.title, template: `%s · Better Payment` },
     description: t.meta.description,
     keywords: ["payment gateway", "ödeme", "iyzico", "paytr", "parampos", "akbank", "sanal pos", "nodejs", "typescript", "npm"],
     alternates: alternates("/", lang),
-    openGraph: { locale: lang === "tr" ? "tr_TR" : "en_US", siteName: "better-payment" },
+    openGraph: { locale: lang === "tr" ? "tr_TR" : "en_US", siteName: "Better Payment" },
   };
 }
 

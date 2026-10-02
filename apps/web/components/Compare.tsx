@@ -1,4 +1,5 @@
 import Code from "@/components/Code";
+import SectionHeading from "@/components/SectionHeading";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
 const before = `// iyzico: JSON + IYZWSv2 signatures
@@ -31,32 +32,20 @@ const result = await payment.use("parampos").createPayment(order);
 
 result.status; // "success" | "failure" | "pending" | "cancelled"`;
 
-export default function Compare({ t }: { t: Dictionary["compare"] }) {
+export default function Compare({ t, code }: { t: Dictionary["compare"]; code: Dictionary["code"] }) {
   return (
     <section className="py-24 px-5 sm:px-8">
       <div className="max-w-6xl mx-auto">
-        <div className="max-w-2xl mb-12">
-          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-            {t.eyebrow}
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-tight">
-            {t.titleLine1}
-            <br />
-            <span className="text-muted-foreground font-medium">{t.titleLine2}</span>
-          </h2>
-          <p className="mt-4 text-base text-muted-foreground leading-relaxed max-w-xl">
-            {t.lead}
-          </p>
-        </div>
+        <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
           <div className="flex flex-col gap-2 min-w-0">
-            <span className="text-xs font-medium text-muted-foreground">{t.without}</span>
+            <span className="text-[13px] font-medium text-muted-foreground">{t.without}</span>
             <Code code={before} file="integration/payments.ts" className="flex-1" />
           </div>
           <div className="flex flex-col gap-2 min-w-0">
-            <span className="text-xs font-medium text-foreground">{t.with}</span>
-            <Code code={after} file="lib/payment.ts" className="flex-1" />
+            <span className="text-[13px] font-medium text-primary">{t.with}</span>
+            <Code code={after} file="lib/payment.ts" copy={code} className="flex-1" />
           </div>
         </div>
 
@@ -64,7 +53,7 @@ export default function Compare({ t }: { t: Dictionary["compare"] }) {
           {t.points.map((point) => (
             <li
               key={point}
-              className="text-xs font-medium text-muted-foreground border border-border rounded-full px-3 py-1.5"
+              className="rounded-full bg-tint px-3 py-1.5 text-xs font-medium text-primary"
             >
               {point}
             </li>

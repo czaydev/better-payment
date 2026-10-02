@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import Image from "next/image";
 import Code from "@/components/Code";
+import SectionHeading from "@/components/SectionHeading";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
 const providers = [
@@ -68,7 +69,7 @@ const result = await payment.parampos.createPayment({
   },
 ];
 
-export default function Providers({ t }: { t: Dictionary["providers"] }) {
+export default function Providers({ t, code }: { t: Dictionary["providers"]; code: Dictionary["code"] }) {
   const [active, setActive] = useState(0);
   const base = providers[active];
   const p = {
@@ -80,16 +81,7 @@ export default function Providers({ t }: { t: Dictionary["providers"] }) {
   return (
     <section id="providers" className="py-24 px-5 sm:px-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-10 max-w-2xl">
-          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-            {t.eyebrow}
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-tight">
-            {t.titleLine1}
-            <br />
-            <span className="text-muted-foreground font-medium">{t.titleLine2}</span>
-          </h2>
-        </div>
+        <SectionHeading line1={t.titleLine1} line2={t.titleLine2} className="mb-10" />
 
         <div
           role="tablist"
@@ -133,13 +125,13 @@ export default function Providers({ t }: { t: Dictionary["providers"] }) {
               </div>
 
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-3">
+                <p className="text-[13px] font-medium text-muted-foreground mb-3">
                   {t.capabilities}
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {p.features.map((feat) => (
                     <li key={feat} className="flex items-center gap-2 text-sm text-foreground/80">
-                      <Check className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <Check className="w-3.5 h-3.5 shrink-0 text-primary" />
                       {feat}
                     </li>
                   ))}
@@ -148,10 +140,10 @@ export default function Providers({ t }: { t: Dictionary["providers"] }) {
             </div>
 
             <div className="p-8 bg-muted/30">
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-4">
+              <p className="text-[13px] font-medium text-muted-foreground mb-4">
                 {t.example}
               </p>
-              <Code code={p.code} file={p.file} />
+              <Code code={p.code} file={p.file} copy={code} />
             </div>
           </div>
         </div>

@@ -2,10 +2,10 @@ import type { Locale } from "./config";
 
 const en = {
   meta: {
-    title: "better-payment — Unified Payment Gateway for Node.js",
+    title: "Better Payment — Unified Payment Gateway for Node.js",
     description:
       "A unified, type-safe payment gateway library for Node.js and edge runtimes. Integrate iyzico, PayTR, Parampos and Akbank with a single consistent API and verified callbacks.",
-    docsTitleSuffix: "better-payment docs",
+    docsTitleSuffix: "Better Payment docs",
   },
   nav: {
     features: "Features",
@@ -23,7 +23,7 @@ const en = {
     getStarted: "Get Started",
     star: "Star on GitHub",
     network: {
-      label: "How a payment moves through better-payment",
+      label: "How a payment moves through Better Payment",
       request: "request",
       verified: "verified",
       idle: "One API · 4 providers",
@@ -38,13 +38,16 @@ const en = {
   trustBar: {
     title: "Works with Node.js and edge runtimes",
   },
+  code: {
+    copy: "Copy",
+    copied: "Copied",
+  },
   compare: {
-    eyebrow: "The problem",
     titleLine1: "Every gateway has a",
     titleLine2: "completely different API.",
-    lead: "Different request shapes, signatures, error formats and callback rules. better-payment implements each one against the provider's specification and gives you one set of types to work with.",
+    lead: "Different request shapes, signatures, error formats and callback rules. Better Payment implements each one against the provider's specification and gives you one set of types to work with.",
     without: "Without",
-    with: "With better-payment",
+    with: "With Better Payment",
     points: [
       "One interface, four providers",
       "Shared result statuses",
@@ -98,7 +101,6 @@ const en = {
     },
   },
   providers: {
-    eyebrow: "Payment gateways",
     titleLine1: "Three gateways,",
     titleLine2: "one set of types.",
     capabilities: "Capabilities",
@@ -143,7 +145,6 @@ const en = {
     },
   },
   banks: {
-    eyebrow: "Direct bank integrations",
     titleLine1: "Bank virtual POS,",
     titleLine2: "same interface.",
     lead: "Talk to a bank's virtual POS directly, without a payment institution in between, using the same request and result types.",
@@ -161,14 +162,12 @@ const en = {
     roadmap: "On the roadmap",
   },
   quickStart: {
-    eyebrow: "Quick start",
     titleLine1: "Up and running",
     titleLine2: "in minutes.",
     steps: ["Install the package", "Configure your providers", "Start a 3D Secure payment"],
     fullDocs: "View full documentation",
   },
   cta: {
-    eyebrow: "Open Source · MIT License",
     titleLine1: "Stop rewriting",
     titleLine2: "payment logic.",
     lead: "One package for iyzico, PayTR, Parampos and Akbank, with full TypeScript support. Upgrading from 3.x? Read",
@@ -213,10 +212,10 @@ export type Dictionary = typeof en;
 
 const tr: Dictionary = {
   meta: {
-    title: "better-payment — Node.js için birleşik ödeme altyapısı",
+    title: "Better Payment — Node.js için birleşik ödeme altyapısı",
     description:
       "Node.js ve edge ortamları için tip güvenli, birleşik ödeme kütüphanesi. iyzico, PayTR, Parampos ve Akbank'ı tek bir tutarlı API ve doğrulanmış callback'lerle entegre edin.",
-    docsTitleSuffix: "better-payment dokümantasyonu",
+    docsTitleSuffix: "Better Payment dokümantasyonu",
   },
   nav: {
     features: "Özellikler",
@@ -234,7 +233,7 @@ const tr: Dictionary = {
     getStarted: "Başlayın",
     star: "GitHub'da yıldızlayın",
     network: {
-      label: "Bir ödemenin better-payment içindeki yolu",
+      label: "Bir ödemenin Better Payment içindeki yolu",
       request: "istek",
       verified: "doğrulandı",
       idle: "Tek API · 4 sağlayıcı",
@@ -249,13 +248,16 @@ const tr: Dictionary = {
   trustBar: {
     title: "Node.js ve edge ortamlarında çalışır",
   },
+  code: {
+    copy: "Kopyala",
+    copied: "Kopyalandı",
+  },
   compare: {
-    eyebrow: "Sorun",
     titleLine1: "Her ödeme sağlayıcısının",
     titleLine2: "API'si bambaşka.",
-    lead: "İstek yapıları, imzalar, hata formatları ve callback kuralları farklı. better-payment her birini sağlayıcının kendi spesifikasyonuna göre uygular ve size tek bir tip seti sunar.",
+    lead: "İstek yapıları, imzalar, hata formatları ve callback kuralları farklı. Better Payment her birini sağlayıcının kendi spesifikasyonuna göre uygular ve size tek bir tip seti sunar.",
     without: "Olmadan",
-    with: "better-payment ile",
+    with: "Better Payment ile",
     points: [
       "Tek arayüz, dört sağlayıcı",
       "Ortak sonuç durumları",
@@ -309,7 +311,6 @@ const tr: Dictionary = {
     },
   },
   providers: {
-    eyebrow: "Ödeme sağlayıcıları",
     titleLine1: "Üç sağlayıcı,",
     titleLine2: "tek tip seti.",
     capabilities: "Yetenekler",
@@ -354,7 +355,6 @@ const tr: Dictionary = {
     },
   },
   banks: {
-    eyebrow: "Doğrudan banka entegrasyonları",
     titleLine1: "Banka sanal POS'u,",
     titleLine2: "aynı arayüz.",
     lead: "Arada bir ödeme kuruluşu olmadan bankanın sanal POS'una doğrudan bağlanın; aynı istek ve sonuç tiplerini kullanın.",
@@ -372,14 +372,12 @@ const tr: Dictionary = {
     roadmap: "Yol haritasında",
   },
   quickStart: {
-    eyebrow: "Hızlı başlangıç",
     titleLine1: "Dakikalar içinde",
     titleLine2: "çalışır durumda.",
     steps: ["Paketi kurun", "Sağlayıcılarınızı yapılandırın", "3D Secure ödeme başlatın"],
     fullDocs: "Tüm dokümantasyonu görün",
   },
   cta: {
-    eyebrow: "Açık kaynak · MIT lisansı",
     titleLine1: "Ödeme kodunu",
     titleLine2: "yeniden yazmayı bırakın.",
     lead: "iyzico, PayTR, Parampos ve Akbank için tam TypeScript destekli tek paket. 3.x'ten mi geçiyorsunuz? Okuyun:",

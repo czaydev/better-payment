@@ -2,6 +2,7 @@ import { Shield, Zap, CreditCard, Lock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import Code from "@/components/Code";
+import SectionHeading from "@/components/SectionHeading";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
 
@@ -41,22 +42,13 @@ const roadmap = [
   { name: "Ziraat Bankası", href: "https://github.com/czaydev/better-payment/issues/36" },
 ];
 
-export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"] }) {
+export default function Banks({ lang, t, code }: { lang: Locale; t: Dictionary["banks"]; code: Dictionary["code"] }) {
   const highlights = t.highlights.map((h, i) => ({ ...h, icon: highlightIcons[i] }));
   return (
     <section id="banks" className="py-24 px-5 sm:px-8 bg-muted/30 border-y border-border">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
-          <div>
-            <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-              {t.eyebrow}
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-tight">
-              {t.titleLine1}
-              <br />
-              <span className="text-muted-foreground font-medium">{t.titleLine2}</span>
-            </h2>
-          </div>
+          <SectionHeading line1={t.titleLine1} line2={t.titleLine2} className="mb-0" />
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
             {t.lead}
           </p>
@@ -96,7 +88,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
 
               <Link
                 href={localePath(lang, "/docs/banks/akbank")}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:underline underline-offset-4 group w-fit"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline underline-offset-4 group w-fit"
               >
                 {t.viewDocs}
                 <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -104,16 +96,16 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
             </div>
 
             <div className="p-8 lg:p-10 min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-4">
+              <p className="text-[13px] font-medium text-muted-foreground mb-4">
                 {t.example}
               </p>
-              <Code code={codeSnippet} file="lib/akbank.ts" />
+              <Code code={codeSnippet} file="lib/akbank.ts" copy={code} />
             </div>
           </div>
         </div>
 
         <div className="mt-6">
-          <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.18em] mb-3 ml-1">
+          <p className="text-[13px] font-medium text-muted-foreground mb-3 ml-1">
             {t.roadmap}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

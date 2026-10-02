@@ -24,11 +24,11 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
       <main>
         <Hero lang={lang} t={t.hero} />
         <TrustBar t={t.trustBar} />
-        <Compare t={t.compare} />
+        <Compare t={t.compare} code={t.code} />
         <Features t={t.features} />
-        <Providers t={t.providers} />
-        <Banks lang={lang} t={t.banks} />
-        <QuickStart lang={lang} t={t.quickStart} />
+        <Providers t={t.providers} code={t.code} />
+        <Banks lang={lang} t={t.banks} code={t.code} />
+        <QuickStart lang={lang} t={t.quickStart} code={t.code} />
         <CTA lang={lang} t={t.cta} />
       </main>
       <Footer lang={lang} t={t.footer} />
