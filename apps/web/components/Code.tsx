@@ -11,7 +11,7 @@ const KEYWORDS = new Set([
 // function calls violet, comments muted italic
 const TOKEN = /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|([A-Za-z_$][\w$]*)(?=(\s*\())?/gm;
 
-function highlight(code: string) {
+export function highlight(code: string) {
   const out: ReactNode[] = [];
   let last = 0;
   for (const m of code.matchAll(TOKEN)) {

@@ -101,7 +101,7 @@ export default function Navbar({
           />
           <Badge
             variant="secondary"
-            className="text-[10px] px-1.5 py-0 hidden sm:flex font-mono tracking-tight"
+            className="text-[10px] px-1.5 py-0 hidden xl:flex font-mono tracking-tight"
           >
             v{version}
           </Badge>

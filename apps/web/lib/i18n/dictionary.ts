@@ -46,12 +46,6 @@ const en = {
     lead: "Different request shapes, signatures, error formats and callback rules. Better Payment implements each one against the provider's specification and gives you one set of types to work with.",
     without: "Without",
     with: "With Better Payment",
-    points: [
-      "One interface, four providers",
-      "Shared result statuses",
-      "Callbacks verified for you",
-      "TypeScript-first",
-    ],
   },
   features: {
     titleLine1: "Everything you need,",
@@ -85,10 +79,8 @@ const en = {
     },
   },
   providers: {
-    titleLine1: "Three gateways,",
-    titleLine2: "one set of types.",
     capabilities: "Capabilities",
-    example: "Example",
+    drag: "Drag to compare",
     gateway: "Payment gateway",
     virtualPos: "Virtual POS (SOAP)",
     iyzico: {
@@ -127,6 +119,18 @@ const en = {
         "BIN lookup",
       ],
     },
+    akbank: {
+      description:
+        "Akbank's Sanal POS JSON API with HMAC-SHA512 signed requests, signature-verified 3D Secure (3D_PAY) callbacks, refunds, voids and order status queries.",
+      features: [
+        "3D Secure (3D_PAY)",
+        "Non-3D payments",
+        "HMAC-SHA512 signed requests",
+        "Refund & void",
+        "Order status queries",
+        "Signature-verified callbacks",
+      ],
+    },
   },
   banks: {
     titleLine1: "Bank virtual POS,",
@@ -142,8 +146,9 @@ const en = {
       { label: "Direct API", desc: "No third-party middleware" },
     ],
     viewDocs: "View Akbank docs",
-    example: "Example",
     roadmap: "On the roadmap",
+    live: "Live",
+    planned: "Planned",
   },
   quickStart: {
     titleLine1: "Up and running",
@@ -240,12 +245,6 @@ const tr: Dictionary = {
     lead: "İstek yapıları, imzalar, hata formatları ve callback kuralları farklı. Better Payment her birini sağlayıcının kendi spesifikasyonuna göre uygular ve size tek bir tip seti sunar.",
     without: "Olmadan",
     with: "Better Payment ile",
-    points: [
-      "Tek arayüz, dört sağlayıcı",
-      "Ortak sonuç durumları",
-      "Callback'ler sizin için doğrulanır",
-      "Önce TypeScript",
-    ],
   },
   features: {
     titleLine1: "İhtiyacınız olan her şey,",
@@ -279,10 +278,8 @@ const tr: Dictionary = {
     },
   },
   providers: {
-    titleLine1: "Üç sağlayıcı,",
-    titleLine2: "tek tip seti.",
     capabilities: "Yetenekler",
-    example: "Örnek",
+    drag: "Karşılaştırmak için sürükleyin",
     gateway: "Ödeme sağlayıcısı",
     virtualPos: "Sanal POS (SOAP)",
     iyzico: {
@@ -321,6 +318,18 @@ const tr: Dictionary = {
         "BIN sorgusu",
       ],
     },
+    akbank: {
+      description:
+        "Akbank Sanal POS JSON API'si: HMAC-SHA512 imzalı istekler, imzası doğrulanan 3D Secure (3D_PAY) callback'leri, iadeler, iptaller ve sipariş durumu sorguları.",
+      features: [
+        "3D Secure (3D_PAY)",
+        "3D'siz ödemeler",
+        "HMAC-SHA512 imzalı istekler",
+        "İade ve iptal",
+        "Sipariş durumu sorgusu",
+        "İmzası doğrulanan callback'ler",
+      ],
+    },
   },
   banks: {
     titleLine1: "Banka sanal POS'u,",
@@ -336,8 +345,9 @@ const tr: Dictionary = {
       { label: "Doğrudan API", desc: "Aracı yazılım yok" },
     ],
     viewDocs: "Akbank dokümantasyonu",
-    example: "Örnek",
     roadmap: "Yol haritasında",
+    live: "Canlı",
+    planned: "Planlanıyor",
   },
   quickStart: {
     titleLine1: "Dakikalar içinde",
