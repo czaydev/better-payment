@@ -22,7 +22,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
     <>
       <Navbar version={VERSION} lang={lang} t={t.nav} />
       <main>
-        <Hero version={VERSION} lang={lang} t={t.hero} />
+        <Hero lang={lang} t={t.hero} />
         <TrustBar t={t.trustBar} />
         <Compare t={t.compare} />
         <Features t={t.features} />

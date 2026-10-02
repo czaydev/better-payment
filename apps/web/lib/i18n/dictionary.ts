@@ -12,22 +12,28 @@ const en = {
     providers: "Providers",
     quickStart: "Quick Start",
     docs: "Docs",
+    getStarted: "Get started",
     openMenu: "Open menu",
     language: "Language",
   },
   hero: {
-    badge: "A fresh start: see what changed",
     titleLine1: "One API for",
     titleLine2: "Turkish payments.",
     lead: "gives iyzico, PayTR, Parampos and Akbank one type-safe interface, with signature-verified callbacks and a secure-by-default HTTP handler.",
     getStarted: "Get Started",
     star: "Star on GitHub",
-    stats: [
-      { value: "4", label: "Providers" },
-      { value: "0", label: "Runtime dependencies" },
-      { value: "TS", label: "Typed end to end" },
-      { value: "MIT", label: "License" },
-    ],
+    network: {
+      label: "How a payment moves through better-payment",
+      request: "request",
+      verified: "verified",
+      idle: "One API · 4 providers",
+      caps: {
+        iyzico: "3D Secure · Non-3D · Refund · Cancel · BIN · Installments",
+        paytr: "3D Secure (iFrame) · Non-3D · Refund · BIN · Installments",
+        parampos: "3D Secure · Non-3D (TRY) · Refund · Cancel · BIN · Installments",
+        akbank: "3D Secure (3D_PAY) · Non-3D · Refund · Cancel",
+      },
+    },
   },
   trustBar: {
     title: "Works with Node.js and edge runtimes",
@@ -47,7 +53,6 @@ const en = {
     ],
   },
   features: {
-    eyebrow: "Features",
     titleLine1: "Everything you need,",
     titleLine2: "nothing you don't.",
     items: {
@@ -218,22 +223,28 @@ const tr: Dictionary = {
     providers: "Sağlayıcılar",
     quickStart: "Hızlı Başlangıç",
     docs: "Dokümantasyon",
+    getStarted: "Başlayın",
     openMenu: "Menüyü aç",
     language: "Dil",
   },
   hero: {
-    badge: "Yeni bir başlangıç: nelerin değiştiğini görün",
     titleLine1: "Türk ödeme sistemleri",
     titleLine2: "için tek API.",
     lead: "iyzico, PayTR, Parampos ve Akbank'ı tek bir tip güvenli arayüzde toplar; imzası doğrulanan callback'ler ve varsayılan olarak güvenli bir HTTP handler sunar.",
     getStarted: "Başlayın",
     star: "GitHub'da yıldızlayın",
-    stats: [
-      { value: "4", label: "Sağlayıcı" },
-      { value: "0", label: "Runtime bağımlılığı" },
-      { value: "TS", label: "Uçtan uca tipli" },
-      { value: "MIT", label: "Lisans" },
-    ],
+    network: {
+      label: "Bir ödemenin better-payment içindeki yolu",
+      request: "istek",
+      verified: "doğrulandı",
+      idle: "Tek API · 4 sağlayıcı",
+      caps: {
+        iyzico: "3D Secure · Non-3D · İade · İptal · BIN · Taksit",
+        paytr: "3D Secure (iFrame) · Non-3D · İade · BIN · Taksit",
+        parampos: "3D Secure · Non-3D (TRY) · İade · İptal · BIN · Taksit",
+        akbank: "3D Secure (3D_PAY) · Non-3D · İade · İptal",
+      },
+    },
   },
   trustBar: {
     title: "Node.js ve edge ortamlarında çalışır",
@@ -253,7 +264,6 @@ const tr: Dictionary = {
     ],
   },
   features: {
-    eyebrow: "Özellikler",
     titleLine1: "İhtiyacınız olan her şey,",
     titleLine2: "fazlası değil.",
     items: {

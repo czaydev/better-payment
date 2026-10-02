@@ -194,6 +194,57 @@ html {
   }
 }
 
+/*
+ * Entrance and reveal (K7c). The entrance runs from CSS alone, so content is
+ * never left hidden when scripts are late or the tab opens in the background.
+ * The reveal uses scroll-driven animations where supported; other browsers
+ * simply show the content.
+ */
+@keyframes bp-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--bp-rise));
+  }
+}
+
+@keyframes bp-art {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(1.02);
+  }
+}
+
+.bp-enter {
+  animation: bp-enter var(--bp-d-lg) var(--bp-ease) both;
+  animation-delay: var(--at, 0ms);
+}
+
+.bp-art {
+  animation: bp-art var(--bp-d-art) var(--bp-ease) both;
+}
+
+@supports (animation-timeline: view()) {
+  .bp-reveal {
+    animation: bp-enter linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 45%;
+  }
+}
+
+/* Provider network in the hero */
+.bp-wire {
+  fill: none;
+  stroke: #d9d6f2;
+  stroke-width: 1.6;
+  stroke-dasharray: 4 6;
+  transition: stroke var(--bp-d-sm);
+}
+.bp-wire[data-active] {
+  stroke: var(--primary);
+  stroke-dasharray: none;
+  stroke-width: 2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn-fx::after {
     display: none;
@@ -201,5 +252,10 @@ html {
   .btn-fx [data-icon] {
     transition: none;
     transform: none !important;
+  }
+  .bp-enter,
+  .bp-art,
+  .bp-reveal {
+    animation: none;
   }
 }

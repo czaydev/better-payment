@@ -1,50 +1,45 @@
-import { Layers, Code2, Package, ShieldCheck, Lock, Clock, CreditCard, GitBranch } from "lucide-react";
+import AnimatedIcon from "@/components/AnimatedIcon";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
+// Each feature pairs with an icon from the frosted-glass set
 const layout = [
-  { key: "unified", icon: Layers, span: "lg:col-span-2" },
-  { key: "typescript", icon: Code2 },
-  { key: "footprint", icon: Package },
-  { key: "callbacks", icon: ShieldCheck },
-  { key: "handler", icon: Lock },
-  { key: "doubleCharge", icon: Clock },
-  { key: "iyzico", icon: CreditCard, span: "lg:col-span-2" },
-  { key: "multi", icon: GitBranch },
+  { key: "unified", icon: "unified-api", span: "lg:col-span-2" },
+  { key: "typescript", icon: "docs" },
+  { key: "footprint", icon: "edge" },
+  { key: "callbacks", icon: "callback" },
+  { key: "handler", icon: "handler" },
+  { key: "doubleCharge", icon: "idempotency" },
+  { key: "iyzico", icon: "installments", span: "lg:col-span-2" },
+  { key: "multi", icon: "sandbox" },
 ] as const;
 
 export default function Features({ t }: { t: Dictionary["features"] }) {
   const features = layout.map((item) => ({ ...item, ...t.items[item.key] }));
   return (
-    <section id="features" className="py-24 px-5 sm:px-8 bg-muted/30 border-y border-border">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-12 max-w-2xl">
-          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-            {t.eyebrow}
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-tight">
-            {t.titleLine1}
-            <br />
-            <span className="text-muted-foreground font-medium">{t.titleLine2}</span>
-          </h2>
-        </div>
+    <section id="features" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="bp-reveal mb-12 max-w-2xl text-[2rem] leading-[1.08] font-extrabold tracking-[-0.03em] text-foreground sm:text-[2.5rem]">
+          {t.titleLine1}
+          <br />
+          <span className="text-muted-foreground">{t.titleLine2}</span>
+        </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
-            <div
+            <article
               key={f.key}
               className={[
-                "rounded-xl border border-border bg-card p-6 flex flex-col gap-4 transition-colors hover:border-foreground/20",
+                "bp-reveal group rounded-2xl border border-border bg-card p-6 transition-[translate,box-shadow,border-color] duration-(--bp-d-md) ease-spring hover:-translate-y-[3px] hover:border-line-strong hover:shadow-[0_10px_30px_-14px_rgb(19_19_43/0.22)]",
                 "span" in f ? f.span : "",
               ].join(" ")}
             >
-              <div className="w-9 h-9 rounded-lg border border-border bg-muted/50 flex items-center justify-center">
-                <f.icon className="w-4 h-4 text-foreground/80" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-2 text-[15px]">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
-              </div>
-            </div>
+              <AnimatedIcon
+                name={f.icon}
+                className="-mt-1.5 -ml-2 mb-3 transition-transform duration-(--bp-d-lg) ease-spring group-hover:-translate-y-1 group-hover:scale-[1.08] group-hover:-rotate-[5deg]"
+              />
+              <h3 className="mb-2 text-[17px] font-bold tracking-[-0.01em] text-foreground">{f.title}</h3>
+              <p className="text-[14.5px] leading-relaxed text-muted-foreground">{f.description}</p>
+            </article>
           ))}
         </div>
       </div>
