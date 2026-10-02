@@ -249,7 +249,66 @@ html {
  * Docs (Faz 6). Sidebar page links get a small brand chevron; the active page is
  * marked by the tint and an indigo chevron instead of Fumadocs' thin line.
  */
-#nd-sidebar a[data-active]::after {
+/* External links (GitHub, Contributing) keep their own icon instead of the chevron */
+:is(#nd-sidebar, #nd-sidebar-mobile) a[target="_blank"]::after {
+  display: none;
+}
+
+/*
+ * Sidebar footer: the language picker and the GitHub link sit on one row with
+ * the same height, instead of a full-width left-aligned picker over a cramped icon box.
+ */
+:is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-label][aria-haspopup="dialog"]) {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div > button[aria-label][aria-haspopup="dialog"] {
+  flex: 1;
+  height: 38px;
+  margin: 0;
+  justify-content: center;
+  gap: 8px;
+  border-color: var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 500;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div > button[aria-label][aria-haspopup="dialog"]:hover {
+  border-color: var(--bp-line-strong);
+  background: var(--card);
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div > button[aria-label][aria-haspopup="dialog"] > svg:last-child {
+  margin-inline-start: 0;
+  opacity: 0.6;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div {
+  height: 38px;
+  padding: 0;
+  border-color: var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div a {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 9px;
+  color: var(--foreground);
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div a:hover {
+  background: var(--bp-tint);
+  color: var(--primary);
+}
+:is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div a svg {
+  width: 18px;
+  height: 18px;
+}
+
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active]::after {
   content: "";
   order: -1;
   flex: none;
@@ -265,14 +324,14 @@ html {
     transform 0.35s var(--bp-spring),
     opacity var(--bp-d-sm);
 }
-#nd-sidebar a[data-active]:hover::after {
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active]:hover::after {
   opacity: 0.75;
   transform: translateX(2px);
 }
-#nd-sidebar a[data-active="true"]::after {
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"]::after {
   opacity: 1;
 }
-#nd-sidebar a[data-active="true"]::before {
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"]::before {
   display: none;
 }
 
