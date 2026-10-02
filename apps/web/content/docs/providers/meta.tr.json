@@ -1,5 +1,7 @@
 {
   "title": "Sağlayıcılar",
+  "icon": "providers",
+  "defaultOpen": true,
   "pages": [
     "iyzico",
     "paytr",

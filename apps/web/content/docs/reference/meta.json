@@ -1,5 +1,7 @@
 {
   "title": "Reference",
+  "icon": "reference",
+  "defaultOpen": true,
   "pages": [
     "types",
     "error-codes",

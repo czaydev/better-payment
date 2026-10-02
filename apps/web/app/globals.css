@@ -245,6 +245,67 @@ html {
   stroke-width: 2;
 }
 
+/*
+ * Docs (Faz 6). Sidebar page links get a small brand chevron; the active page is
+ * marked by the tint and an indigo chevron instead of Fumadocs' thin line.
+ */
+#nd-sidebar a[data-active]::after {
+  content: "";
+  order: -1;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background-color: currentColor;
+  opacity: 0.4;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition:
+    transform 0.35s var(--bp-spring),
+    opacity var(--bp-d-sm);
+}
+#nd-sidebar a[data-active]:hover::after {
+  opacity: 0.75;
+  transform: translateX(2px);
+}
+#nd-sidebar a[data-active="true"]::after {
+  opacity: 1;
+}
+#nd-sidebar a[data-active="true"]::before {
+  display: none;
+}
+
+/* Inline code in docs prose */
+.prose :not(pre) > code {
+  border: 0;
+  border-radius: 6px;
+  background: var(--bp-tint);
+  color: var(--primary);
+  padding: 0.1em 0.38em;
+  font-size: 0.88em;
+}
+.prose :not(pre) > code::before,
+.prose :not(pre) > code::after {
+  content: none;
+}
+
+/* Brand checkmark that replaces ✅ in docs tables (see source.config.ts) */
+.bp-check {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bp-tint);
+  color: var(--primary);
+  vertical-align: -3px;
+}
+.bp-check svg {
+  width: 11px;
+  height: 11px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn-fx::after {
     display: none;

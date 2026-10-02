@@ -1,4 +1,8 @@
 {
   "title": "Banks",
-  "pages": ["akbank"]
+  "icon": "banks",
+  "defaultOpen": true,
+  "pages": [
+    "akbank"
+  ]
 }
