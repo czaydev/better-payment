@@ -45,6 +45,11 @@
       "types": "./dist/fastify/index.d.ts",
       "import": "./dist/fastify/index.mjs",
       "require": "./dist/fastify/index.js"
+    },
+    "./elysia": {
+      "types": "./dist/elysia/index.d.ts",
+      "import": "./dist/elysia/index.mjs",
+      "require": "./dist/elysia/index.js"
     }
   },
   "sideEffects": false,

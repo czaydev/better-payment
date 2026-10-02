@@ -56,10 +56,10 @@ import { Elysia } from 'elysia';
 import { toElysiaHandler } from 'better-payment/elysia';
 
 const app = new Elysia();
-app.all('/api/pay/*', toElysiaHandler(payment));
+app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
 ```
 
-Elysia, Bun için ergonomik bir web framework'üdür.
+`{ parse: 'none' }` handler'a ham gövdeyi bırakır: banka callback'leri form-urlencoded gelir ve imzaları orijinal alanlarla doğrulanır. Bu ayar olmadan `body` okuyan herhangi bir hook (`onTransform`, `derive`, `onBeforeHandle` ya da bir plugin) Elysia'nın isteği önce tüketmesine yol açar. Elysia Bun için tasarlanmıştır, Node.js'te de çalışır.
 
 ## Düz Node.js [#plain-nodejs]
 

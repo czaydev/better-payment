@@ -200,6 +200,7 @@ Adapter'lar handler'ı framework'ünüze bağlar ve yanlış yapılması kolay a
 | Express | `better-payment/express` | `app.all('/api/pay/*path', toExpressHandler(payment))` |
 | Fastify | `better-payment/fastify` | `app.register(toFastifyPlugin(payment), { prefix: '/api/pay' })` |
 | Hono | `better-payment/hono` | `app.all('/api/pay/*', toHonoHandler(payment))` |
+| Elysia | `better-payment/elysia` | `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })` |
 | `node:http` | `better-payment/express` | `createServer(toNodeHandler(payment))` |
 | Workers, Deno, Bun | `better-payment` | `toFetchHandler(payment)` |
 

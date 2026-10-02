@@ -43,9 +43,9 @@ void fastify.register(toFastifyPlugin(getBetterPayment), { prefix: '/api/pay' })
 const hono = new Hono();
 hono.all('/api/pay/*', toHonoHandler(getBetterPayment));
 
-// Elysia
+// Elysia: parse: 'none' keeps the raw body for the bank callbacks
 const elysiaApp = new Elysia();
-elysiaApp.all('/api/pay/*', toElysiaHandler(getBetterPayment));
+elysiaApp.all('/api/pay/*', toElysiaHandler(getBetterPayment), { parse: 'none' });
 
 // Cloudflare Workers / Deno / Bun
 export default { fetch: toFetchHandler(getBetterPayment) };
