@@ -101,9 +101,15 @@ export default function Navbar({
     >
       <nav className="max-w-6xl mx-auto px-5 sm:px-8 flex items-center justify-between h-14">
         {/* Logo */}
-        <Link href={localePath(lang, "/")} className="flex items-center gap-2 group">
-          <Image src="/logo.svg" width={1000} height={897} alt="" priority className="h-8 w-auto" />
-          <span className="font-semibold tracking-tight text-base">better-payment</span>
+        <Link href={localePath(lang, "/")} className="flex items-center gap-2.5 group">
+          <Image
+            src="/brand/better-payment-horizontal-color.svg"
+            width={1226}
+            height={155}
+            alt="Better Payment"
+            priority
+            className="h-6 w-auto"
+          />
           <Badge
             variant="secondary"
             className="text-[10px] px-1.5 py-0 hidden sm:flex font-mono tracking-tight"
