@@ -114,6 +114,22 @@ const adapters: Record<string, () => Promise<Send>> = {
       };
     };
   },
+  Elysia: async () => {
+    const { Elysia } = await import('elysia');
+    const { toElysiaHandler } = await import('better-payment/elysia');
+    const app = new Elysia();
+    app.all('/api/pay/*', toElysiaHandler(createPayment()));
+    return async (method, path, body, contentType) =>
+      fromResponse(
+        await app.handle(
+          new Request(`http://localhost${path}`, {
+            method,
+            body,
+            headers: contentType ? { 'content-type': contentType } : {},
+          })
+        )
+      );
+  },
   Express: async () => {
     const app = express();
     app.all('/api/pay/*path', toExpressHandler(createPayment()));

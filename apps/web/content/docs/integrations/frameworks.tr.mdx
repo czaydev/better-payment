@@ -49,6 +49,18 @@ app.all('/api/pay/*', toHonoHandler(payment));
 
 Hono, better-payment gibi Node.js, Bun, Deno ve Cloudflare Workers'da çalışır.
 
+## Elysia
+
+```typescript
+import { Elysia } from 'elysia';
+import { toElysiaHandler } from 'better-payment/elysia';
+
+const app = new Elysia();
+app.all('/api/pay/*', toElysiaHandler(payment));
+```
+
+Elysia, Bun için ergonomik bir web framework'üdür.
+
 ## Düz Node.js [#plain-nodejs]
 
 ```typescript
