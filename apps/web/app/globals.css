@@ -229,6 +229,20 @@ html {
     animation-timeline: view();
     animation-range: entry 0% entry 45%;
   }
+
+  /* Hero artwork drifts slower than the page over the first screen of scroll */
+  .bp-parallax {
+    animation: bp-parallax linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 100svh;
+  }
+}
+
+@keyframes bp-parallax {
+  to {
+    transform: translateY(14%) scale(1.06);
+    opacity: 0.55;
+  }
 }
 
 /* Provider network in the hero */
@@ -375,7 +389,8 @@ html {
   }
   .bp-enter,
   .bp-art,
-  .bp-reveal {
+  .bp-reveal,
+  .bp-parallax {
     animation: none;
   }
 }

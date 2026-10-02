@@ -14,14 +14,17 @@ const at = (ms: number) => ({ "--at": `${ms}ms` }) as React.CSSProperties;
 export default function Hero({ lang, t }: { lang: Locale; t: Dictionary["hero"] }) {
   return (
     <section className="relative isolate overflow-hidden md:min-h-[min(880px,100svh)]">
-      <Image
-        src="/brand/hero/hero-a3.jpg"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="bp-art -z-10 object-cover object-bottom max-md:object-[42%_100%]"
-      />
+      <div aria-hidden className="bp-parallax absolute inset-0 -z-10 origin-bottom">
+        <Image
+          src="/brand/hero/hero-a3.webp"
+          alt=""
+          fill
+          priority
+          quality={90}
+          sizes="100vw"
+          className="bp-art object-cover object-bottom max-md:object-[42%_100%]"
+        />
+      </div>
 
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pt-32 pb-52 sm:px-8 md:grid-cols-[1.05fr_0.95fr] md:pt-40 md:pb-64">
         <div className="min-w-0">

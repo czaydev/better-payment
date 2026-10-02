@@ -124,7 +124,7 @@ export default function Navbar({
         {/* Desktop actions */}
         <div className="hidden lg:flex items-center gap-1.5">
           <LanguageSwitch lang={lang} label={t.language} />
-          <Separator orientation="vertical" className="h-4 mx-1" />
+          <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
           <a
             href="https://github.com/czaydev/better-payment"
             target="_blank"
