@@ -52,11 +52,12 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans antialiased">
-        {/* The site is light only; dark mode is a separate follow-up */}
-        <RootProvider
-          i18n={i18nUI.provider(lang)}
-          theme={{ forcedTheme: "light", defaultTheme: "light", enableSystem: false }}
-        >
+        {/*
+          The site is light only (dark mode is a separate follow-up), so next-themes is
+          turned off. Left on, it renders an inline <script> that React reports when the
+          [lang] layout re-renders on the client, e.g. when switching between tr and en.
+        */}
+        <RootProvider i18n={i18nUI.provider(lang)} theme={{ enabled: false }}>
           {children}
         </RootProvider>
       </body>

@@ -26,6 +26,7 @@ const en = {
       label: "How a payment moves through Better Payment",
       request: "request",
       verified: "verified",
+      all: "4 providers",
       idle: "One API · 4 providers",
       caps: {
         iyzico: "3D Secure · Non-3D · Refund · Cancel · BIN · Installments",
@@ -34,9 +35,6 @@ const en = {
         akbank: "3D Secure (3D_PAY) · Non-3D · Refund · Cancel",
       },
     },
-  },
-  trustBar: {
-    title: "Works with Node.js and edge runtimes",
   },
   code: {
     copy: "Copy",
@@ -64,10 +62,6 @@ const en = {
         description:
           "createPayment, initThreeDSPayment, refund, cancel and getPayment take the same request types on every provider and return the same result shape.",
       },
-      typescript: {
-        title: "TypeScript-first",
-        description: "Typed requests, results and configuration, with no any types in the public API.",
-      },
       footprint: {
         title: "Zero dependencies",
         description:
@@ -87,16 +81,6 @@ const en = {
         title: "No double charges",
         description:
           "A timeout returns pending with NETWORK_ERROR instead of guessing. Payment, refund and cancel requests are never retried automatically.",
-      },
-      iyzico: {
-        title: "iyzico extras",
-        description:
-          "Hosted checkout form, pay with IBAN (PWI) and subscription billing: products, pricing plans and card updates. These are iyzico-only APIs.",
-      },
-      multi: {
-        title: "Several providers, one config",
-        description:
-          "Enable multiple providers and choose one per call with payment.use(). Provider-specific setup, like callback URLs, still applies.",
       },
     },
   },
@@ -236,6 +220,7 @@ const tr: Dictionary = {
       label: "Bir ödemenin Better Payment içindeki yolu",
       request: "istek",
       verified: "doğrulandı",
+      all: "4 sağlayıcı",
       idle: "Tek API · 4 sağlayıcı",
       caps: {
         iyzico: "3D Secure · Non-3D · İade · İptal · BIN · Taksit",
@@ -244,9 +229,6 @@ const tr: Dictionary = {
         akbank: "3D Secure (3D_PAY) · Non-3D · İade · İptal",
       },
     },
-  },
-  trustBar: {
-    title: "Node.js ve edge ortamlarında çalışır",
   },
   code: {
     copy: "Kopyala",
@@ -274,10 +256,6 @@ const tr: Dictionary = {
         description:
           "createPayment, initThreeDSPayment, refund, cancel ve getPayment her sağlayıcıda aynı istek tiplerini alır ve aynı yapıda sonuç döner.",
       },
-      typescript: {
-        title: "Önce TypeScript",
-        description: "İstekler, sonuçlar ve yapılandırma tipli; public API'de hiç any yok.",
-      },
       footprint: {
         title: "Sıfır bağımlılık",
         description:
@@ -297,16 +275,6 @@ const tr: Dictionary = {
         title: "Çift çekim yok",
         description:
           "Zaman aşımında tahmin yürütülmez; sonuç NETWORK_ERROR ile pending döner. Ödeme, iade ve iptal istekleri asla otomatik olarak tekrarlanmaz.",
-      },
-      iyzico: {
-        title: "iyzico'ya özel özellikler",
-        description:
-          "Hazır ödeme formu (checkout form), IBAN ile ödeme (PWI) ve abonelik: ürünler, ödeme planları ve kart güncelleme. Bunlar yalnızca iyzico'da bulunan API'ler.",
-      },
-      multi: {
-        title: "Birden çok sağlayıcı, tek yapılandırma",
-        description:
-          "Birden fazla sağlayıcıyı etkinleştirin, her çağrıda payment.use() ile birini seçin. Callback URL'leri gibi sağlayıcıya özel ayarlar yine geçerli.",
       },
     },
   },

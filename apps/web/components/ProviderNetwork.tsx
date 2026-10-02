@@ -44,7 +44,6 @@ function subscribeReduced(onChange: () => void) {
 }
 
 export default function ProviderNetwork({ t, className }: { t: Strings; className?: string }) {
-  const [active, setActive] = useState(0);
   const [phase, setPhase] = useState<Phase>("idle");
   const [tip, setTip] = useState<number | null>(null);
   const reduced = useSyncExternalStore(
@@ -55,61 +54,60 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
 
   const root = useRef<HTMLDivElement>(null);
   const wires = useRef<(SVGPathElement | null)[]>([]);
-  const dot = useRef<SVGGElement>(null);
+  const dots = useRef<(SVGGElement | null)[]>([]);
   const generation = useRef(0);
   const visible = useRef(true);
 
   const wait = (ms: number, gen: number) =>
     new Promise<boolean>((resolve) => setTimeout(() => resolve(gen === generation.current), ms));
 
-  // The timer drives the flow; animation frames only draw the dot, so the
-  // loop keeps its order even when the browser skips frames
-  const travel = useCallback((index: number, reverse: boolean, gen: number) => {
+  // All four requests (and all four verified returns) travel at the same time.
+  // The timer drives the flow; animation frames only draw the dots, so the
+  // loop keeps its order even when the browser skips frames.
+  const travel = useCallback((reverse: boolean, gen: number) => {
     return new Promise<boolean>((resolve) => {
-      const path = wires.current[index];
-      const g = dot.current;
-      if (!path || !g) return resolve(false);
-      const length = path.getTotalLength();
+      const lanes = NODES.map((_, i) => ({ path: wires.current[i], g: dots.current[i] }));
+      if (lanes.some((l) => !l.path || !l.g)) return resolve(false);
+      const lengths = lanes.map((l) => l.path!.getTotalLength());
       const start = performance.now();
       let done = false;
-      g.style.opacity = "1";
+      lanes.forEach((l) => (l.g!.style.opacity = "1"));
       const step = (now: number) => {
         if (done) return;
         const k = Math.min(1, (now - start) / TRAVEL_MS);
-        const at = easeInOut(k) * length;
-        const p = path.getPointAtLength(reverse ? length - at : at);
-        g.setAttribute("transform", `translate(${p.x},${p.y})`);
+        lanes.forEach((l, i) => {
+          const at = easeInOut(k) * lengths[i];
+          const p = l.path!.getPointAtLength(reverse ? lengths[i] - at : at);
+          l.g!.setAttribute("transform", `translate(${p.x},${p.y})`);
+        });
         if (k < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
       setTimeout(() => {
         done = true;
-        g.style.opacity = "0";
+        lanes.forEach((l) => (l.g!.style.opacity = "0"));
         resolve(gen === generation.current);
       }, TRAVEL_MS);
     });
   }, []);
 
   const run = useCallback(
-    async (first: number, delay: number) => {
+    async (delay: number) => {
       const gen = ++generation.current;
       if (!(await wait(delay, gen))) return;
-      let index = first;
       while (gen === generation.current) {
         if (!visible.current) {
           if (!(await wait(400, gen))) return;
           continue;
         }
-        setActive(index);
         setPhase("request");
-        if (!(await travel(index, false, gen))) return;
+        if (!(await travel(false, gen))) return;
         setPhase("at");
         if (!(await wait(HOLD_MS, gen))) return;
         setPhase("return");
-        if (!(await travel(index, true, gen))) return;
+        if (!(await travel(true, gen))) return;
         setPhase("verified");
         if (!(await wait(GAP_MS, gen))) return;
-        index = (index + 1) % NODES.length;
       }
     },
     [travel],
@@ -125,7 +123,7 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
       stop();
       return;
     }
-    run(0, START_MS);
+    run(START_MS);
     return stop;
   }, [reduced, run, stop]);
 
@@ -140,13 +138,12 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
     return () => io.disconnect();
   }, []);
 
-  const node = NODES[active];
   const chip =
     reduced || phase === "idle"
       ? { tone: "ok", text: t.idle }
       : phase === "verified"
-        ? { tone: "ok", text: `✓ ${t.verified} · success · ${node.name}` }
-        : { tone: "req", text: `${t.request} → ${node.name}` };
+        ? { tone: "ok", text: `✓ ${t.verified} · success · 4/4` }
+        : { tone: "req", text: `${t.request} → ${t.all}` };
 
   return (
     <div
@@ -164,13 +161,21 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
             }}
             d={wirePath(n.x, n.y)}
             className="bp-wire"
-            data-active={!reduced && i === active && phase !== "idle" && phase !== "verified" ? "" : undefined}
+            data-active={!reduced && phase !== "idle" && phase !== "verified" ? "" : undefined}
           />
         ))}
-        <g ref={dot} style={{ opacity: 0 }}>
-          <circle r={11} className={phase === "return" ? "fill-success/20" : "fill-primary/20"} />
-          <circle r={5} className={phase === "return" ? "fill-success" : "fill-primary"} />
-        </g>
+        {NODES.map((n, i) => (
+          <g
+            key={n.key}
+            ref={(el) => {
+              dots.current[i] = el;
+            }}
+            style={{ opacity: 0 }}
+          >
+            <circle r={11} className={phase === "return" ? "fill-success/20" : "fill-primary/20"} />
+            <circle r={5} className={phase === "return" ? "fill-success" : "fill-primary"} />
+          </g>
+        ))}
       </svg>
 
       <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-2xl bg-primary px-4 py-3 font-mono text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-12px_rgb(67_56_242)] max-md:gap-2 max-md:px-3 max-md:py-2.5 max-md:text-[12.5px]">
@@ -181,7 +186,7 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
       <div
         aria-live="polite"
         className={cn(
-          "absolute left-1/2 top-[calc(50%+38px)] z-10 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors duration-(--bp-d-md)",
+          "absolute left-1/2 top-[calc(50%+38px)] z-20 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors duration-(--bp-d-md)",
           chip.tone === "ok" ? "bg-success-soft text-success" : "border border-border bg-card text-muted-foreground",
         )}
       >
@@ -190,7 +195,7 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
       </div>
 
       {NODES.map((n, i) => {
-        const on = !reduced && i === active;
+        const on = !reduced;
         return (
           <button
             key={n.key}
@@ -201,7 +206,6 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
             onMouseLeave={() => setTip(null)}
             onFocus={() => setTip(i)}
             onBlur={() => setTip(null)}
-            onClick={() => !reduced && run(i, 0)}
             className={cn(
               "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-[14px] border border-border bg-card py-2 pr-3 pl-2 transition-[border-color,box-shadow,scale] duration-(--bp-d-md) ease-spring focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary max-md:gap-2 max-md:py-1.5 max-md:pr-2.5 max-md:pl-1.5",
               on && phase === "at" && "scale-[1.04] border-primary shadow-[0_0_0_5px_var(--bp-tint)]",

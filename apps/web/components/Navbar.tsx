@@ -13,11 +13,14 @@ import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
 
+// Homepage sections are reached by scrolling, without a #hash in the address bar
+export const SCROLL_TARGET_KEY = "bp-scroll-to";
+
 function navLinks(t: Dictionary["nav"]) {
   return [
-    { label: t.features, href: "/#features" },
-    { label: t.providers, href: "/#providers" },
-    { label: t.quickStart, href: "/#quickstart" },
+    { label: t.features, href: "/", section: "features" },
+    { label: t.providers, href: "/", section: "providers" },
+    { label: t.quickStart, href: "/", section: "quickstart" },
     { label: t.docs, href: "/docs" },
   ];
 }
@@ -54,6 +57,19 @@ export default function Navbar({
   t: Dictionary["nav"];
 }) {
   const links = navLinks(t);
+  const pathname = usePathname();
+
+  function go(event: React.MouseEvent, section?: string) {
+    setOpen(false);
+    if (!section) return;
+    if (pathname === localePath(lang, "/")) {
+      event.preventDefault();
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // The homepage scrolls to it after navigation (see ScrollToSection)
+      sessionStorage.setItem(SCROLL_TARGET_KEY, section);
+    }
+  }
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -97,6 +113,7 @@ export default function Navbar({
             <Link
               key={link.label}
               href={localePath(lang, link.href)}
+              onClick={(event) => go(event, link.section)}
               className="whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60 font-medium"
             >
               {link.label}
@@ -145,7 +162,7 @@ export default function Navbar({
               key={link.label}
               href={localePath(lang, link.href)}
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent/60 transition-colors font-medium"
-              onClick={() => setOpen(false)}
+              onClick={(event) => go(event, link.section)}
             >
               {link.label}
             </Link>

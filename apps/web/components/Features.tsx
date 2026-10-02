@@ -4,13 +4,10 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 // Each feature pairs with an icon from the frosted-glass set
 const layout = [
   { key: "unified", icon: "unified-api", span: "lg:col-span-2" },
-  { key: "typescript", icon: "docs" },
   { key: "footprint", icon: "edge" },
   { key: "callbacks", icon: "callback" },
   { key: "handler", icon: "handler" },
   { key: "doubleCharge", icon: "idempotency" },
-  { key: "iyzico", icon: "installments", span: "lg:col-span-2" },
-  { key: "multi", icon: "sandbox" },
 ] as const;
 
 export default function Features({ t }: { t: Dictionary["features"] }) {

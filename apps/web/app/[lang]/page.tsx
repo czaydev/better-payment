@@ -2,7 +2,6 @@ import { VERSION } from "better-payment";
 import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import TrustBar from "@/components/TrustBar";
 import Compare from "@/components/Compare";
 import Features from "@/components/Features";
 import Providers from "@/components/Providers";
@@ -10,6 +9,7 @@ import Banks from "@/components/Banks";
 import QuickStart from "@/components/QuickStart";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
+import ScrollToSection from "@/components/ScrollToSection";
 import { isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -23,7 +23,6 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
       <Navbar version={VERSION} lang={lang} t={t.nav} />
       <main>
         <Hero lang={lang} t={t.hero} />
-        <TrustBar t={t.trustBar} />
         <Compare t={t.compare} code={t.code} />
         <Features t={t.features} />
         <Providers t={t.providers} code={t.code} />
@@ -32,6 +31,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
         <CTA lang={lang} t={t.cta} />
       </main>
       <Footer lang={lang} t={t.footer} />
+      <ScrollToSection />
     </>
   );
 }
