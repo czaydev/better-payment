@@ -1,0 +1,11 @@
+{
+  "title": "Get Started",
+  "icon": "get-started",
+  "defaultOpen": true,
+  "pages": [
+    "index",
+    "installation",
+    "quick-start",
+    "whats-new"
+  ]
+}

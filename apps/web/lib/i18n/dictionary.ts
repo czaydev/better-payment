@@ -2,53 +2,52 @@ import type { Locale } from "./config";
 
 const en = {
   meta: {
-    title: "better-payment — Unified Payment Gateway for Node.js",
+    title: "Better Payment — Unified Payment Gateway for Node.js",
     description:
       "A unified, type-safe payment gateway library for Node.js and edge runtimes. Integrate iyzico, PayTR, Parampos and Akbank with a single consistent API and verified callbacks.",
-    docsTitleSuffix: "better-payment docs",
+    docsTitleSuffix: "Better Payment docs",
   },
   nav: {
     features: "Features",
     providers: "Providers",
     quickStart: "Quick Start",
     docs: "Docs",
-    toggleTheme: "Toggle theme",
+    getStarted: "Get started",
     openMenu: "Open menu",
     language: "Language",
   },
   hero: {
-    badge: "A fresh start: see what changed",
     titleLine1: "One API for",
     titleLine2: "Turkish payments.",
     lead: "gives iyzico, PayTR, Parampos and Akbank one type-safe interface, with signature-verified callbacks and a secure-by-default HTTP handler.",
     getStarted: "Get Started",
     star: "Star on GitHub",
-    stats: [
-      { value: "4", label: "Providers" },
-      { value: "0", label: "Runtime dependencies" },
-      { value: "TS", label: "Typed end to end" },
-      { value: "MIT", label: "License" },
-    ],
+    network: {
+      label: "How a payment moves through Better Payment",
+      request: "request",
+      verified: "verified",
+      all: "4 providers",
+      idle: "One API · 4 providers",
+      caps: {
+        iyzico: "3D Secure · Non-3D · Refund · Cancel · BIN · Installments",
+        paytr: "3D Secure (iFrame) · Non-3D · Refund · BIN · Installments",
+        parampos: "3D Secure · Non-3D (TRY) · Refund · Cancel · BIN · Installments",
+        akbank: "3D Secure (3D_PAY) · Non-3D · Refund · Cancel",
+      },
+    },
   },
-  trustBar: {
-    title: "Works with Node.js and edge runtimes",
+  code: {
+    copy: "Copy",
+    copied: "Copied",
   },
   compare: {
-    eyebrow: "The problem",
     titleLine1: "Every gateway has a",
     titleLine2: "completely different API.",
-    lead: "Different request shapes, signatures, error formats and callback rules. better-payment implements each one against the provider's specification and gives you one set of types to work with.",
+    lead: "Different request shapes, signatures, error formats and callback rules. Better Payment implements each one against the provider's specification and gives you one set of types to work with.",
     without: "Without",
-    with: "With better-payment",
-    points: [
-      "One interface, four providers",
-      "Shared result statuses",
-      "Callbacks verified for you",
-      "TypeScript-first",
-    ],
+    with: "With Better Payment",
   },
   features: {
-    eyebrow: "Features",
     titleLine1: "Everything you need,",
     titleLine2: "nothing you don't.",
     items: {
@@ -56,10 +55,6 @@ const en = {
         title: "Unified API surface",
         description:
           "createPayment, initThreeDSPayment, refund, cancel and getPayment take the same request types on every provider and return the same result shape.",
-      },
-      typescript: {
-        title: "TypeScript-first",
-        description: "Typed requests, results and configuration, with no any types in the public API.",
       },
       footprint: {
         title: "Zero dependencies",
@@ -81,24 +76,11 @@ const en = {
         description:
           "A timeout returns pending with NETWORK_ERROR instead of guessing. Payment, refund and cancel requests are never retried automatically.",
       },
-      iyzico: {
-        title: "iyzico extras",
-        description:
-          "Hosted checkout form, pay with IBAN (PWI) and subscription billing: products, pricing plans and card updates. These are iyzico-only APIs.",
-      },
-      multi: {
-        title: "Several providers, one config",
-        description:
-          "Enable multiple providers and choose one per call with payment.use(). Provider-specific setup, like callback URLs, still applies.",
-      },
     },
   },
   providers: {
-    eyebrow: "Payment gateways",
-    titleLine1: "Three gateways,",
-    titleLine2: "one set of types.",
     capabilities: "Capabilities",
-    example: "Example",
+    drag: "Drag to compare",
     gateway: "Payment gateway",
     virtualPos: "Virtual POS (SOAP)",
     iyzico: {
@@ -137,9 +119,20 @@ const en = {
         "BIN lookup",
       ],
     },
+    akbank: {
+      description:
+        "Akbank's Sanal POS JSON API with HMAC-SHA512 signed requests, signature-verified 3D Secure (3D_PAY) callbacks, refunds, voids and order status queries.",
+      features: [
+        "3D Secure (3D_PAY)",
+        "Non-3D payments",
+        "HMAC-SHA512 signed requests",
+        "Refund & void",
+        "Order status queries",
+        "Signature-verified callbacks",
+      ],
+    },
   },
   banks: {
-    eyebrow: "Direct bank integrations",
     titleLine1: "Bank virtual POS,",
     titleLine2: "same interface.",
     lead: "Talk to a bank's virtual POS directly, without a payment institution in between, using the same request and result types.",
@@ -153,18 +146,17 @@ const en = {
       { label: "Direct API", desc: "No third-party middleware" },
     ],
     viewDocs: "View Akbank docs",
-    example: "Example",
     roadmap: "On the roadmap",
+    live: "Live",
+    planned: "Planned",
   },
   quickStart: {
-    eyebrow: "Quick start",
     titleLine1: "Up and running",
     titleLine2: "in minutes.",
     steps: ["Install the package", "Configure your providers", "Start a 3D Secure payment"],
     fullDocs: "View full documentation",
   },
   cta: {
-    eyebrow: "Open Source · MIT License",
     titleLine1: "Stop rewriting",
     titleLine2: "payment logic.",
     lead: "One package for iyzico, PayTR, Parampos and Akbank, with full TypeScript support. Upgrading from 3.x? Read",
@@ -209,53 +201,52 @@ export type Dictionary = typeof en;
 
 const tr: Dictionary = {
   meta: {
-    title: "better-payment — Node.js için birleşik ödeme altyapısı",
+    title: "Better Payment — Node.js için birleşik ödeme altyapısı",
     description:
       "Node.js ve edge ortamları için tip güvenli, birleşik ödeme kütüphanesi. iyzico, PayTR, Parampos ve Akbank'ı tek bir tutarlı API ve doğrulanmış callback'lerle entegre edin.",
-    docsTitleSuffix: "better-payment dokümantasyonu",
+    docsTitleSuffix: "Better Payment dokümantasyonu",
   },
   nav: {
     features: "Özellikler",
     providers: "Sağlayıcılar",
     quickStart: "Hızlı Başlangıç",
     docs: "Dokümantasyon",
-    toggleTheme: "Temayı değiştir",
+    getStarted: "Başlayın",
     openMenu: "Menüyü aç",
     language: "Dil",
   },
   hero: {
-    badge: "Yeni bir başlangıç: nelerin değiştiğini görün",
     titleLine1: "Türk ödeme sistemleri",
     titleLine2: "için tek API.",
     lead: "iyzico, PayTR, Parampos ve Akbank'ı tek bir tip güvenli arayüzde toplar; imzası doğrulanan callback'ler ve varsayılan olarak güvenli bir HTTP handler sunar.",
     getStarted: "Başlayın",
     star: "GitHub'da yıldızlayın",
-    stats: [
-      { value: "4", label: "Sağlayıcı" },
-      { value: "0", label: "Runtime bağımlılığı" },
-      { value: "TS", label: "Uçtan uca tipli" },
-      { value: "MIT", label: "Lisans" },
-    ],
+    network: {
+      label: "Bir ödemenin Better Payment içindeki yolu",
+      request: "istek",
+      verified: "doğrulandı",
+      all: "4 sağlayıcı",
+      idle: "Tek API · 4 sağlayıcı",
+      caps: {
+        iyzico: "3D Secure · Non-3D · İade · İptal · BIN · Taksit",
+        paytr: "3D Secure (iFrame) · Non-3D · İade · BIN · Taksit",
+        parampos: "3D Secure · Non-3D (TRY) · İade · İptal · BIN · Taksit",
+        akbank: "3D Secure (3D_PAY) · Non-3D · İade · İptal",
+      },
+    },
   },
-  trustBar: {
-    title: "Node.js ve edge ortamlarında çalışır",
+  code: {
+    copy: "Kopyala",
+    copied: "Kopyalandı",
   },
   compare: {
-    eyebrow: "Sorun",
     titleLine1: "Her ödeme sağlayıcısının",
     titleLine2: "API'si bambaşka.",
-    lead: "İstek yapıları, imzalar, hata formatları ve callback kuralları farklı. better-payment her birini sağlayıcının kendi spesifikasyonuna göre uygular ve size tek bir tip seti sunar.",
+    lead: "İstek yapıları, imzalar, hata formatları ve callback kuralları farklı. Better Payment her birini sağlayıcının kendi spesifikasyonuna göre uygular ve size tek bir tip seti sunar.",
     without: "Olmadan",
-    with: "better-payment ile",
-    points: [
-      "Tek arayüz, dört sağlayıcı",
-      "Ortak sonuç durumları",
-      "Callback'ler sizin için doğrulanır",
-      "Önce TypeScript",
-    ],
+    with: "Better Payment ile",
   },
   features: {
-    eyebrow: "Özellikler",
     titleLine1: "İhtiyacınız olan her şey,",
     titleLine2: "fazlası değil.",
     items: {
@@ -263,10 +254,6 @@ const tr: Dictionary = {
         title: "Birleşik API",
         description:
           "createPayment, initThreeDSPayment, refund, cancel ve getPayment her sağlayıcıda aynı istek tiplerini alır ve aynı yapıda sonuç döner.",
-      },
-      typescript: {
-        title: "Önce TypeScript",
-        description: "İstekler, sonuçlar ve yapılandırma tipli; public API'de hiç any yok.",
       },
       footprint: {
         title: "Sıfır bağımlılık",
@@ -288,24 +275,11 @@ const tr: Dictionary = {
         description:
           "Zaman aşımında tahmin yürütülmez; sonuç NETWORK_ERROR ile pending döner. Ödeme, iade ve iptal istekleri asla otomatik olarak tekrarlanmaz.",
       },
-      iyzico: {
-        title: "iyzico'ya özel özellikler",
-        description:
-          "Hazır ödeme formu (checkout form), IBAN ile ödeme (PWI) ve abonelik: ürünler, ödeme planları ve kart güncelleme. Bunlar yalnızca iyzico'da bulunan API'ler.",
-      },
-      multi: {
-        title: "Birden çok sağlayıcı, tek yapılandırma",
-        description:
-          "Birden fazla sağlayıcıyı etkinleştirin, her çağrıda payment.use() ile birini seçin. Callback URL'leri gibi sağlayıcıya özel ayarlar yine geçerli.",
-      },
     },
   },
   providers: {
-    eyebrow: "Ödeme sağlayıcıları",
-    titleLine1: "Üç sağlayıcı,",
-    titleLine2: "tek tip seti.",
     capabilities: "Yetenekler",
-    example: "Örnek",
+    drag: "Karşılaştırmak için sürükleyin",
     gateway: "Ödeme sağlayıcısı",
     virtualPos: "Sanal POS (SOAP)",
     iyzico: {
@@ -344,9 +318,20 @@ const tr: Dictionary = {
         "BIN sorgusu",
       ],
     },
+    akbank: {
+      description:
+        "Akbank Sanal POS JSON API'si: HMAC-SHA512 imzalı istekler, imzası doğrulanan 3D Secure (3D_PAY) callback'leri, iadeler, iptaller ve sipariş durumu sorguları.",
+      features: [
+        "3D Secure (3D_PAY)",
+        "3D'siz ödemeler",
+        "HMAC-SHA512 imzalı istekler",
+        "İade ve iptal",
+        "Sipariş durumu sorgusu",
+        "İmzası doğrulanan callback'ler",
+      ],
+    },
   },
   banks: {
-    eyebrow: "Doğrudan banka entegrasyonları",
     titleLine1: "Banka sanal POS'u,",
     titleLine2: "aynı arayüz.",
     lead: "Arada bir ödeme kuruluşu olmadan bankanın sanal POS'una doğrudan bağlanın; aynı istek ve sonuç tiplerini kullanın.",
@@ -360,18 +345,17 @@ const tr: Dictionary = {
       { label: "Doğrudan API", desc: "Aracı yazılım yok" },
     ],
     viewDocs: "Akbank dokümantasyonu",
-    example: "Örnek",
     roadmap: "Yol haritasında",
+    live: "Canlı",
+    planned: "Planlanıyor",
   },
   quickStart: {
-    eyebrow: "Hızlı başlangıç",
     titleLine1: "Dakikalar içinde",
     titleLine2: "çalışır durumda.",
     steps: ["Paketi kurun", "Sağlayıcılarınızı yapılandırın", "3D Secure ödeme başlatın"],
     fullDocs: "Tüm dokümantasyonu görün",
   },
   cta: {
-    eyebrow: "Açık kaynak · MIT lisansı",
     titleLine1: "Ödeme kodunu",
     titleLine2: "yeniden yazmayı bırakın.",
     lead: "iyzico, PayTR, Parampos ve Akbank için tam TypeScript destekli tek paket. 3.x'ten mi geçiyorsunuz? Okuyun:",

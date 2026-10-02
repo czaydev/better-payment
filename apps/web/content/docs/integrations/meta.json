@@ -1,4 +1,10 @@
 {
   "title": "Integrations",
-  "pages": ["nextjs", "frameworks", "edge"]
+  "icon": "integrations",
+  "defaultOpen": true,
+  "pages": [
+    "nextjs",
+    "frameworks",
+    "edge"
+  ]
 }

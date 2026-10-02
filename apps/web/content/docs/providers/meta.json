@@ -1,4 +1,10 @@
 {
   "title": "Providers",
-  "pages": ["iyzico", "paytr", "parampos"]
+  "icon": "providers",
+  "defaultOpen": true,
+  "pages": [
+    "iyzico",
+    "paytr",
+    "parampos"
+  ]
 }

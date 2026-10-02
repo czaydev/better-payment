@@ -18,6 +18,8 @@ const movedDocs: Record<string, string> = {
 };
 
 const nextConfig: NextConfig = {
+  // 90 keeps the soft gradients in the hero artwork free of banding
+  images: { qualities: [75, 90] },
   async redirects() {
     return Object.entries(movedDocs).flatMap(([from, to]) =>
       ["", "/tr"].map((prefix) => ({

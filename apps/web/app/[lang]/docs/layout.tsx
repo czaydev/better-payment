@@ -14,14 +14,18 @@ export default async function Layout({ children, params }: LayoutProps<"/[lang]/
       i18n
       nav={{
         title: (
-          <>
-            <Image src="/logo.svg" width={1000} height={897} alt="" className="h-6 w-auto" />
-            better-payment
-          </>
+          <Image
+            src="/brand/better-payment-horizontal-color.svg"
+            width={1226}
+            height={155}
+            alt="Better Payment"
+            className="h-5 w-auto"
+          />
         ),
         url: localePath(lang, "/"),
       }}
       githubUrl="https://github.com/czaydev/better-payment"
+      themeSwitch={{ enabled: false }}
     >
       {children}
     </DocsLayout>

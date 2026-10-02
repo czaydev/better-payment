@@ -1,26 +1,14 @@
 {
-  "title": "better-payment",
+  "title": "Better Payment",
   "pages": [
-    "---[Rocket]Get Started---",
-    "index",
-    "installation",
-    "quick-start",
-    "whats-new",
-    "---[Blocks]Concepts---",
-    "...concepts",
-    "---[CreditCard]Payments---",
-    "...payments",
-    "---[Wallet]Providers---",
-    "...providers",
-    "---[Landmark]Banks---",
-    "...banks",
-    "---[Plug]Integrations---",
-    "...integrations",
-    "---[Puzzle]Plugins---",
-    "...plugins",
-    "---[BookOpen]Guides---",
-    "...guides",
-    "---[FileCode]Reference---",
-    "...reference"
+    "(get-started)",
+    "concepts",
+    "payments",
+    "providers",
+    "banks",
+    "integrations",
+    "plugins",
+    "guides",
+    "reference"
   ]
 }
