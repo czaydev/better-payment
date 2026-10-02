@@ -100,6 +100,6 @@ The plugin's code (in `errorCode`) is looked up first, then the normalized `code
 
 The built-in messages are in `packages/better-payment/src/plugins/localized-errors/`, one file per language, typed as `Record<PaymentErrorCode, string>`: a file that misses a code does not compile.
 
-1. Copy `en.ts` to a file named after the language (`de.ts`) and translate the messages. Keep them short and written for customers, without technical details.
+1. Copy `en.ts` to a file named after the language (`fr.ts`) and translate the messages. Write them for customers, in words that read naturally in that language, without technical details. Don't shorten them to fit the bundle size check; if the new language goes over the budget, say so in the pull request.
 2. Add the language to `errorMessages` in `localized-errors/index.ts`.
 3. Open a pull request. The existing test checks that every language has a message for every code.

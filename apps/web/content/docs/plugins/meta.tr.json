@@ -1,5 +1,7 @@
 {
   "title": "Plugin'ler",
+  "icon": "plugins",
+  "defaultOpen": true,
   "pages": [
     "localized-errors"
   ]

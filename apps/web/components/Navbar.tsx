@@ -1,23 +1,26 @@
 "use client";
 
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { useTheme } from "next-themes";
 import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
+import { GitHubIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
 
+// Homepage sections are reached by scrolling, without a #hash in the address bar
+export const SCROLL_TARGET_KEY = "bp-scroll-to";
+
 function navLinks(t: Dictionary["nav"]) {
   return [
-    { label: t.features, href: "/#features" },
-    { label: t.providers, href: "/#providers" },
-    { label: t.quickStart, href: "/#quickstart" },
+    { label: t.features, href: "/", section: "features" },
+    { label: t.providers, href: "/", section: "providers" },
+    { label: t.quickStart, href: "/", section: "quickstart" },
     { label: t.docs, href: "/docs" },
   ];
 }
@@ -44,33 +47,6 @@ function LanguageSwitch({ lang, label }: { lang: Locale; label: string }) {
   );
 }
 
-function ThemeToggle({ label }: { label: string }) {
-  const { theme, setTheme } = useTheme();
-  // false during SSR and hydration, true afterwards (the theme is only known on the client)
-  const mounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  if (!mounted) return <div className="w-8 h-8" />;
-  return (
-    <button
-      className={cn(
-        buttonVariants({ variant: "ghost", size: "icon" }),
-        "h-8 w-8 text-muted-foreground hover:text-foreground",
-      )}
-      aria-label={label}
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-    >
-      {theme === "dark" ? (
-        <Sun className="h-[15px] w-[15px]" />
-      ) : (
-        <Moon className="h-[15px] w-[15px]" />
-      )}
-    </button>
-  );
-}
-
 export default function Navbar({
   version,
   lang,
@@ -81,6 +57,19 @@ export default function Navbar({
   t: Dictionary["nav"];
 }) {
   const links = navLinks(t);
+  const pathname = usePathname();
+
+  function go(event: React.MouseEvent, section?: string) {
+    setOpen(false);
+    if (!section) return;
+    if (pathname === localePath(lang, "/")) {
+      event.preventDefault();
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // The homepage scrolls to it after navigation (see ScrollToSection)
+      sessionStorage.setItem(SCROLL_TARGET_KEY, section);
+    }
+  }
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -101,24 +90,31 @@ export default function Navbar({
     >
       <nav className="max-w-6xl mx-auto px-5 sm:px-8 flex items-center justify-between h-14">
         {/* Logo */}
-        <Link href={localePath(lang, "/")} className="flex items-center gap-2 group">
-          <Image src="/logo.svg" width={1000} height={897} alt="" priority className="h-8 w-auto" />
-          <span className="font-semibold tracking-tight text-base">better-payment</span>
+        <Link href={localePath(lang, "/")} className="flex items-center gap-2.5 group">
+          <Image
+            src="/brand/better-payment-horizontal-color.svg"
+            width={1226}
+            height={155}
+            alt="Better Payment"
+            priority
+            className="h-6 w-auto"
+          />
           <Badge
             variant="secondary"
-            className="text-[10px] px-1.5 py-0 hidden sm:flex font-mono tracking-tight"
+            className="text-[10px] px-1.5 py-0 hidden xl:flex font-mono tracking-tight"
           >
             v{version}
           </Badge>
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-0.5">
+        <div className="hidden lg:flex items-center gap-0.5">
           {links.map((link) => (
             <Link
               key={link.label}
               href={localePath(lang, link.href)}
-              className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60 font-medium"
+              onClick={(event) => go(event, link.section)}
+              className="whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60 font-medium"
             >
               {link.label}
             </Link>
@@ -126,38 +122,28 @@ export default function Navbar({
         </div>
 
         {/* Desktop actions */}
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden lg:flex items-center gap-1.5">
           <LanguageSwitch lang={lang} label={t.language} />
-          <ThemeToggle label={t.toggleTheme} />
-          <Separator orientation="vertical" className="h-4 mx-1" />
+          <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
           <a
             href="https://github.com/czaydev/better-payment"
             target="_blank"
             rel="noopener noreferrer"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground hover:text-foreground h-8 px-3 text-xs font-medium",
-            )}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
+            <GitHubIcon data-icon="brand" />
             GitHub
           </a>
-          <a
-            href="https://www.npmjs.com/package/better-payment"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "h-8 px-3 text-xs font-medium",
-            )}
-          >
-            npm install
-          </a>
+          <Link href={localePath(lang, "/docs")} className={buttonVariants({ size: "sm" })}>
+            {t.getStarted}
+            <ChevronRight data-icon="chevron" />
+          </Link>
         </div>
 
         {/* Mobile menu toggle */}
         <button
           aria-label={t.openMenu}
-          className="md:hidden p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60"
+          className="lg:hidden p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60"
           onClick={() => setOpen(!open)}
         >
           {open ? (
@@ -170,13 +156,13 @@ export default function Navbar({
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-2xl px-5 py-3 flex flex-col gap-0.5">
+        <div className="lg:hidden border-t border-border bg-background/95 backdrop-blur-2xl px-5 py-3 flex flex-col gap-0.5">
           {links.map((link) => (
             <Link
               key={link.label}
               href={localePath(lang, link.href)}
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent/60 transition-colors font-medium"
-              onClick={() => setOpen(false)}
+              onClick={(event) => go(event, link.section)}
             >
               {link.label}
             </Link>
@@ -188,24 +174,19 @@ export default function Navbar({
               href="https://github.com/czaydev/better-payment"
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "flex-1 justify-center text-xs h-9",
-              )}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")}
             >
+              <GitHubIcon data-icon="brand" />
               GitHub
             </a>
-            <a
-              href="https://www.npmjs.com/package/better-payment"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "flex-1 justify-center text-xs h-9",
-              )}
+            <Link
+              href={localePath(lang, "/docs")}
+              className={cn(buttonVariants({ size: "sm" }), "flex-1")}
+              onClick={() => setOpen(false)}
             >
-              npm install
-            </a>
+              {t.getStarted}
+              <ChevronRight data-icon="chevron" />
+            </Link>
           </div>
         </div>
       )}

@@ -57,8 +57,13 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
               href={localePath(lang, "/")}
               className="flex items-center gap-2.5 mb-4 w-fit group"
             >
-              <Image src="/logo.svg" width={1000} height={897} alt="" className="h-9 w-auto" />
-              <span className="font-semibold tracking-tight text-lg">better-payment</span>
+              <Image
+                src="/brand/better-payment-horizontal-color.svg"
+                width={1226}
+                height={155}
+                alt="Better Payment"
+                className="h-7 w-auto"
+              />
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-[230px]">
               {t.tagline}
@@ -86,7 +91,7 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
           {/* Link columns */}
           {footerLinks(t).map(({ group, items }) => (
             <div key={group} className="col-span-1">
-              <h4 className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-4">
+              <h4 className="text-[13px] font-semibold text-foreground mb-4">
                 {group}
               </h4>
               <ul className="space-y-2.5">
@@ -120,7 +125,7 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground/50">
-            © {new Date().getFullYear()} better-payment. {t.license}
+            © {new Date().getFullYear()} Better Payment. {t.license}
           </span>
           <span className="text-xs text-muted-foreground/35 font-mono">
             {t.builtWith}

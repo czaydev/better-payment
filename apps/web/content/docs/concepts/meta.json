@@ -1,5 +1,7 @@
 {
   "title": "Concepts",
+  "icon": "concepts",
+  "defaultOpen": true,
   "pages": [
     "configuration",
     "handler",

@@ -21,8 +21,8 @@ export async function usage(): Promise<void> {
   void languages;
 
   // Every built-in language has every code
-  const de: Record<PaymentErrorCode, string> = { ...errorMessages.en };
-  void de;
+  const ru: Record<PaymentErrorCode, string> = errorMessages.ru;
+  void ru;
 
   // @ts-expect-error the plugin adds `errors`, nothing else
   void payment.translations;

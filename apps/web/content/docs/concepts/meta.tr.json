@@ -1,5 +1,7 @@
 {
   "title": "Kavramlar",
+  "icon": "concepts",
+  "defaultOpen": true,
   "pages": [
     "configuration",
     "handler",

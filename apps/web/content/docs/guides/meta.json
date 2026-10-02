@@ -1,5 +1,7 @@
 {
   "title": "Guides",
+  "icon": "guides",
+  "defaultOpen": true,
   "pages": [
     "writing-plugins",
     "custom-providers",
