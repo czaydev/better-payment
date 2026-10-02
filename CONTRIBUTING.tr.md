@@ -432,6 +432,7 @@ Web sitesi ve dokümantasyon İngilizce (varsayılan, `/docs/...`) ve Türkçe (
 - Yalnızca metin çevrilir; kod blokları İngilizce sayfayla birebir aynı kalır.
 - Başlık yapısı aynı kalır ve her Türkçe başlık İngilizce başlığın id'sini taşır (`## Taksit [#installments]`).
 - Bir İngilizce sayfayı değiştirdiğinizde Türkçesini aynı PR'da güncelleyin.
+- Kullanıcıya yönelik yeni özellikleri iki dilde de `<Since version="x.y.z" />` ile işaretleyin. `packages/better-payment/package.json` bu sürüme ulaşana kadar rozet, özelliğin henüz yayınlanmadığını otomatik olarak belirtir.
 - Terimler için sözlüğe uyun (ön provizyon, taksit, sanal POS, …).
 
 Kurallar ve terim sözlüğü: [apps/web/TRANSLATIONS.md](apps/web/TRANSLATIONS.md). CI şu kontrolü çalıştırır:

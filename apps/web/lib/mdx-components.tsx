@@ -4,6 +4,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import { Card, Cards } from "fumadocs-ui/components/card";
 import DocsCallout from "@/components/docs/DocsCallout";
 import DocsCodeBlock from "@/components/docs/DocsCodeBlock";
+import { Since, type SinceProps } from "@/components/docs/Since";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -24,5 +25,6 @@ export function getMDXComponents(components: MDXComponents, lang: Locale = "en")
     Tabs,
     Card,
     Cards,
+    Since: (props: SinceProps) => <Since {...props} lang={lang} />,
   };
 }

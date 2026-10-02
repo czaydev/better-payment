@@ -3,6 +3,8 @@ title: Pre-authorization
 description: Block an amount on the card now, charge it later with capture, or release it with void.
 ---
 
+<Since version="0.2.0" />
+
 A normal payment charges the card immediately. A **pre-authorization** only blocks the amount: the customer sees a pending transaction and their limit goes down, but nothing is charged until you **capture** it. If the order does not go through, **void** the authorization and the block disappears without a refund.
 
 Typical uses:
