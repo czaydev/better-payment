@@ -96,6 +96,6 @@ plugins: [
 
 Yerleşik mesajlar `packages/better-payment/src/plugins/localized-errors/` altında, her dil için bir dosyada ve `Record<PaymentErrorCode, string>` tipindedir: bir kodu eksik olan dosya derlenmez.
 
-1. `en.ts` dosyasını dilin adıyla (`de.ts`) kopyalayın ve mesajları çevirin. Mesajları kısa, müşteriye yönelik ve teknik ayrıntısız tutun.
+1. `en.ts` dosyasını dilin adıyla (`fr.ts`) kopyalayın ve mesajları çevirin. Mesajları müşteriye yönelik, o dilde doğal okunan ifadelerle ve teknik ayrıntısız yazın. Paket boyutu kontrolüne sığdırmak için kısaltmayın; yeni dil sınırı aşarsa bunu pull request'te belirtin.
 2. Dili `localized-errors/index.ts` içindeki `errorMessages` nesnesine ekleyin.
 3. Bir pull request açın. Mevcut test her dilde her kodun mesajı olduğunu kontrol eder.
