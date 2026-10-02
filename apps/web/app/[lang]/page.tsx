@@ -9,6 +9,7 @@ import QuickStart from "@/components/QuickStart";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 import ScrollToSection from "@/components/ScrollToSection";
+import RevealOnScroll from "@/components/RevealOnScroll";
 import { isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -30,6 +31,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
       </main>
       <Footer lang={lang} t={t.footer} />
       <ScrollToSection />
+      <RevealOnScroll />
     </>
   );
 }

@@ -58,7 +58,7 @@ export default function QuickStart({ lang, t, code }: { lang: Locale; t: Diction
 
         <ol className="flex flex-col">
           {steps.map((step, idx) => (
-            <li key={step.number} className="flex gap-6 sm:gap-8">
+            <li key={step.number} className="bp-reveal flex gap-6 sm:gap-8">
               <div className="flex flex-col items-center shrink-0 pt-1">
                 <div className="w-9 h-9 rounded-lg bg-tint flex items-center justify-center">
                   <span className="text-[11px] font-semibold text-primary font-mono">
@@ -78,7 +78,7 @@ export default function QuickStart({ lang, t, code }: { lang: Locale; t: Diction
           ))}
         </ol>
 
-        <div className="mt-12 pl-[calc(36px+1.5rem)] sm:pl-[calc(36px+2rem)]">
+        <div className="bp-reveal mt-12 pl-[calc(36px+1.5rem)] sm:pl-[calc(36px+2rem)]">
           <Link
             href={localePath(lang, "/docs")}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-primary group"

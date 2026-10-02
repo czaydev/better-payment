@@ -223,13 +223,15 @@ html {
   animation: bp-art var(--bp-d-art) var(--bp-ease) both;
 }
 
-@supports (animation-timeline: view()) {
-  .bp-reveal {
-    animation: bp-enter linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 45%;
-  }
+/* Sections fade and rise once as they scroll into view (RevealOnScroll) */
+:root[data-reveal] .bp-reveal:not([data-shown]) {
+  opacity: 0;
+}
+:root[data-reveal] .bp-reveal[data-shown] {
+  animation: bp-enter var(--bp-d-xl) var(--bp-ease) var(--at, 0ms) both;
+}
 
+@supports (animation-timeline: scroll()) {
   /* Hero artwork drifts slower than the page over the first screen of scroll */
   .bp-parallax {
     animation: bp-parallax linear both;

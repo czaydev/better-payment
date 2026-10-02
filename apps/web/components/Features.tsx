@@ -22,9 +22,10 @@ export default function Features({ t }: { t: Dictionary["features"] }) {
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
+          {features.map((f, i) => (
             <article
               key={f.key}
+              style={{ "--at": `${(i % 3) * 110}ms` } as React.CSSProperties}
               className={[
                 "bp-reveal group rounded-2xl border border-border bg-card p-6 transition-[translate,box-shadow,border-color] duration-(--bp-d-md) ease-spring hover:-translate-y-[3px] hover:border-line-strong hover:shadow-[0_10px_30px_-14px_rgb(19_19_43/0.22)]",
                 "span" in f ? f.span : "",
