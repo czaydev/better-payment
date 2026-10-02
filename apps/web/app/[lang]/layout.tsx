@@ -6,6 +6,7 @@ import { RootProvider } from "fumadocs-ui/provider/next";
 import { LOCALES, SITE_URL, alternates, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { i18nUI } from "@/lib/i18n/ui";
+import { Analytics } from "@vercel/analytics/next";
 
 // Brand typography: Manrope for display and headings, Inter for text, JetBrains Mono for code
 const manrope = Manrope({
@@ -60,6 +61,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
         <RootProvider i18n={i18nUI.provider(lang)} theme={{ enabled: false }}>
           {children}
         </RootProvider>
+        <Analytics />
       </body>
     </html>
   );
