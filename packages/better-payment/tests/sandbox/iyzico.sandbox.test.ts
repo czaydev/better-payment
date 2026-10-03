@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { betterPayment, iyzico } from '../../src';
+import { betterPayment, iyzico as createIyzico } from '../../src';
 import { PaymentStatus } from '../../src/types';
 import {
   CALLBACK_URL,
@@ -32,7 +32,7 @@ describe.skipIf(!env)('iyzico sandbox', () => {
     : betterPayment({
         mode: 'sandbox',
         providers: {
-          iyzico: iyzico({
+          iyzico: createIyzico({
             apiKey: env!.IYZICO_SANDBOX_API_KEY,
             secretKey: env!.IYZICO_SANDBOX_SECRET_KEY,
           }),
