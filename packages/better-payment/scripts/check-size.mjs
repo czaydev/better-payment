@@ -4,9 +4,10 @@ import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
 const budgets = [
-  // 27 kB since the plugin system (hooks, events, plugin endpoints)
-  { file: 'dist/index.mjs', maxGzipKb: 27 },
-  { file: 'dist/index.js', maxGzipKb: 27 },
+  // 27 kB since the plugin system (hooks, events, plugin endpoints), 28 kB since
+  // buildBasket(); ESM bundlers drop it when it is not imported
+  { file: 'dist/index.mjs', maxGzipKb: 28 },
+  { file: 'dist/index.js', maxGzipKb: 28 },
   { file: 'dist/client/index.mjs', maxGzipKb: 2 },
   { file: 'dist/client/index.js', maxGzipKb: 2 },
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },

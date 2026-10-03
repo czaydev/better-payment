@@ -22,6 +22,10 @@ const payment = betterPayment({
 });
 ```
 
+<Callout type="info">
+  Sepet kalemlerinin fiyatları toplamı `price`'a tam eşit olmalıdır. İndirim ve kargoyu kalemlere kuruşu kuruşuna dağıtmak için [`buildBasket()`](/docs/payments/basket) kullanın.
+</Callout>
+
 ## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
 
 ```typescript

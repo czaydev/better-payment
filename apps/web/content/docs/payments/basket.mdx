@@ -1,0 +1,65 @@
+---
+title: Basket builder
+description: Spread discounts and shipping over basket items so they add up to the payment total, to the kuruş.
+---
+
+<Since version="0.7.0" />
+
+iyzico rejects a payment when the basket item prices don't add up exactly to `price`. With coupons and shipping this is the most common integration error: `100.00` minus a 10% coupon, spread over three items, leaves a kuruş that fits nowhere.
+
+`buildBasket()` does the arithmetic for you. It works in minor units (kuruş), so there is no floating-point drift, and the result is deterministic.
+
+```typescript
+import { buildBasket } from 'better-payment';
+
+const { basketItems, price, discount } = buildBasket({
+  items: [
+    { id: 'A', name: 'T-shirt', category1: 'Clothing', itemType: 'PHYSICAL', price: '49.90', quantity: 2 },
+    { id: 'B', name: 'Mug', category1: 'Home', itemType: 'PHYSICAL', price: '35.00' },
+  ],
+  discount: '13.48', // or { percent: 10 }
+  shipping: { price: '29.90' }, // added as an item
+});
+
+await payment.iyzico.createPayment({
+  ...order,
+  price,
+  paidPrice: price,
+  basketItems,
+});
+```
+
+The sum of `basketItems[].price` is always equal to `price`.
+
+## Discounts
+
+- **Fixed amount**: `discount: '13.48'`.
+- **Percentage**: `discount: { percent: 10 }`, rounded half up to the kuruş. The returned `discount` holds the amount applied.
+
+The discount applies to the items only, not to shipping. It is spread in proportion to each item's total. Rounding leftovers go one kuruş at a time to the items with the largest remainders; ties go to the larger item, then to the earlier one.
+
+## Quantities
+
+iyzico has no quantity field; it needs one line per item. `quantity` controls how units are sent:
+
+| `quantity` option | Result for `{ id: 'A', price: '49.90', quantity: 2 }` |
+| --- | --- |
+| `'expand'` (default) | Two items, `A-1` and `A-2`, each `49.90` minus its discount share |
+| `'multiply'` | One item `A` priced `99.80` minus its discount share |
+
+With `'expand'`, each unit has its own id, so you can match the `itemTransactions` of the payment result (for partial refunds) back to a unit.
+
+## Shipping
+
+`shipping` is added as the last item and is not discounted. Defaults: `id: 'shipping'`, `name: 'Shipping'`, `category1: 'Shipping'`, `itemType: 'VIRTUAL'`; pass any of them to override. A zero fee (free shipping) adds no item, because iyzico rejects items priced `0`.
+
+## Errors
+
+`buildBasket` throws a `ValidationError` (with `field` set to the invalid path) when:
+
+- the basket is empty;
+- a price is zero, negative or not a number;
+- a `quantity` is not a positive integer;
+- `percent` is outside 0 to 100;
+- the discount is equal to or larger than the item total;
+- the discount would bring an item down to zero (for example a `0.01` item in a heavily discounted basket).

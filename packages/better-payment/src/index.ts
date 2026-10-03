@@ -81,6 +81,14 @@ export type {
   HandlerIdempotencyOptions,
 } from './core/BetterPaymentHandler';
 
+export { buildBasket } from './core/basket';
+export type {
+  BasketBuilderItem,
+  BasketShipping,
+  BuildBasketOptions,
+  BuiltBasket,
+} from './core/basket';
+
 export { VERSION } from './version';
 
 export { PaymentErrorCode, ISO8583_ERROR_CODES } from './core/error-codes';
