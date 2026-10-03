@@ -6,6 +6,14 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.6.0
+
+### Added
+
+- `better-payment/elysia`: `toElysiaHandler(payment)` mounts the handler on Elysia (Bun). Register
+  the route with `{ parse: 'none' }` so bank callbacks keep their raw body. Thanks to
+  @ScottHallchico (#128).
+
 ## 0.5.2
 
 ### Added
