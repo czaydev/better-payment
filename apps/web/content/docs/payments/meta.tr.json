@@ -4,6 +4,7 @@
   "defaultOpen": true,
   "pages": [
     "pre-authorization",
-    "stored-cards"
+    "stored-cards",
+    "basket"
   ]
 }

@@ -1,0 +1,65 @@
+---
+title: Sepet oluşturucu
+description: İndirim ve kargoyu sepet kalemlerine dağıtın; toplam, ödeme tutarına kuruşu kuruşuna eşit olsun.
+---
+
+<Since version="0.7.0" />
+
+iyzico, sepet kalemlerinin fiyatları toplamı `price`'a tam eşit değilse ödemeyi reddeder. Kupon ve kargo olunca en sık yapılan entegrasyon hatası budur: `100.00` tutarından %10 kuponu üç kaleme dağıtınca bir kuruş hiçbir yere sığmaz.
+
+`buildBasket()` bu hesabı sizin yerinize yapar. Kuruş cinsinden çalışır, bu yüzden kayan nokta hatası olmaz ve sonuç her zaman aynıdır.
+
+```typescript
+import { buildBasket } from 'better-payment';
+
+const { basketItems, price, discount } = buildBasket({
+  items: [
+    { id: 'A', name: 'T-shirt', category1: 'Clothing', itemType: 'PHYSICAL', price: '49.90', quantity: 2 },
+    { id: 'B', name: 'Mug', category1: 'Home', itemType: 'PHYSICAL', price: '35.00' },
+  ],
+  discount: '13.48', // or { percent: 10 }
+  shipping: { price: '29.90' }, // added as an item
+});
+
+await payment.iyzico.createPayment({
+  ...order,
+  price,
+  paidPrice: price,
+  basketItems,
+});
+```
+
+`basketItems[].price` toplamı her zaman `price`'a eşittir.
+
+## İndirimler [#discounts]
+
+- **Sabit tutar**: `discount: '13.48'`.
+- **Yüzde**: `discount: { percent: 10 }`, kuruşa yarım yukarı yuvarlanır. Dönen `discount` uygulanan tutarı verir.
+
+İndirim yalnızca ürünlere uygulanır, kargoya uygulanmaz. Her kalemin toplamıyla orantılı dağıtılır. Yuvarlamadan kalan kuruşlar, kalanı en büyük olan kalemlere birer birer verilir; eşitlikte büyük kalem, sonra önce gelen kalem kazanır.
+
+## Adetler [#quantities]
+
+iyzico'da adet alanı yoktur; her ürün için ayrı bir satır ister. `quantity` seçeneği adetlerin nasıl gönderileceğini belirler:
+
+| `quantity` seçeneği | `{ id: 'A', price: '49.90', quantity: 2 }` için sonuç |
+| --- | --- |
+| `'expand'` (varsayılan) | İki kalem, `A-1` ve `A-2`; her biri `49.90` eksi indirim payı |
+| `'multiply'` | Tek kalem `A`, `99.80` eksi indirim payı |
+
+`'expand'` ile her birimin kendi id'si olur; böylece ödeme sonucundaki `itemTransactions` kayıtlarını (kısmi iadeler için) birime eşleyebilirsiniz.
+
+## Kargo [#shipping]
+
+`shipping` son kalem olarak eklenir ve indirime girmez. Varsayılanlar: `id: 'shipping'`, `name: 'Shipping'`, `category1: 'Shipping'`, `itemType: 'VIRTUAL'`; istediğinizi değiştirebilirsiniz. Ücret sıfırsa (ücretsiz kargo) kalem eklenmez, çünkü iyzico `0` fiyatlı kalemleri reddeder.
+
+## Hatalar [#errors]
+
+`buildBasket` şu durumlarda `ValidationError` fırlatır (`field` hatalı alanın yolunu verir):
+
+- sepet boşsa;
+- bir fiyat sıfır, negatif ya da sayı değilse;
+- `quantity` pozitif bir tam sayı değilse;
+- `percent` 0 ile 100 arasında değilse;
+- indirim ürün toplamına eşit ya da ondan büyükse;
+- indirim bir kalemi sıfıra indirecekse (örneğin çok indirimli bir sepette `0.01` fiyatlı bir kalem).
