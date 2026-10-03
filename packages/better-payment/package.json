@@ -1,6 +1,6 @@
 {
   "name": "better-payment",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Unified payment gateway library for Turkish payment providers",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
