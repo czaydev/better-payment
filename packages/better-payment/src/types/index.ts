@@ -220,7 +220,13 @@ export interface ThreeDSInitResponse {
  * İade isteği
  */
 export interface RefundRequest {
+  /** The paymentId returned by the payment (iyzico); the order id for other providers */
   paymentId: string;
+  /**
+   * iyzico only: refund one basket item by its `paymentTransactionId` (from
+   * `itemTransactions`) instead of the payment as a whole.
+   */
+  paymentTransactionId?: string;
   price: string;
   currency: Currency | string;
   ip: string;

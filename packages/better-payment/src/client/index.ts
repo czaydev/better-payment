@@ -198,7 +198,7 @@ class ProviderClient {
    * @example
    * ```typescript
    * const result = await client.iyzico.refund({
-   *   paymentTransactionId: '123456',
+   *   paymentId: '123456',
    *   price: '0.50',
    *   currency: 'TRY',
    * });

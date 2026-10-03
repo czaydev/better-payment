@@ -92,8 +92,16 @@ const bin = await payment.iyzico.binCheck('552879');
 ## İade, iptal ve durum sorgusu [#refund-cancel--status]
 
 ```typescript
-// refund takes the paymentTransactionId of the basket item
-await payment.iyzico.refund({ paymentId: 'payment-transaction-id', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+// ödemenin bir kısmını veya tamamını iade et
+await payment.iyzico.refund({ paymentId: 'payment-id', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+// ya da tek bir sepet kalemini paymentTransactionId ile iade et (itemTransactions içinden)
+await payment.iyzico.refund({
+  paymentId: 'payment-id',
+  paymentTransactionId: 'payment-transaction-id',
+  price: '50.00',
+  currency: 'TRY',
+  ip: '1.2.3.4',
+});
 
 await payment.iyzico.cancel({ paymentId: 'payment-id', ip: '1.2.3.4' });
 

@@ -76,7 +76,8 @@ interface BasketItem {
 
 ```typescript
 interface RefundRequest {
-  paymentId: string;  // iyzico: paymentTransactionId; others: order id
+  paymentId: string;  // iyzico: paymentId; others: order id
+  paymentTransactionId?: string;  // yalnızca iyzico: tek bir sepet kalemini iade eder
   price: string;
   currency: Currency | string;
   ip: string;

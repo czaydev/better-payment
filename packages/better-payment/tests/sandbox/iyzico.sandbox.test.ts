@@ -52,18 +52,28 @@ describe.skipIf(!env)('iyzico sandbox', () => {
     expect(lookup.status, describeResult(lookup)).toBe(PaymentStatus.SUCCESS);
     expect(lookup.paymentId).toBe(payment.paymentId);
 
-    const raw = payment.rawResponse as { itemTransactions?: { paymentTransactionId: string }[] };
-    const transactionId = raw.itemTransactions?.[0]?.paymentTransactionId;
-    expect(transactionId).toBeTruthy();
-
     const refund = await iyzico.refund({
-      paymentId: transactionId!,
+      paymentId: payment.paymentId!,
       price: '0.1',
       currency: 'TRY',
       ip: '85.34.78.112',
     });
     record('iyzico', 'refund', refund.rawResponse);
     expect(refund.status, describeResult(refund)).toBe(PaymentStatus.SUCCESS);
+
+    const raw = payment.rawResponse as { itemTransactions?: { paymentTransactionId: string }[] };
+    const transactionId = raw.itemTransactions?.[0]?.paymentTransactionId;
+    expect(transactionId).toBeTruthy();
+
+    const itemRefund = await iyzico.refund({
+      paymentId: payment.paymentId!,
+      paymentTransactionId: transactionId!,
+      price: '0.1',
+      currency: 'TRY',
+      ip: '85.34.78.112',
+    });
+    record('iyzico', 'refund-item', itemRefund.rawResponse);
+    expect(itemRefund.status, describeResult(itemRefund)).toBe(PaymentStatus.SUCCESS);
   });
 
   it('cancels a payment', async () => {
