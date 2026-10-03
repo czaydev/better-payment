@@ -10,6 +10,7 @@ export default defineConfig({
     'express/index': 'src/adapters/express.ts',
     'hono/index': 'src/adapters/hono.ts',
     'fastify/index': 'src/adapters/fastify.ts',
+    'elysia/index': 'src/adapters/elysia.ts',
   },
   format: ['cjs', 'esm'],
   dts: {

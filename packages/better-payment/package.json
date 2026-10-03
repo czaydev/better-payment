@@ -45,6 +45,11 @@
       "types": "./dist/fastify/index.d.ts",
       "import": "./dist/fastify/index.mjs",
       "require": "./dist/fastify/index.js"
+    },
+    "./elysia": {
+      "types": "./dist/elysia/index.d.ts",
+      "import": "./dist/elysia/index.mjs",
+      "require": "./dist/elysia/index.js"
     }
   },
   "sideEffects": false,
@@ -114,6 +119,7 @@
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "@vitest/coverage-v8": "^4.0.1",
+    "elysia": "^1.4.30",
     "esbuild": "0.27.7",
     "eslint": "^8.54.0",
     "express": "^5.2.1",

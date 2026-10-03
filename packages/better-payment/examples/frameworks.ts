@@ -11,6 +11,8 @@ import { toNextJsHandler } from 'better-payment/next';
 import { toExpressHandler, toNodeHandler } from 'better-payment/express';
 import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
+import { toElysiaHandler } from 'better-payment/elysia';
+import { Elysia } from 'elysia';
 
 const createPayment = () =>
   betterPayment({
@@ -40,6 +42,10 @@ void fastify.register(toFastifyPlugin(getBetterPayment), { prefix: '/api/pay' })
 // Hono
 const hono = new Hono();
 hono.all('/api/pay/*', toHonoHandler(getBetterPayment));
+
+// Elysia: parse: 'none' keeps the raw body for the bank callbacks
+const elysiaApp = new Elysia();
+elysiaApp.all('/api/pay/*', toElysiaHandler(getBetterPayment), { parse: 'none' });
 
 // Cloudflare Workers / Deno / Bun
 export default { fetch: toFetchHandler(getBetterPayment) };

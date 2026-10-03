@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import express from 'express';
 import Fastify from 'fastify';
 import { Hono } from 'hono';
+import { Elysia } from 'elysia';
 import {
   betterPayment,
   type BetterPayment,
@@ -17,6 +18,7 @@ import { toNextJsHandler } from 'better-payment/next';
 import { toExpressHandler, toNodeHandler } from 'better-payment/express';
 import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
+import { toElysiaHandler } from 'better-payment/elysia';
 import { mockPaymentRequest } from '../../fixtures/payment-data';
 
 const PAYTR = { merchantId: '123456', merchantKey: 'KEY', merchantSalt: 'SALT' };
@@ -113,6 +115,19 @@ const adapters: Record<string, () => Promise<Send>> = {
         text: res.body,
       };
     };
+  },
+  Elysia: async () => {
+    const app = new Elysia().all('/api/pay/*', toElysiaHandler(createPayment()), {
+      parse: 'none',
+    });
+    return async (...args) => fromResponse(await app.handle(webRequest(...args)));
+  },
+  // A hook that reads `body` makes Elysia parse the request; parse: 'none' keeps it raw
+  'Elysia with a hook that reads the body': async () => {
+    const app = new Elysia()
+      .onTransform(({ body }) => void body)
+      .all('/api/pay/*', toElysiaHandler(createPayment()), { parse: 'none' });
+    return async (...args) => fromResponse(await app.handle(webRequest(...args)));
   },
   Express: async () => {
     const app = express();

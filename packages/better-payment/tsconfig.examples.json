@@ -37,6 +37,9 @@
       ],
       "better-payment/fastify": [
         "src/adapters/fastify.ts"
+      ],
+      "better-payment/elysia": [
+        "src/adapters/elysia.ts"
       ]
     },
     "noUnusedLocals": false,

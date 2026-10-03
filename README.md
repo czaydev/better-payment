@@ -214,6 +214,7 @@ export const { GET, POST } = toNextJsHandler(getBetterPayment);
 // Express:  app.all('/api/pay/*path', toExpressHandler(payment))        — better-payment/express
 // Fastify:  app.register(toFastifyPlugin(payment), { prefix: '/api/pay' }) — better-payment/fastify
 // Hono:     app.all('/api/pay/*', toHonoHandler(payment))               — better-payment/hono
+// Elysia:   app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' }) — better-payment/elysia
 // Workers, Deno, Bun: toFetchHandler(payment)                            — better-payment
 ```
 

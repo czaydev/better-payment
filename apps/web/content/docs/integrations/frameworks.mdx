@@ -49,6 +49,18 @@ app.all('/api/pay/*', toHonoHandler(payment));
 
 Hono runs on Node.js, Bun, Deno and Cloudflare Workers, like better-payment.
 
+## Elysia
+
+```typescript
+import { Elysia } from 'elysia';
+import { toElysiaHandler } from 'better-payment/elysia';
+
+const app = new Elysia();
+app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
+```
+
+`{ parse: 'none' }` keeps the raw body for the handler: bank callbacks are form-urlencoded and their signatures are checked against the original fields. Without it, any hook that reads `body` (`onTransform`, `derive`, `onBeforeHandle` or a plugin) makes Elysia consume the request first. Elysia is built for Bun and also runs on Node.js.
+
 ## Plain Node.js
 
 ```typescript
