@@ -450,12 +450,24 @@ node scripts/check-translations.mjs --fix  # başlık id'lerini ekler
 Proje [Changesets](https://github.com/changesets/changesets) kullanır.
 
 1. Kullanıcıyı etkileyen her PR bir changeset içerir: `pnpm changeset`.
-2. Sürüm hazırlanırken `pnpm run version` changeset'leri `package.json` sürümüne ve
-   `CHANGELOG.md`'ye işler; bu değişiklik bir PR ile main'e alınır.
-3. Yayın, GitHub Actions'taki **Publish to NPM** workflow'u ile elle başlatılır
-   (`npm_tag` genelde `latest`). Workflow lint, typecheck ve testleri çalıştırır,
-   ardından npm **trusted publishing** (OIDC) ile yayınlar; npm token gerekmez ve
-   paket provenance kaydıyla yayınlanır.
+2. Changeset'ler `main`'e girdiğinde **Release PR** workflow'u `chore(release): version packages`
+   PR'ını açar veya günceller. Bu PR `pnpm version-packages` çalıştırır: changeset'leri
+   `package.json`, `src/version.ts`, `CHANGELOG.md` ve kurulum dokümanındaki `VERSION` örneğine işler.
+3. Birleştirmeden önce release PR'ını düzenleyin (`changeset-release/main` dalına push edin):
+   - `CHANGELOG.md`: yeni bölüm her changeset özetini `Added` (minor), `Fixed` (patch) veya
+     `Changed (breaking)` (major) altında listeler. Önceki sürümlerdeki gibi kullanıcıya göre
+     yeniden yazın, uygun olanları `Changed` altına taşıyın ve katkı verenleri anın.
+   - Doküman changelog'u (`apps/web/content/docs/reference/changelog.mdx` ve `changelog.tr.mdx`)
+     İngilizce ve Türkçe olarak, doküman linkleriyle elle yazılır.
+4. Release PR'ını birleştirmek sürümü hazırlar, henüz bir şey yayınlanmaz. Yayın, GitHub
+   Actions'taki **Publish to NPM** workflow'u ile elle başlatılır (`npm_tag` genelde `latest`).
+   Workflow lint, typecheck ve testleri çalıştırır, ardından npm **trusted publishing** (OIDC) ile
+   yayınlar; npm token gerekmez ve paket provenance kaydıyla yayınlanır. GitHub release'i
+   `CHANGELOG.md` bölümünden oluşturulur.
+
+Release PR'ı varsayılan `GITHUB_TOKEN` ile açıldığı için, `RELEASE_PR_TOKEN` secret'ı (Contents ve
+Pull requests yazma izni olan fine-grained bir token) tanımlanmadıkça üzerinde CI çalışmaz.
+Depo ayarlarında *Allow GitHub Actions to create and approve pull requests* açık olmalıdır.
 
 Sürüm geçmişi `0.0.1` ile sıfırlandı; `0.x` boyunca kırıcı değişiklikler minor
 sürümle yayınlanır ve changelog'da geçiş notuyla belirtilir.

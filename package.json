@@ -7,10 +7,11 @@
     "build:web": "pnpm --filter web build",
     "test": "pnpm --filter better-payment test",
     "changeset": "changeset",
-    "version": "changeset version",
+    "version": "node scripts/version-packages.mjs",
     "release": "pnpm build && changeset publish",
     "lint": "pnpm --filter better-payment lint",
-    "typecheck": "pnpm --filter better-payment typecheck"
+    "typecheck": "pnpm --filter better-payment typecheck",
+    "version-packages": "node scripts/version-packages.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
