@@ -94,8 +94,16 @@ const bin = await payment.iyzico.binCheck('552879');
 ## Refund, Cancel & Status
 
 ```typescript
-// refund takes the paymentTransactionId of the basket item
-await payment.iyzico.refund({ paymentId: 'payment-transaction-id', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+// refund an amount of the payment
+await payment.iyzico.refund({ paymentId: 'payment-id', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+// or refund one basket item by its paymentTransactionId (from itemTransactions)
+await payment.iyzico.refund({
+  paymentId: 'payment-id',
+  paymentTransactionId: 'payment-transaction-id',
+  price: '50.00',
+  currency: 'TRY',
+  ip: '1.2.3.4',
+});
 
 await payment.iyzico.cancel({ paymentId: 'payment-id', ip: '1.2.3.4' });
 

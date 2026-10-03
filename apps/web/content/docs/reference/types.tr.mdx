@@ -76,7 +76,8 @@ interface BasketItem {
 
 ```typescript
 interface RefundRequest {
-  paymentId: string;  // iyzico: paymentTransactionId; others: order id
+  paymentId: string;  // iyzico: paymentId; others: order id
+  paymentTransactionId?: string;  // iyzico only: refund one basket item
   price: string;
   currency: Currency | string;
   ip: string;

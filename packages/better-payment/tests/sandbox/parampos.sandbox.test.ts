@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { betterPayment, parampos } from '../../src';
+import { betterPayment, parampos as createParampos } from '../../src';
 import { PaymentStatus } from '../../src/types';
 import {
   describeResult,
@@ -26,7 +26,7 @@ describe.skipIf(!env)('Parampos sandbox', () => {
     : betterPayment({
         mode: 'sandbox',
         providers: {
-          parampos: parampos({
+          parampos: createParampos({
             clientCode: env!.PARAMPOS_SANDBOX_CLIENT_CODE,
             clientUsername: env!.PARAMPOS_SANDBOX_CLIENT_USERNAME,
             clientPassword: env!.PARAMPOS_SANDBOX_CLIENT_PASSWORD,

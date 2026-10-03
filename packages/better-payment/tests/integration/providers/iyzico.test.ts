@@ -240,20 +240,30 @@ describe('Iyzico Provider - Integration Tests', () => {
       expect(request.data).toHaveProperty('callbackUrl', mockThreeDSPaymentRequest.callbackUrl);
     });
 
-    it('should send refund request with correct format', async () => {
+    it('should refund the payment by paymentId with the v2 endpoint', async () => {
       await iyzico.refund(mockRefundRequest);
 
       expect(capturedRequests).toHaveLength(1);
       const request = capturedRequests[0];
 
-      // Verify endpoint
-      expect(request.url).toBe('/payment/refund');
-
-      // Verify refund fields
-      expect(request.data).toHaveProperty('paymentTransactionId', mockRefundRequest.paymentId);
+      expect(request.url).toBe('/v2/payment/refund');
+      expect(request.data).toHaveProperty('paymentId', mockRefundRequest.paymentId);
+      expect(request.data).not.toHaveProperty('paymentTransactionId');
       expect(request.data).toHaveProperty('price', mockRefundRequest.price);
       expect(request.data).toHaveProperty('currency', mockRefundRequest.currency);
       expect(request.data).toHaveProperty('ip', mockRefundRequest.ip);
+    });
+
+    it('should refund a basket item by paymentTransactionId', async () => {
+      await iyzico.refund({ ...mockRefundRequest, paymentTransactionId: '987654' });
+
+      expect(capturedRequests).toHaveLength(1);
+      const request = capturedRequests[0];
+
+      expect(request.url).toBe('/payment/refund');
+      expect(request.data).toHaveProperty('paymentTransactionId', '987654');
+      expect(request.data).not.toHaveProperty('paymentId');
+      expect(request.data).toHaveProperty('price', mockRefundRequest.price);
     });
   });
 
@@ -316,7 +326,7 @@ describe('Iyzico Provider - Integration Tests', () => {
 
     it('should use correct endpoint for refund', async () => {
       await iyzico.refund(mockRefundRequest);
-      expect(capturedRequests[0].url).toBe('/payment/refund');
+      expect(capturedRequests[0].url).toBe('/v2/payment/refund');
     });
   });
 
