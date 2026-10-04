@@ -31,8 +31,8 @@ const banks: RouteItem[] = [
   { name: "TEB", logo: "/brand/banks/teb.png", w: 971, h: 421, issue: 36 },
   { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },
   { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, issue: 39 },
-  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64 },
-  { name: "Kuveyt Türk", logo: "/brand/banks/kuveyt-turk.svg", w: 227, h: 41 },
+  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, issue: 133 },
+  { name: "Kuveyt Türk", logo: "/brand/banks/kuveyt-turk.svg", w: 227, h: 41, issue: 134 },
 ];
 
 const institutions: RouteItem[] = [
