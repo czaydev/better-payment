@@ -8,44 +8,83 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 
 const highlightIcons = [Lock, CreditCard, Shield, Zap];
 
+type RouteItem = {
+  name: string;
+  // Logo files live in public/brand/banks; a missing logo falls back to the name
+  logo?: string;
+  w?: number;
+  h?: number;
+  live?: boolean;
+  issue?: number;
+};
+
 // Akbank is live; the rest are tracked in issues (logo sources: public/brand/banks/SOURCES.md)
-const route = [
+const banks: RouteItem[] = [
   { name: "Akbank", logo: "/akbank.svg", w: 75, h: 38, live: true },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
   { name: "İş Bankası", logo: "/brand/banks/is-bankasi.svg", w: 157, h: 49, issue: 36 },
   { name: "Ziraat Bankası", logo: "/brand/banks/ziraat.svg", w: 142, h: 27, issue: 36 },
-] as const;
+  { name: "Halkbank", issue: 36 },
+  { name: "TEB", issue: 36 },
+  { name: "QNB", issue: 39 },
+  { name: "DenizBank", issue: 39 },
+  { name: "VakıfBank" },
+  { name: "Kuveyt Türk" },
+];
 
-// Nodes sit on alternating heights; the dashed wave passes through their centres
-const X = [10, 30, 50, 70, 90];
-const Y = [30, 70, 30, 70, 30];
-const WAVE = X.slice(1)
-  .map((x, i) => {
-    const px = X[i] * 10;
-    const py = Y[i] * 2.2;
-    const nx = x * 10;
-    const ny = Y[i + 1] * 2.2;
-    return `${i === 0 ? `M${px},${py} ` : ""}C${px + 100},${py} ${nx - 100},${ny} ${nx},${ny}`;
-  })
-  .join(" ");
+const institutions: RouteItem[] = [
+  { name: "Sipay", issue: 40 },
+  { name: "Moka", issue: 40 },
+  { name: "Papara", issue: 40 },
+  { name: "Lidio", issue: 40 },
+];
 
-function RouteNode({ bank, t }: { bank: (typeof route)[number]; t: Dictionary["banks"] }) {
-  const live = "live" in bank;
+const ISSUES = "https://github.com/czaydev/better-payment/issues";
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
+// Nodes sit on alternating heights across a 1000x220 box; the dashed wave passes through their centres
+function layout(count: number) {
+  const X = Array.from({ length: count }, (_, i) => ((i + 0.5) / count) * 100);
+  const Y = X.map((_, i) => (i % 2 === 0 ? 30 : 70));
+  const bend = 500 / count;
+  const wave = X.slice(1)
+    .map((x, i) => {
+      const px = X[i] * 10;
+      const py = Y[i] * 2.2;
+      const nx = x * 10;
+      const ny = Y[i + 1] * 2.2;
+      return `${i === 0 ? `M${px},${py} ` : ""}C${px + bend},${py} ${nx - bend},${ny} ${nx},${ny}`;
+    })
+    .join(" ");
+  return { X, Y, wave };
+}
+
+function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
+  const live = item.live === true;
   const body = (
     <>
-      <span className="grid h-16 w-[168px] place-items-center rounded-2xl border border-border bg-card px-5 shadow-[0_1px_2px_rgb(19_19_43/0.04)] transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_rgb(19_19_43/0.22)]">
-        <Image
-          src={bank.logo}
-          alt={bank.name}
-          width={bank.w}
-          height={bank.h}
-          className={cn(
-            "w-auto max-w-full object-contain transition-[filter,opacity] duration-(--bp-d-md)",
-            // akbank.svg carries its own padding, so it needs more room to match the others
-            live ? "max-h-12" : "max-h-7 opacity-85 grayscale-[80%] group-hover:opacity-100 group-hover:grayscale-0",
-          )}
-        />
+      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_rgb(19_19_43/0.04)] transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_rgb(19_19_43/0.22)]">
+        {item.logo ? (
+          <Image
+            src={item.logo}
+            alt={item.name}
+            width={item.w}
+            height={item.h}
+            className={cn(
+              "w-auto max-w-full object-contain transition-[filter,opacity] duration-(--bp-d-md)",
+              // akbank.svg carries its own padding, so it needs more room to match the others
+              live ? "max-h-12" : "max-h-7 opacity-85 grayscale-[80%] group-hover:opacity-100 group-hover:grayscale-0",
+            )}
+          />
+        ) : (
+          <span className="text-[15px] font-bold tracking-tight text-muted-foreground">{item.name}</span>
+        )}
       </span>
       <span
         className={cn(
@@ -54,17 +93,65 @@ function RouteNode({ bank, t }: { bank: (typeof route)[number]; t: Dictionary["b
         )}
       >
         <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-        {live ? t.live : `${t.planned} · #${"issue" in bank ? bank.issue : ""}`}
+        {live ? t.live : item.issue ? `${t.planned} · #${item.issue}` : t.planned}
       </span>
     </>
   );
   const cls = "group flex flex-col items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary rounded-2xl";
-  return live ? (
+  return live || !item.issue ? (
     <div className={cls}>{body}</div>
   ) : (
-    <a href={`https://github.com/czaydev/better-payment/issues/${"issue" in bank ? bank.issue : ""}`} target="_blank" rel="noopener noreferrer" className={cls}>
+    <a href={`${ISSUES}/${item.issue}`} target="_blank" rel="noopener noreferrer" className={cls}>
       {body}
     </a>
+  );
+}
+
+function WaveRow({ items, t }: { items: RouteItem[]; t: Dictionary["banks"] }) {
+  const { X, Y, wave } = layout(items.length);
+  return (
+    <div className="relative aspect-[1000/220]">
+      {items.length > 1 && (
+        <svg viewBox="0 0 1000 220" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden="true">
+          <path d={wave} fill="none" stroke="#cfcde6" strokeWidth="2" strokeDasharray="6 8" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      {items.map((item, i) => (
+        <div key={item.name} className="absolute -translate-x-1/2 -translate-y-[38%]" style={{ left: `${X[i]}%`, top: `${Y[i]}%` }}>
+          <RouteNode item={item} t={t} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Route({ title, items, t }: { title: string; items: RouteItem[]; t: Dictionary["banks"] }) {
+  return (
+    <div>
+      <h4 className="mb-4 text-[13px] font-semibold tracking-wide text-muted-foreground uppercase">{title}</h4>
+
+      {/* Desktop: dashed waves through alternating nodes, six per row on wide screens and four on tablets */}
+      <div className="hidden gap-4 lg:grid">
+        {chunk(items, 6).map((row) => (
+          <WaveRow key={row[0].name} items={row} t={t} />
+        ))}
+      </div>
+      <div className="hidden gap-4 md:grid lg:hidden">
+        {chunk(items, 4).map((row) => (
+          <WaveRow key={row[0].name} items={row} t={t} />
+        ))}
+      </div>
+
+      {/* Mobile: the same route, vertically */}
+      <ol className="relative grid gap-6 border-l-2 border-dashed border-line-strong pl-6 md:hidden">
+        {items.map((item) => (
+          <li key={item.name} className="relative flex justify-start">
+            <span className="absolute top-8 -left-[31px] size-3 rounded-full border-2 border-card bg-line-strong" aria-hidden="true" />
+            <RouteNode item={item} t={t} />
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -122,27 +209,10 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
         <div className="bp-reveal mt-14">
           <h3 className="mb-6 text-[17px] font-bold text-foreground">{t.roadmap}</h3>
 
-          {/* Desktop: a dashed wave through alternating nodes */}
-          <div className="relative hidden aspect-[1000/220] md:block">
-            <svg viewBox="0 0 1000 220" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden="true">
-              <path d={WAVE} fill="none" stroke="#cfcde6" strokeWidth="2" strokeDasharray="6 8" vectorEffect="non-scaling-stroke" />
-            </svg>
-            {route.map((bank, i) => (
-              <div key={bank.name} className="absolute -translate-x-1/2 -translate-y-[38%]" style={{ left: `${X[i]}%`, top: `${Y[i]}%` }}>
-                <RouteNode bank={bank} t={t} />
-              </div>
-            ))}
+          <div className="grid gap-10">
+            <Route title={t.roadmapBanks} items={banks} t={t} />
+            <Route title={t.roadmapInstitutions} items={institutions} t={t} />
           </div>
-
-          {/* Mobile: the same route, vertically */}
-          <ol className="relative grid gap-6 border-l-2 border-dashed border-line-strong pl-6 md:hidden">
-            {route.map((bank) => (
-              <li key={bank.name} className="relative flex justify-start">
-                <span className="absolute top-8 -left-[31px] size-3 rounded-full border-2 border-card bg-line-strong" aria-hidden="true" />
-                <RouteNode bank={bank} t={t} />
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
     </section>
