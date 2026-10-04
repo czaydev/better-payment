@@ -10,10 +10,12 @@ const highlightIcons = [Lock, CreditCard, Shield, Zap];
 
 type RouteItem = {
   name: string;
-  // Logo files live in public/brand/banks; a missing logo falls back to the name
+  // Logo files live in public/brand; a missing logo falls back to the name
   logo?: string;
   w?: number;
   h?: number;
+  // Stacked or square logos read small at the default height
+  tall?: boolean;
   live?: boolean;
   issue?: number;
 };
@@ -25,19 +27,19 @@ const banks: RouteItem[] = [
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
   { name: "İş Bankası", logo: "/brand/banks/is-bankasi.svg", w: 157, h: 49, issue: 36 },
   { name: "Ziraat Bankası", logo: "/brand/banks/ziraat.svg", w: 142, h: 27, issue: 36 },
-  { name: "Halkbank", issue: 36 },
-  { name: "TEB", issue: 36 },
-  { name: "QNB", issue: 39 },
-  { name: "DenizBank", issue: 39 },
-  { name: "VakıfBank" },
-  { name: "Kuveyt Türk" },
+  { name: "Halkbank", logo: "/brand/banks/halkbank.svg", w: 512, h: 99, issue: 36 },
+  { name: "TEB", logo: "/brand/banks/teb.png", w: 971, h: 421, issue: 36 },
+  { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },
+  { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, issue: 39 },
+  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64 },
+  { name: "Kuveyt Türk", logo: "/brand/banks/kuveyt-turk.svg", w: 227, h: 41 },
 ];
 
 const institutions: RouteItem[] = [
-  { name: "Sipay", issue: 40 },
-  { name: "Moka", issue: 40 },
-  { name: "Papara", issue: 40 },
-  { name: "Lidio", issue: 40 },
+  { name: "Sipay", logo: "/brand/institutions/sipay.svg", w: 140, h: 68, issue: 40 },
+  { name: "Moka United", logo: "/brand/institutions/moka-united.svg", w: 196, h: 80, tall: true, issue: 40 },
+  { name: "Papara", logo: "/brand/institutions/papara.png", w: 1280, h: 354, issue: 40 },
+  { name: "Lidio", logo: "/brand/institutions/lidio.svg", w: 197, h: 91, tall: true, issue: 40 },
 ];
 
 const ISSUES = "https://github.com/czaydev/better-payment/issues";
@@ -79,7 +81,7 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
             className={cn(
               "w-auto max-w-full object-contain transition-[filter,opacity] duration-(--bp-d-md)",
               // akbank.svg carries its own padding, so it needs more room to match the others
-              live ? "max-h-12" : "max-h-7 opacity-85 grayscale-[80%] group-hover:opacity-100 group-hover:grayscale-0",
+              live ? "max-h-12" : cn(item.tall ? "max-h-10" : "max-h-7", "opacity-85 grayscale-[80%] group-hover:opacity-100 group-hover:grayscale-0"),
             )}
           />
         ) : (
