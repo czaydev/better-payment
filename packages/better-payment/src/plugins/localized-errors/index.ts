@@ -8,6 +8,7 @@ import { en } from './en';
 import { tr } from './tr';
 import { de } from './de';
 import { ru } from './ru';
+import { ar } from './ar';
 
 /** Messages of one language by error code: normalized codes and plugin codes */
 export type ErrorMessageDictionary = Partial<Record<PaymentErrorCode, string>> &
@@ -17,7 +18,7 @@ export type ErrorMessageDictionary = Partial<Record<PaymentErrorCode, string>> &
  * The built-in languages. Each one has a message for every normalized error code;
  * a language that misses one does not compile.
  */
-export const errorMessages = { en, tr, de, ru } satisfies Record<
+export const errorMessages = { en, tr, de, ru, ar } satisfies Record<
   string,
   Record<PaymentErrorCode, string>
 >;

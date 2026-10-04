@@ -263,7 +263,7 @@ payment.on('payment.succeeded', (event) => orders.markPaid(event.conversationId)
 
 Official plugins ship under `better-payment/plugins`. `localizedErrors` puts
 customer-facing error messages in `errorMessage`, in the customer's language
-(English, Turkish, German, and Russian included; per request from `Accept-Language` in the handler):
+(English, Turkish, German, Russian, and Arabic included; per request from `Accept-Language` in the handler):
 
 ```typescript
 import { localizedErrors } from 'better-payment/plugins';
