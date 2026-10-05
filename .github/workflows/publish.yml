@@ -54,6 +54,13 @@ jobs:
             echo "::error::CHANGELOG.md has no '## $VERSION' section"
             exit 1
           fi
+          # The docs changelog is written by hand in the release PR; do not publish without it
+          for page in changelog.mdx changelog.tr.mdx; do
+            if ! grep -qx "## $VERSION" "../../apps/web/content/docs/reference/$page"; then
+              echo "::error::apps/web/content/docs/reference/$page has no '## $VERSION' section; add the release notes (en/tr) before publishing"
+              exit 1
+            fi
+          done
 
       - name: Check the release does not exist yet
         if: ${{ inputs.dry_run == false || inputs.dry_run == 'false' }}
