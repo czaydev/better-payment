@@ -164,7 +164,7 @@ Maintainers release with [Changesets](https://github.com/changesets/changesets).
 2. When changesets land on `main`, the **Release PR** workflow opens or updates the `chore(release): version packages` pull request. It runs `pnpm version-packages`, which consumes the changesets into `package.json`, `src/version.ts`, `CHANGELOG.md` and the `VERSION` example in the installation docs.
 3. Before merging it, edit the release PR (push to its `changeset-release/main` branch):
    - `CHANGELOG.md`: the new section lists each changeset summary under `Added` (minor), `Fixed` (patch) or `Changed (breaking)` (major). Reword it for users, move entries to `Changed` where that fits, and credit contributors, like the earlier releases.
-   - The docs changelog (`apps/web/content/docs/reference/changelog.mdx` and `changelog.tr.mdx`) is written by hand, in English and Turkish, with links to the docs.
+   - The docs changelog (`apps/web/content/docs/reference/changelog.mdx` and `changelog.tr.mdx`) is written by hand, in English and Turkish, with links to the docs. **Publish to NPM** stops if it has no section for the new version.
 4. Merging the release PR prepares the release; nothing is published yet. Run the **Publish to NPM** workflow (`npm_tag` is usually `latest`). It runs lint, typecheck and tests, publishes with npm trusted publishing (provenance, no tokens) and creates the GitHub release from the `CHANGELOG.md` section.
 
 The release PR is opened with the default `GITHUB_TOKEN`, so CI does not run on it unless a `RELEASE_PR_TOKEN` secret (a fine-grained token with Contents and Pull requests write access) is set. The repository setting *Allow GitHub Actions to create and approve pull requests* must be on.

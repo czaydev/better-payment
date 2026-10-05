@@ -8,17 +8,19 @@ https://better-payment.czaylabs.com/docs/whats-new
 
 ## 0.7.0
 
-### Added
+### Changed (breaking)
 
-- Add `buildBasket()`: spreads discounts and shipping over basket items so they add up to the payment total, to the kuruş
 - iyzico: `refund()` takes the payment's `paymentId`, like `cancel()` and `getPayment()`, and
   refunds an amount of the whole payment (`/v2/payment/refund`). To refund one basket item, pass its
-  `paymentTransactionId` as well. **Breaking for iyzico:** code that passed a `paymentTransactionId`
-  as `paymentId` must move it to the new `paymentTransactionId` field.
+  `paymentTransactionId` as well. Code that passed a `paymentTransactionId` as `paymentId` must
+  move it to the new `paymentTransactionId` field.
 
-### Fixed
+### Added
 
+- `buildBasket()`: spreads discounts and shipping over basket items so they add up to the payment
+  total, to the kuruş.
 - `localizedErrors`: Arabic (`ar`) messages. `Accept-Language: ar` picks Arabic in the handler.
+  Thanks to @poyrazavsever (#136).
 
 ## 0.6.0
 

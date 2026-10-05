@@ -458,7 +458,8 @@ Proje [Changesets](https://github.com/changesets/changesets) kullanır.
      `Changed (breaking)` (major) altında listeler. Önceki sürümlerdeki gibi kullanıcıya göre
      yeniden yazın, uygun olanları `Changed` altına taşıyın ve katkı verenleri anın.
    - Doküman changelog'u (`apps/web/content/docs/reference/changelog.mdx` ve `changelog.tr.mdx`)
-     İngilizce ve Türkçe olarak, doküman linkleriyle elle yazılır.
+     İngilizce ve Türkçe olarak, doküman linkleriyle elle yazılır. Yeni sürümün bölümü yoksa **Publish to NPM**
+     durur.
 4. Release PR'ını birleştirmek sürümü hazırlar, henüz bir şey yayınlanmaz. Yayın, GitHub
    Actions'taki **Publish to NPM** workflow'u ile elle başlatılır (`npm_tag` genelde `latest`).
    Workflow lint, typecheck ve testleri çalıştırır, ardından npm **trusted publishing** (OIDC) ile
