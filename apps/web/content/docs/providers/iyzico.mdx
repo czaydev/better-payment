@@ -22,6 +22,10 @@ const payment = betterPayment({
 });
 ```
 
+<Callout type="info">
+  The basket item prices must add up exactly to `price`. Use [`buildBasket()`](/docs/payments/basket) to spread discounts and shipping over the items to the kuruş.
+</Callout>
+
 ## Direct Payment (non-3D)
 
 ```typescript
