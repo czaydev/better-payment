@@ -504,23 +504,33 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * İade işlemi
+   * Refund. With `paymentId` alone, refunds an amount of the whole payment
+   * (`/v2/payment/refund`). With `paymentTransactionId`, refunds that basket
+   * item (`/payment/refund`).
    */
   async refund(request: RefundRequest): Promise<RefundResponse> {
     try {
       this.validateRefund(request);
-      const response = await this.sendRequest<IyzicoRefundResponse>('/payment/refund', {
+      const common = {
         locale: this.config.locale || 'tr',
         conversationId: request.conversationId,
-        paymentTransactionId: request.paymentId,
         price: request.price,
         currency: request.currency,
         ip: request.ip,
-      });
+      };
+      const response = request.paymentTransactionId
+        ? await this.sendRequest<IyzicoRefundResponse>('/payment/refund', {
+            ...common,
+            paymentTransactionId: request.paymentTransactionId,
+          })
+        : await this.sendRequest<IyzicoRefundResponse>('/v2/payment/refund', {
+            ...common,
+            paymentId: request.paymentId,
+          });
 
       return this.withErrorCode({
         status: this.mapStatus(response.status),
-        refundId: response.paymentTransactionId,
+        refundId: response.paymentTransactionId ?? response.paymentId,
         conversationId: response.conversationId,
         errorCode: response.errorCode,
         errorMessage: response.errorMessage,

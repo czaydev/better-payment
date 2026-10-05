@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { betterPayment, paytr } from '../../src';
+import { betterPayment, paytr as createPaytr } from '../../src';
 import { PaymentStatus } from '../../src/types';
 import { describeResult, orderId, record, requireEnv, sandboxCard, threeDSRequest } from './setup';
 
@@ -24,7 +24,7 @@ describe.skipIf(!env)('PayTR sandbox (test_mode=1)', () => {
     : betterPayment({
         mode: 'sandbox',
         providers: {
-          paytr: paytr({
+          paytr: createPaytr({
             merchantId: env!.PAYTR_SANDBOX_MERCHANT_ID,
             merchantKey: env!.PAYTR_SANDBOX_MERCHANT_KEY,
             merchantSalt: env!.PAYTR_SANDBOX_MERCHANT_SALT,

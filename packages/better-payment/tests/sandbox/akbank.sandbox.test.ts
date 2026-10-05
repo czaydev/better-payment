@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { betterPayment, akbank } from '../../src';
+import { betterPayment, akbank as createAkbank } from '../../src';
 import { PaymentStatus } from '../../src/types';
 import { describeResult, orderId, paymentRequest, record, requireEnv, sandboxCard } from './setup';
 
@@ -17,7 +17,7 @@ describe.skipIf(!env)('Akbank sandbox', () => {
     : betterPayment({
         mode: 'sandbox',
         providers: {
-          akbank: akbank({
+          akbank: createAkbank({
             merchantSafeId: env!.AKBANK_SANDBOX_MERCHANT_SAFE_ID,
             terminalSafeId: env!.AKBANK_SANDBOX_TERMINAL_SAFE_ID,
             secretKey: env!.AKBANK_SANDBOX_SECRET_KEY,
