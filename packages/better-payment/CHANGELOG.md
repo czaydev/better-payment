@@ -6,6 +6,20 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.7.0
+
+### Added
+
+- Add `buildBasket()`: spreads discounts and shipping over basket items so they add up to the payment total, to the kuruş
+- iyzico: `refund()` takes the payment's `paymentId`, like `cancel()` and `getPayment()`, and
+  refunds an amount of the whole payment (`/v2/payment/refund`). To refund one basket item, pass its
+  `paymentTransactionId` as well. **Breaking for iyzico:** code that passed a `paymentTransactionId`
+  as `paymentId` must move it to the new `paymentTransactionId` field.
+
+### Fixed
+
+- `localizedErrors`: Arabic (`ar`) messages. `Accept-Language: ar` picks Arabic in the handler.
+
 ## 0.6.0
 
 ### Added
