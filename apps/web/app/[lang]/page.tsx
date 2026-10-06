@@ -5,6 +5,7 @@ import Hero from "@/components/Hero";
 import Integrations from "@/components/Integrations";
 import Features from "@/components/Features";
 import Banks from "@/components/Banks";
+import Contributors from "@/components/Contributors";
 import QuickStart from "@/components/QuickStart";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
@@ -26,6 +27,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
         <Integrations compare={t.compare} t={t.providers} bankTagline={t.banks.akbankTagline} code={t.code} />
         <Features t={t.features} />
         <Banks lang={lang} t={t.banks} />
+        <Contributors lang={lang} t={t.contributors} />
         <QuickStart lang={lang} t={t.quickStart} code={t.code} />
         <CTA lang={lang} t={t.cta} />
       </main>
