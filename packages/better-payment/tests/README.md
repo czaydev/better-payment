@@ -1,227 +1,111 @@
 # Testing Guide
 
-Bu proje için test stratejisi ve yapısı.
+Better Payment testlerinin yapısı ve çalıştırma rehberi. Kurulum için [katkı rehberine](../../../CONTRIBUTING.tr.md) bakın.
 
 ## Test Klasör Yapısı
 
-```
+Bu ağaç `packages/better-payment/` altındadır. Unit test dosyaları yerine test grupları gösterilmiştir.
+
+```text
 tests/
-├── unit/                      # Unit testler - mock kullanır
-│   ├── core/                 # Core sınıfların unit testleri
-│   ├── providers/            # Provider'ların unit testleri
-│   │   ├── iyzico/
-│   │   └── paytr/
-│   ├── adapters/             # Adapter testleri
-│   └── client/               # Client testleri
-│
-├── integration/              # Integration testler - gerçek request formatlarını test eder
-│   ├── core/                 # Multi-provider entegrasyonu
-│   └── providers/            # Provider-specific integration testler
-│       ├── iyzico.test.ts   # Iyzico request format, signature, vb.
-│       └── paytr.test.ts    # PayTR hash, basket encoding, vb.
-│
-├── sandbox/                  # Gerçek sağlayıcı test ortamları (pnpm test:sandbox,
-│                             # kimlik bilgisi yoksa atlanır; bkz. CONTRIBUTING.tr.md)
-│
-├── e2e/                      # End-to-end testler
-│   └── payment-flows.test.ts # Tam ödeme akışları
-│
-├── fixtures/                 # Test verileri
-│   ├── payment-data.ts      # Mock ödeme verileri
-│   └── provider-responses.ts # Provider response'ları (sadece unit testler için)
-│
-└── helpers/                  # Test yardımcıları
-    └── request-validator.ts # Request validation helpers
+├── unit/
+│   ├── adapters/              # Framework adapter'ları
+│   ├── client/                # Tarayıcı istemcisi
+│   ├── core/                  # Ödeme, handler, doğrulama, sepet ve hata mantığı
+│   ├── examples/              # Özel provider örneği
+│   ├── plugins/               # localizedErrors
+│   ├── providers/             # iyzico, PayTR, Parampos, Akbank ve ortak işlemler
+│   ├── testing/               # MockProvider
+│   ├── sandbox-redact.test.ts # Sandbox kayıtlarının hassas veri temizliği
+│   └── version.test.ts        # Paket sürümü
+├── integration/
+│   ├── core/
+│   │   └── multi-provider.test.ts
+│   └── providers/
+│       └── iyzico.test.ts
+├── sandbox/
+│   ├── akbank.sandbox.test.ts
+│   ├── iyzico.sandbox.test.ts
+│   ├── parampos.sandbox.test.ts
+│   ├── paytr.sandbox.test.ts
+│   └── setup.ts               # Ortam değişkenleri, test verisi ve kayıt yardımcıları
+├── fixtures/
+│   ├── akbank.ts
+│   ├── parampos-installments.ts
+│   ├── payment-data.ts
+│   ├── provider-responses.ts
+│   └── subscription-data.ts
+└── helpers/
+    ├── fake-payment.ts
+    └── request-validator.ts
 ```
 
 ## Test Türleri
 
-### 1. Unit Tests (`tests/unit/`)
+### Unit testler
 
-**Amaç**: Tek bir fonksiyon veya sınıfı izole bir şekilde test etmek.
+`tests/unit/`, fonksiyonları ve bileşenleri izole olarak test eder. Provider testlerinde sahte `fetch`, mock yanıtlar veya HTTP istemcisi stub'ları kullanılır. Core akışlarında `MockProvider` ve ortak test yardımcıları kullanılabilir. Gerçek provider API'lerine istek gönderilmez.
 
-**Özellikler**:
-- HTTP istekleri mock'lanır (sahte `fetch` ile)
-- Provider response'ları fixture'dan gelir
-- Hızlı çalışır
-- Kod mantığını test eder
+### Integration testler
 
-**Ne zaman kullanılır**:
-- Utility fonksiyonlarını test ederken
-- Sınıf metodlarının içsel mantığını test ederken
-- Error handling mantığını test ederken
+`tests/integration/core/multi-provider.test.ts`, birden fazla provider ile çalışan core akışlarını test eder. `tests/integration/providers/iyzico.test.ts`, HTTP istemcisinin `request` metodunu mock'layarak üretilen endpoint, header ve gövdeyi yakalar. Yanıtlar da sahtedir; integration testler ağ erişimi veya credential gerektirmez.
 
-**Örnek**:
-```typescript
-// tests/unit/providers/iyzico/utils.test.ts
-import { createIyzicoHeaders } from '../../../src/providers/iyzico/utils';
+Bu testlerde yalnızca başarılı sonucu değil, gönderilecek isteğin formatını ve alan eşlemesini de doğrulayın. Güncel iyzico yetkilendirme örnekleri için [mevcut integration testini](integration/providers/iyzico.test.ts) kullanın.
 
-it('should create headers with correct signature', () => {
-  const headers = createIyzicoHeaders('api-key', 'secret', '/endpoint', 'body');
-  expect(headers.Authorization).toContain('IYZWS');
-});
-```
+### Sandbox testleri
 
-### 2. Integration Tests (`tests/integration/`)
+`tests/sandbox/`, provider'ların gerçek test ortamlarına bağlanır. Normal test çalıştırmasına dahil değildir; ayrı [Vitest yapılandırması](../vitest.sandbox.config.ts) ile çalışır. Gerekli ortam değişkenleri bulunmayan provider suite'leri atlanır.
 
-**Amaç**: Provider'lara gönderilen request'lerin GERÇEKTEN doğru formatta olduğunu test etmek.
-
-**Özellikler**:
-- HTTP istekleri intercept edilir (mock edilmez!)
-- Request formatı, header'lar, signature/hash kontrolü yapılır
-- Gerçek API'ye gitmeden önce son validasyon
-- Unit testlerden daha yavaş ama gerçekçi
-
-**Ne test eder**:
-- ✅ Request format (JSON vs form-urlencoded)
-- ✅ Authorization header format
-- ✅ Signature/hash hesaplamaları
-- ✅ Request body transformasyonu
-- ✅ Endpoint routing
-- ✅ Provider-specific field mapping
-
-**Örnek**:
-```typescript
-// tests/integration/providers/iyzico.test.ts
-it('should send payment request with correct Iyzico format', async () => {
-  await iyzico.createPayment(mockPaymentRequest);
-
-  const lastRequest = requestValidator.getLastRequest();
-
-  // Validate Iyzico-specific format
-  validateIyzicoRequest(lastRequest);
-  expect(lastRequest.headers['Authorization']).toMatch(/^IYZWS .+:.+$/);
-  expect(lastRequest.body.locale).toBe('tr');
-});
-```
-
-### 3. E2E Tests (`tests/e2e/`)
-
-**Amaç**: Tüm sistemin birlikte çalışmasını test etmek.
-
-**Özellikler**:
-- Gerçek API'lere istek atabilir (sandbox ortamlarına)
-- Veya tam mock server kullanır
-- En yavaş ama en kapsamlı testler
-
-**Ne zaman kullanılır**:
-- Tam ödeme akışlarını test ederken
-- Multi-step işlemleri test ederken (3DS flow, refund, vb.)
-- Production-like senaryoları test ederken
+Credential ve test kartı gereksinimleri [Sandbox Testleri](../../../CONTRIBUTING.tr.md#sandbox-testleri) bölümündedir. Yalnızca test ortamı verilerini kullanın. `SANDBOX_RECORD=1` ile açılan kayıt modu, hassas verileri temizlenmiş yanıtları `tests/fixtures/recorded/` altına yazar; bu klasör gerektiğinde oluşturulur.
 
 ## Test Çalıştırma
 
+Aşağıdaki komutları repository kökünden çalıştırın:
+
 ```bash
-# Tüm testler
-npm test
+# Unit ve integration testlerini bir kez çalıştırır, sandbox hariçtir
+pnpm test
 
-# Sadece unit testler
-npm run test:unit
+# Yalnızca unit veya integration testlerini bir kez çalıştırır
+pnpm --filter better-payment test:unit --run
+pnpm --filter better-payment test:integration --run
 
-# Sadece integration testler
-npm run test:integration
-
-# Sadece e2e testler
-npm run test:e2e
-
-# Coverage ile
-npm run test:coverage
+# Coverage raporu ve yapılandırılmış eşikler
+pnpm --filter better-payment test:coverage
 
 # Watch mode
-npm run test:watch
+pnpm --filter better-payment test:watch
+
+# Aynı testleri edge-runtime ortamında çalıştırır
+pnpm --filter better-payment test:edge
+
+# Gerçek provider sandbox'ları, gerekli ortam değişkenleri ayarlandıktan sonra
+pnpm --filter better-payment test:sandbox
 ```
+
+`test:unit` ve `test:integration` komutlarında `--run`, yerel çalıştırmanın watch mode'a geçmesini önler. Paket klasöründeyseniz `--filter better-payment` kısmını çıkarabilirsiniz.
 
 ## Yeni Test Yazarken
 
-### Unit Test Yazma
+1. Mevcut bir test grubunda `*.test.ts` dosyası oluşturun ve benzer testin kurulumunu izleyin.
+2. Paylaşılan istek ve yanıt verileri için `fixtures/`, test yardımcıları için `helpers/` klasörlerini kullanın. Gerçek credential, müşteri veya kart verisi eklemeyin.
+3. Unit ve integration testlerinde ağ çağrılarını sahte `fetch`, stub veya `MockProvider` ile karşılayın. Gerçek sandbox çağrıları yalnızca ayrı sandbox suite'lerinde bulunmalıdır.
+4. Başarılı senaryoya ek olarak ilgili hata, timeout ve geçersiz girdi yollarını doğrulayın. Callback ve imza testlerinde sahte veya eksik imzaların reddedildiğini kontrol edin.
+5. Testler arasında mock, spy ve global değişiklikleri temizleyin. Testlerin çalışma sırasına bağımlı olmayın.
 
-1. `tests/unit/` altında uygun klasöre git
-2. Provider'a `fetch` seçeneğiyle sahte bir fetch ver (ya da `(provider as any).client.request/post`'u stub'la)
-3. Provider response'ları için `fixtures/provider-responses.ts` kullan
-4. Tek bir fonksiyon/metod'u test et
+Örnek alınabilecek dosyalar:
 
-```typescript
-import { mockIyzicoSuccessResponse } from '../../../fixtures/provider-responses';
+- [iyzico unit testleri](unit/providers/iyzico/index.test.ts)
+- [iyzico istek formatı testleri](integration/providers/iyzico.test.ts)
+- [Çoklu provider testleri](integration/core/multi-provider.test.ts)
+- [MockProvider testleri](unit/testing/mock-provider.test.ts)
 
-it('should handle payment success', async () => {
-  const fetch = vi.fn(async () => new Response(JSON.stringify(mockIyzicoSuccessResponse)));
-  const iyzico = new Iyzico({ apiKey: 'k', secretKey: 's', baseUrl: 'https://sandbox-api.iyzipay.com', fetch });
+## Coverage
 
-  const result = await iyzico.createPayment(mockPaymentRequest);
+Coverage eşiklerinin kaynağı [vitest.config.ts](../vitest.config.ts) içindeki `coverage.thresholds` ayarıdır. `pnpm --filter better-payment test:coverage` bu eşikleri uygular ve `packages/better-payment/coverage/` altında rapor üretir. Yeni test eklerken kapsamı koruyun; eşikleri yalnızca mevcut değerleri doğruladıktan sonra güncelleyin.
 
-  expect(result.status).toBe(PaymentStatus.SUCCESS);
-});
-```
+## CI
 
-### Integration Test Yazma
+[CI workflow'u](../../../.github/workflows/ci.yml), `main` push'larında ve pull request'lerde Node.js 20, 22 ve 24 üzerinde coverage eşikleriyle testleri ve edge-runtime suite'ini çalıştırır. Ayrıca lint, format, typecheck, örneklerin typecheck'i, build, paket boyutu ve build çıktılarının smoke kontrolleri vardır.
 
-1. `tests/integration/` altında uygun klasöre git
-2. `RequestValidator` kullan
-3. İstekleri sahte `fetch` ile yakala
-4. Request formatını detaylı kontrol et
-
-```typescript
-import { RequestValidator, validateIyzicoRequest } from '../../helpers/request-validator';
-
-beforeEach(() => {
-  requestValidator = new RequestValidator();
-
-  // Intercept requests
-  const fetch = vi.fn(async (url: string, init: RequestInit) => {
-    requestValidator.captureRequest({ /* url, init.headers, init.body */ });
-    return new Response('{}');
-  });
-  iyzico = new Iyzico({ ...config, fetch });
-});
-
-it('should send correct format', async () => {
-  await iyzico.createPayment(mockPaymentRequest);
-
-  const lastRequest = requestValidator.getLastRequest();
-  validateIyzicoRequest(lastRequest);
-});
-```
-
-## Yaygın Hatalar
-
-### ❌ YANLIŞ: Integration testlerde mock response kullanmak
-
-```typescript
-// KÖTÜ - Bu unit test!
-const fetch = async () => new Response(JSON.stringify(mockIyzicoSuccessResponse));
-await iyzico.createPayment(mockPaymentRequest);
-```
-
-### ✅ DOĞRU: Request formatını validate etmek
-
-```typescript
-// İYİ - Bu integration test!
-const iyzico = new Iyzico({ ...config, fetch: capturingFetch });
-await iyzico.createPayment(mockPaymentRequest);
-
-const request = requestValidator.getLastRequest();
-expect(request.headers['Authorization']).toBeDefined();
-expect(request.body.locale).toBe('tr');
-```
-
-## Test Prensipleri
-
-1. **Unit testler mock kullanır** - Hızlı ve izole
-2. **Integration testler request'i validate eder** - Gerçek format kontrolü
-3. **E2E testler akışı test eder** - Tam senaryo
-4. **Her test bağımsız olmalı** - Birbirine bağımlı testler yazmayın
-5. **Test adları açıklayıcı olmalı** - Ne test ettiği belli olmalı
-
-## Coverage Hedefleri
-
-- **Lines**: 80%+
-- **Functions**: 80%+
-- **Branches**: 80%+
-- **Statements**: 80%+
-
-## CI/CD
-
-Testler her commit'te otomatik çalışır:
-- Unit testler her zaman çalışır
-- Integration testler her zaman çalışır
-- E2E testler sadece PR'larda çalışır (opsiyonel)
+[Sandbox workflow'u](../../../.github/workflows/sandbox.yml) upstream repository'de gecelik veya manuel çalışır. Gerekli secret'ları bulunmayan provider suite'leri atlanır. Kayıt seçeneği açıkken temizlenmiş yanıtlar workflow artifact'i olarak yüklenir.
