@@ -247,6 +247,52 @@ html {
   }
 }
 
+/* Roadmap: one route of half-oval dashed bridges; page scroll carries it to the right (RoadmapScroller) */
+.bp-roadmap-stage { padding-block: 12px; }
+.bp-route-viewport {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bp-line-strong) transparent;
+  padding-block: 8px;
+  /* Stops fade in and out at the edges instead of being cut */
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.bp-route-viewport:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+/* The route bleeds to the screen edges but starts and ends in line with the content column */
+.bp-route-viewport { margin-inline: calc(50% - 50vw); }
+.bp-route-track {
+  box-sizing: content-box;
+  width: max-content;
+  padding-inline: max(20px, calc(50vw - 36rem));
+  will-change: transform;
+}
+.bp-route-line {
+  fill: none;
+  stroke: var(--bp-line-strong);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-dasharray: 2 9;
+  animation: bp-route-flow 1.6s linear infinite;
+}
+.bp-route-line-reached { stroke: var(--primary); stroke-width: 2; }
+@keyframes bp-route-flow { to { stroke-dashoffset: -11; } }
+.bp-route-stop > * { transition: transform var(--bp-d-md) var(--bp-ease); }
+.bp-route-stop[data-reached] img { opacity: 1; filter: none; }
+.bp-route-stop[data-reached] a > span:first-child { border-color: var(--bp-lilac); }
+.bp-route-stop[data-reached]:not([data-live]) a > span:last-child { background: var(--bp-tint); color: var(--primary); }
+.bp-roadmap-progress { display: none; }
+.bp-roadmap[data-scroll-linked] .bp-roadmap-stage { position: sticky; top: max(80px, calc(50svh - 210px)); }
+.bp-roadmap[data-scroll-linked] .bp-roadmap-progress { display: block; }
+.bp-roadmap[data-scroll-linked] .bp-route-viewport { overflow: hidden; }
+.bp-roadmap-progress > div { transform: scaleX(var(--route-progress, 0)); }
+.bp-roadmap-nudge { animation: bp-nudge 1.8s var(--bp-ease) infinite; }
+@keyframes bp-nudge { 50% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .bp-route-line, .bp-roadmap-nudge { animation: none; }
+}
+
 /* Provider network in the hero */
 .bp-wire {
   fill: none;

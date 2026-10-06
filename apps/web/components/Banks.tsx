@@ -2,6 +2,7 @@ import { Shield, Zap, CreditCard, Lock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import SectionHeading from "@/components/SectionHeading";
+import RoadmapScroller from "@/components/RoadmapScroller";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
@@ -43,29 +44,6 @@ const institutions: RouteItem[] = [
 ];
 
 const ISSUES = "https://github.com/czaydev/better-payment/issues";
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const rows: T[][] = [];
-  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
-  return rows;
-}
-
-// Nodes sit on alternating heights across a 1000x220 box; the dashed wave passes through their centres
-function layout(count: number) {
-  const X = Array.from({ length: count }, (_, i) => ((i + 0.5) / count) * 100);
-  const Y = X.map((_, i) => (i % 2 === 0 ? 30 : 70));
-  const bend = 500 / count;
-  const wave = X.slice(1)
-    .map((x, i) => {
-      const px = X[i] * 10;
-      const py = Y[i] * 2.2;
-      const nx = x * 10;
-      const ny = Y[i + 1] * 2.2;
-      return `${i === 0 ? `M${px},${py} ` : ""}C${px + bend},${py} ${nx - bend},${ny} ${nx},${ny}`;
-    })
-    .join(" ");
-  return { X, Y, wave };
-}
 
 function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
   const live = item.live === true;
@@ -109,50 +87,60 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
   );
 }
 
-function WaveRow({ items, t }: { items: RouteItem[]; t: Dictionary["banks"] }) {
-  const { X, Y, wave } = layout(items.length);
+// One continuous route: a group label, then its providers, joined by half-oval dashed bridges
+const SPACING = 270;
+const PAD = 96;
+const MID = 104;
+const NODE_W = 150;
+const LABEL_W = 176;
+
+type Stop = { label: string } | { item: RouteItem };
+
+function RouteTrack({ groups, t }: { groups: { title: string; items: RouteItem[] }[]; t: Dictionary["banks"] }) {
+  const stops: Stop[] = groups.flatMap(({ title, items }) => [{ label: title }, ...items.map((item) => ({ item }))]);
+  const x = stops.map((_, i) => PAD + i * SPACING);
+  const half = (stop: Stop) => ("label" in stop ? LABEL_W : NODE_W) / 2 + 6;
+  const width = x[x.length - 1] + PAD;
+  // Bridges alternate above and below the line, so the route reads as a gentle wave moving right
+  const bridges = stops.slice(1).map((stop, i) => {
+    const from = x[i] + half(stops[i]);
+    const to = x[i + 1] - half(stop);
+    const rx = (to - from) / 2;
+    return `M ${from} ${MID} A ${rx} ${rx * 0.78} 0 0 ${i % 2 === 0 ? 1 : 0} ${to} ${MID}`;
+  });
+  const d = bridges.join(" ");
   return (
-    <div className="relative aspect-[1000/220]">
-      {items.length > 1 && (
-        <svg viewBox="0 0 1000 220" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden="true">
-          <path d={wave} fill="none" stroke="#cfcde6" strokeWidth="2" strokeDasharray="6 8" vectorEffect="non-scaling-stroke" />
+    <div data-route-track className="bp-route-track">
+      <div className="relative h-[232px]" style={{ width }}>
+        <svg viewBox={`0 0 ${width} 232`} className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden="true">
+          <defs>
+            <clipPath id="bp-route-reached">
+              <rect data-route-clip x="0" y="0" width="0" height="232" />
+            </clipPath>
+          </defs>
+          <path d={d} className="bp-route-line" />
+          <path d={d} className="bp-route-line bp-route-line-reached" clipPath="url(#bp-route-reached)" />
         </svg>
-      )}
-      {items.map((item, i) => (
-        <div key={item.name} className="absolute -translate-x-1/2 -translate-y-[38%]" style={{ left: `${X[i]}%`, top: `${Y[i]}%` }}>
-          <RouteNode item={item} t={t} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Route({ title, items, t }: { title: string; items: RouteItem[]; t: Dictionary["banks"] }) {
-  return (
-    <div>
-      <h4 className="mb-4 text-[13px] font-semibold tracking-wide text-muted-foreground uppercase">{title}</h4>
-
-      {/* Desktop: dashed waves through alternating nodes, six per row on wide screens and four on tablets */}
-      <div className="hidden gap-4 lg:grid">
-        {chunk(items, 6).map((row) => (
-          <WaveRow key={row[0].name} items={row} t={t} />
-        ))}
+        <ol className="m-0 list-none p-0">
+          {stops.map((stop, i) => (
+            <li
+              key={"label" in stop ? stop.label : stop.item.name}
+              data-route-stop={x[i]}
+              data-live={"item" in stop && stop.item.live ? "" : undefined}
+              className="bp-route-stop absolute -translate-x-1/2"
+              style={{ left: x[i], top: MID - 32 }}
+            >
+              {"label" in stop ? (
+                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-[12px] font-semibold tracking-wide text-primary uppercase" style={{ width: LABEL_W }}>
+                  {stop.label}
+                </h4>
+              ) : (
+                <RouteNode item={stop.item} t={t} />
+              )}
+            </li>
+          ))}
+        </ol>
       </div>
-      <div className="hidden gap-4 md:grid lg:hidden">
-        {chunk(items, 4).map((row) => (
-          <WaveRow key={row[0].name} items={row} t={t} />
-        ))}
-      </div>
-
-      {/* Mobile: the same route, vertically */}
-      <ol className="relative grid gap-6 border-l-2 border-dashed border-line-strong pl-6 md:hidden">
-        {items.map((item) => (
-          <li key={item.name} className="relative flex justify-start">
-            <span className="absolute top-8 -left-[31px] size-3 rounded-full border-2 border-card bg-line-strong" aria-hidden="true" />
-            <RouteNode item={item} t={t} />
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -160,7 +148,7 @@ function Route({ title, items, t }: { title: string; items: RouteItem[]; t: Dict
 export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"] }) {
   const highlights = t.highlights.map((h, i) => ({ ...h, icon: highlightIcons[i] }));
   return (
-    <section id="banks" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
+    <section id="banks" className="scroll-mt-20 overflow-x-clip px-5 py-24 sm:px-8 md:py-28">
       <div className="mx-auto max-w-6xl">
         <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} />
 
@@ -208,14 +196,15 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
           </ul>
         </div>
 
-        <div className="bp-reveal mt-14">
-          <h3 className="mb-6 text-[17px] font-bold text-foreground">{t.roadmap}</h3>
-
-          <div className="grid gap-10">
-            <Route title={t.roadmapBanks} items={banks} t={t} />
-            <Route title={t.roadmapInstitutions} items={institutions} t={t} />
-          </div>
-        </div>
+        <RoadmapScroller title={t.roadmap} hint={t.roadmapHint} previous={t.previous} next={t.next}>
+          <RouteTrack
+            groups={[
+              { title: t.roadmapBanks, items: banks },
+              { title: t.roadmapInstitutions, items: institutions },
+            ]}
+            t={t}
+          />
+        </RoadmapScroller>
       </div>
     </section>
   );
