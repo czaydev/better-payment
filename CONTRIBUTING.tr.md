@@ -128,7 +128,18 @@ git commit -m "feat: Add amazing feature"
 - Branch'inizi fork'unuza push edin
 - GitHub'da Pull Request açın
 - Değişiklikleri ve test sonuçlarını açıklayın
-- Kullanıcıyı etkileyen her değişiklik için `pnpm changeset` ile bir changeset ekleyin
+- Kullanıcıyı etkileyen her değişiklik için `pnpm changeset` ile bir changeset ekleyin. Özetin
+  altına doküman changelog'u maddesini İngilizce ve Türkçe, doküman linkleriyle yazın (CI kontrol eder):
+
+  ```md
+  <!-- docs -->
+  en: **[React Router adapter](/docs/integrations/frameworks#react-router):** ...
+  tr: **[React Router adaptörü](/docs/integrations/frameworks#react-router):** ...
+  ```
+
+  Madde `Added` (minor), `Fixed` (patch) veya `Changed (breaking)` (major) altına girer. Başka bir
+  bölüm için `section:` satırı ekleyin (`added`, `changed`, `changed-breaking`, `fixed`); örneğin
+  0.x'te geriye uyumsuz bir değişiklik için `section: changed-breaking`.
 
 5. **Code Review**
 - Geri bildirimlere yanıt verin
@@ -452,14 +463,15 @@ Proje [Changesets](https://github.com/changesets/changesets) kullanır.
 1. Kullanıcıyı etkileyen her PR bir changeset içerir: `pnpm changeset`.
 2. Changeset'ler `main`'e girdiğinde **Release PR** workflow'u `chore(release): version packages`
    PR'ını açar veya günceller. Bu PR `pnpm version-packages` çalıştırır: changeset'leri
-   `package.json`, `src/version.ts`, `CHANGELOG.md` ve kurulum dokümanındaki `VERSION` örneğine işler.
+   `package.json`, `src/version.ts`, `CHANGELOG.md`, doküman changelog'u (her changeset'in
+   `<!-- docs -->` maddesinden) ve kurulum dokümanındaki `VERSION` örneğine işler.
 3. Birleştirmeden önce release PR'ını düzenleyin (`changeset-release/main` dalına push edin):
    - `CHANGELOG.md`: yeni bölüm her changeset özetini `Added` (minor), `Fixed` (patch) veya
      `Changed (breaking)` (major) altında listeler. Önceki sürümlerdeki gibi kullanıcıya göre
      yeniden yazın, uygun olanları `Changed` altına taşıyın ve katkı verenleri anın.
    - Doküman changelog'u (`apps/web/content/docs/reference/changelog.mdx` ve `changelog.tr.mdx`)
-     İngilizce ve Türkçe olarak, doküman linkleriyle elle yazılır. Yeni sürümün bölümü yoksa **Publish to NPM**
-     durur.
+     yeni sürümün bölümünü changeset'lerden alır. Büyük bir sürüm için isterseniz bir satırlık giriş
+     ekleyin. Yeni sürümün bölümü yoksa **Publish to NPM** durur.
 4. Release PR'ını birleştirmek sürümü yayınlar: **Publish to NPM** workflow'u `main`'e yapılan her
    push'ta çalışır ve paket sürümünün henüz GitHub release'i yoksa yayınlar. Workflow lint,
    typecheck ve testleri çalıştırır, ardından npm **trusted publishing** (OIDC) ile `latest`
