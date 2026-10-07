@@ -48,6 +48,19 @@
   --color-warning-soft: var(--bp-warning-soft);
   --color-danger: var(--bp-danger);
   --color-danger-soft: var(--bp-danger-soft);
+  --color-accent-text: var(--bp-accent-text);
+  --color-logo: var(--bp-logo-surface);
+  --color-code-fn: var(--bp-code-fn);
+  --color-code-muted-bg: var(--bp-code-muted-bg);
+  --color-callout-info-border: var(--bp-callout-info-border);
+  --color-callout-info-title: var(--bp-callout-info-title);
+  --color-callout-warn-border: var(--bp-callout-warn-border);
+  --color-callout-warn-title: var(--bp-callout-warn-title);
+  --color-callout-error-border: var(--bp-callout-error-border);
+  --color-callout-error-title: var(--bp-callout-error-title);
+  --color-callout-success-border: var(--bp-callout-success-border);
+  --color-callout-success-title: var(--bp-callout-success-title);
+  --color-callout-code: var(--bp-callout-code);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -61,9 +74,13 @@ html {
   scroll-behavior: smooth;
   color-scheme: light;
 }
+html.dark {
+  color-scheme: dark;
+}
 
 /*
- * Light only. Palette "Signal Indigo" (vault: Branding/05 - Brand Lock).
+ * Palette "Signal Indigo" (vault: Branding/05 - Brand Lock), light below and
+ * dark in `.dark`. next-themes sets the class before first paint.
  * Fumadocs reads the same variables through fumadocs-ui/css/shadcn.css.
  */
 :root {
@@ -105,6 +122,24 @@ html {
   --bp-warning-soft: #fdf3e3;
   --bp-danger: #c8322b;
   --bp-danger-soft: #fdeceb;
+  /* Indigo used as text on tinted surfaces (inline code, labels) */
+  --bp-accent-text: #4338f2;
+  /* Third-party logos are drawn for light backgrounds, so they keep a light tile */
+  --bp-logo-surface: #ffffff;
+  --bp-wire: #d9d6f2;
+  --bp-glow: rgb(67 56 242 / 0.67);
+  --bp-shadow: rgb(19 19 43 / 0.22);
+  --bp-code-fn: #6a3fd8;
+  --bp-code-muted-bg: #fbfbfe;
+  --bp-callout-info-border: #dcd8ff;
+  --bp-callout-info-title: #2b2496;
+  --bp-callout-warn-border: #f4dfb8;
+  --bp-callout-warn-title: #7a4605;
+  --bp-callout-error-border: #f6cfcc;
+  --bp-callout-error-title: #8f211c;
+  --bp-callout-success-border: #c4e7d8;
+  --bp-callout-success-title: #065c40;
+  --bp-callout-code: rgb(255 255 255 / 0.7);
 
   /* Motion tokens (vault: Branding/06 - Bileşen ve Motion Spesifikasyonu) */
   --bp-d-xs: 140ms;
@@ -117,6 +152,63 @@ html {
   --bp-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --bp-exit: cubic-bezier(0.4, 0, 1, 1);
   --bp-rise: 18px;
+}
+
+/* Dark "Signal Indigo": deep navy surfaces, a lifted indigo, soft tints */
+.dark {
+  --background: #0d0d1c;
+  --foreground: #ecebfa;
+  --card: #15152a;
+  --card-foreground: #ecebfa;
+  --popover: #17172e;
+  --popover-foreground: #ecebfa;
+  --primary: #7068ff;
+  --primary-foreground: #ffffff;
+  --secondary: #23214a;
+  --secondary-foreground: #c4c0ff;
+  --muted: #1a1a30;
+  --muted-foreground: #a0a0bd;
+  --accent: #23214a;
+  --accent-foreground: #ecebfa;
+  --destructive: #f3726b;
+  --border: #29293f;
+  --input: #2f2f4c;
+  --ring: #7068ff;
+  --sidebar: #0d0d1c;
+  --sidebar-foreground: #ecebfa;
+  --sidebar-primary: #7068ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #23214a;
+  --sidebar-accent-foreground: #c4c0ff;
+  --sidebar-border: #29293f;
+  --sidebar-ring: #7068ff;
+
+  --bp-tint: #1f1d45;
+  --bp-lilac: #5a53c9;
+  --bp-line-strong: #3a3a5c;
+  --bp-primary-hover: #8079ff;
+  --bp-success: #3ccf97;
+  --bp-success-soft: #0f2a22;
+  --bp-warning: #f0b04a;
+  --bp-warning-soft: #2e2210;
+  --bp-danger: #f3726b;
+  --bp-danger-soft: #331616;
+  --bp-accent-text: #b9b4ff;
+  --bp-logo-surface: #ecebf5;
+  --bp-wire: #34325e;
+  --bp-glow: rgb(112 104 255 / 0.45);
+  --bp-shadow: rgb(0 0 0 / 0.5);
+  --bp-code-fn: #c8a6ff;
+  --bp-code-muted-bg: #111124;
+  --bp-callout-info-border: #34306e;
+  --bp-callout-info-title: #c4c0ff;
+  --bp-callout-warn-border: #4d3a17;
+  --bp-callout-warn-title: #f6c97a;
+  --bp-callout-error-border: #55231f;
+  --bp-callout-error-title: #f8a29d;
+  --bp-callout-success-border: #17473a;
+  --bp-callout-success-title: #7fe0bb;
+  --bp-callout-code: rgb(255 255 255 / 0.08);
 }
 
 @layer base {
@@ -281,7 +373,7 @@ html {
 .bp-route-stop > * { transition: transform var(--bp-d-md) var(--bp-ease); }
 .bp-route-stop[data-reached] img { opacity: 1; filter: none; }
 .bp-route-stop[data-reached] a > span:first-child { border-color: var(--bp-lilac); }
-.bp-route-stop[data-reached]:not([data-live]) a > span:last-child { background: var(--bp-tint); color: var(--primary); }
+.bp-route-stop[data-reached]:not([data-live]) a > span:last-child { background: var(--bp-tint); color: var(--bp-accent-text); }
 .bp-roadmap-progress { display: none; }
 .bp-roadmap[data-scroll-linked] .bp-roadmap-stage { position: sticky; top: max(80px, calc(50svh - 210px)); }
 .bp-roadmap[data-scroll-linked] .bp-roadmap-progress { display: block; }
@@ -296,7 +388,7 @@ html {
 /* Provider network in the hero */
 .bp-wire {
   fill: none;
-  stroke: #d9d6f2;
+  stroke: var(--bp-wire);
   stroke-width: 1.6;
   stroke-dasharray: 4 6;
   transition: stroke var(--bp-d-sm);
@@ -363,7 +455,7 @@ html {
 }
 :is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div a:hover {
   background: var(--bp-tint);
-  color: var(--primary);
+  color: var(--bp-accent-text);
 }
 :is(#nd-sidebar, #nd-sidebar-mobile) > div:has(> button[aria-haspopup="dialog"]) > div a svg {
   width: 18px;
@@ -402,7 +494,7 @@ html {
   border: 0;
   border-radius: 6px;
   background: var(--bp-tint);
-  color: var(--primary);
+  color: var(--bp-accent-text);
   padding: 0.1em 0.38em;
   font-size: 0.88em;
 }
@@ -419,7 +511,7 @@ html {
   height: 18px;
   border-radius: 999px;
   background: var(--bp-tint);
-  color: var(--primary);
+  color: var(--bp-accent-text);
   vertical-align: -3px;
 }
 .bp-check svg {

@@ -62,7 +62,14 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
                 width={1226}
                 height={155}
                 alt="Better Payment"
-                className="h-7 w-auto"
+                className="h-7 w-auto dark:hidden"
+              />
+              <Image
+                src="/brand/better-payment-horizontal-dark.svg"
+                width={1226}
+                height={155}
+                alt="Better Payment"
+                className="hidden h-7 w-auto dark:block"
               />
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-[230px]">

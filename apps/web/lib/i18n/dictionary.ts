@@ -15,6 +15,7 @@ const en = {
     getStarted: "Get started",
     openMenu: "Open menu",
     language: "Language",
+    theme: "Toggle dark mode",
   },
   hero: {
     titleLine1: "One API for",
@@ -231,6 +232,7 @@ const tr: Dictionary = {
     getStarted: "Başlayın",
     openMenu: "Menüyü aç",
     language: "Dil",
+    theme: "Karanlık modu aç/kapat",
   },
   hero: {
     titleLine1: "Türk ödeme sistemleri",

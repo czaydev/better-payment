@@ -22,7 +22,16 @@ export default function Hero({ lang, t }: { lang: Locale; t: Dictionary["hero"] 
           priority
           quality={90}
           sizes="100vw"
-          className="bp-art object-cover object-bottom max-md:object-[42%_100%]"
+          className="bp-art object-cover object-bottom max-md:object-[42%_100%] dark:hidden"
+        />
+        {/* Same render with its lightness inverted onto the dark background */}
+        <Image
+          src="/brand/hero/hero-a3-dark.webp"
+          alt=""
+          fill
+          quality={90}
+          sizes="100vw"
+          className="bp-art hidden object-cover object-bottom max-md:object-[42%_100%] dark:block"
         />
       </div>
 

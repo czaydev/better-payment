@@ -33,7 +33,7 @@ export default function CopyButton({
       aria-live="polite"
       className={cn(
         "ml-auto inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary",
-        copied ? "text-success" : "text-muted-foreground hover:bg-tint hover:text-primary",
+        copied ? "text-success" : "text-muted-foreground hover:bg-tint hover:text-accent-text",
         className,
       )}
     >

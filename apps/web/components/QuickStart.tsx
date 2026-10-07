@@ -61,7 +61,7 @@ export default function QuickStart({ lang, t, code }: { lang: Locale; t: Diction
             <li key={step.number} className="bp-reveal flex gap-6 sm:gap-8">
               <div className="flex flex-col items-center shrink-0 pt-1">
                 <div className="w-9 h-9 rounded-lg bg-tint flex items-center justify-center">
-                  <span className="text-[11px] font-semibold text-primary font-mono">
+                  <span className="text-[11px] font-semibold text-accent-text font-mono">
                     {step.number}
                   </span>
                 </div>
@@ -81,7 +81,7 @@ export default function QuickStart({ lang, t, code }: { lang: Locale; t: Diction
         <div className="bp-reveal mt-12 pl-[calc(36px+1.5rem)] sm:pl-[calc(36px+2rem)]">
           <Link
             href={localePath(lang, "/docs")}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary group"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text group"
           >
             {t.fullDocs}
             <ChevronRight className="size-4 transition-transform duration-(--bp-d-md) ease-spring group-hover:translate-x-[3px]" />

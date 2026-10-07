@@ -49,7 +49,7 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
   const live = item.live === true;
   const body = (
     <>
-      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_rgb(19_19_43/0.04)] transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_rgb(19_19_43/0.22)]">
+      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_rgb(19_19_43/0.04)] dark:bg-logo transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]">
         {item.logo ? (
           <Image
             src={item.logo}
@@ -131,7 +131,7 @@ function RouteTrack({ groups, t }: { groups: { title: string; items: RouteItem[]
               style={{ left: x[i], top: MID - 32 }}
             >
               {"label" in stop ? (
-                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-[12px] font-semibold tracking-wide text-primary uppercase" style={{ width: LABEL_W }}>
+                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-[12px] font-semibold tracking-wide text-accent-text uppercase" style={{ width: LABEL_W }}>
                   {stop.label}
                 </h4>
               ) : (
@@ -155,7 +155,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
         <div className="bp-reveal grid gap-3">
           <div className="grid gap-x-10 gap-y-4 rounded-2xl border border-border bg-card p-6 sm:p-7 lg:grid-cols-[1fr_1.2fr] lg:items-center">
             <div className="flex items-center gap-3">
-              <span className="grid size-12 place-items-center rounded-xl border border-border bg-background">
+              <span className="grid size-12 place-items-center rounded-xl border border-border bg-background dark:bg-logo">
                 <Image src="/akbank.svg" alt="" width={75} height={38} className="h-6 w-10 object-contain" />
               </span>
               <div className="min-w-0">
@@ -173,7 +173,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
               <p className="text-[14.5px] leading-relaxed text-muted-foreground">{t.akbankDescription}</p>
               <Link
                 href={localePath(lang, "/docs/banks/akbank")}
-                className="group mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
+                className="group mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent-text"
               >
                 {t.viewDocs}
                 <ChevronRight className="size-4 transition-transform duration-(--bp-d-md) ease-spring group-hover:translate-x-[3px]" />
@@ -184,7 +184,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
           <ul className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {highlights.map((h) => (
               <li key={h.label} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-tint text-primary">
+                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-tint text-accent-text">
                   <h.icon className="size-4" />
                 </span>
                 <span className="min-w-0">

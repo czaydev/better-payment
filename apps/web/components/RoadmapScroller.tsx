@@ -110,7 +110,7 @@ export default function RoadmapScroller({ children, title, hint, previous, next 
           </div>
           <div className="flex shrink-0 gap-2">
             {[{ label: previous, direction: -1, Icon: ChevronLeft }, { label: next, direction: 1, Icon: ChevronRight }].map(({ label, direction, Icon }) => (
-              <button key={direction} type="button" aria-label={label} onClick={() => advance(direction)} className="grid size-10 place-items-center rounded-full border border-border bg-card text-primary transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+              <button key={direction} type="button" aria-label={label} onClick={() => advance(direction)} className="grid size-10 place-items-center rounded-full border border-border bg-card text-accent-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
                 <Icon className="size-4" />
               </button>
             ))}

@@ -178,7 +178,7 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
         ))}
       </svg>
 
-      <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-2xl bg-primary px-4 py-3 font-mono text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-12px_rgb(67_56_242)] max-md:gap-2 max-md:px-3 max-md:py-2.5 max-md:text-[12.5px]">
+      <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-2xl bg-primary px-4 py-3 font-mono text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-12px_var(--bp-glow)] max-md:gap-2 max-md:px-3 max-md:py-2.5 max-md:text-[12.5px]">
         <Image src="/brand/better-payment-symbol-white.svg" width={22} height={22} alt="" className="size-5.5 max-md:size-4.5" />
         betterPayment()
       </div>
@@ -212,7 +212,7 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
               on && (phase === "return" || phase === "verified") && "border-success shadow-[0_0_0_5px_var(--bp-success-soft)]",
             )}
           >
-            <span className="grid size-9.5 place-items-center rounded-[9px] border border-border bg-background max-md:size-7.5">
+            <span className="grid size-9.5 place-items-center rounded-[9px] border border-border bg-background dark:bg-logo max-md:size-7.5">
               <Image src={n.logo} width={32} height={18} alt="" className="h-4.5 w-8 object-contain max-md:h-3.5 max-md:w-6.5" />
             </span>
             <b className="font-display text-[13.5px] max-md:text-[12.5px]">{n.name}</b>

@@ -52,7 +52,7 @@ export function Since({ version, lang = "en" }: SinceProps) {
       className={
         released
           ? "not-prose my-2 inline-flex w-fit items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
-          : "not-prose my-2 inline-flex w-fit items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300"
+          : "not-prose my-2 inline-flex w-fit items-center rounded-full border border-warning/30 bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning"
       }
       data-release-status={released ? "released" : "unreleased"}
     >

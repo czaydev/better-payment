@@ -23,9 +23,9 @@ export function highlight(code: string) {
     } else if (string) {
       out.push(<span key={index} className="text-success">{text}</span>);
     } else if (word && KEYWORDS.has(word)) {
-      out.push(<span key={index} className="text-primary">{text}</span>);
+      out.push(<span key={index} className="text-accent-text">{text}</span>);
     } else if (word && call !== undefined) {
-      out.push(<span key={index} className="text-[#6a3fd8]">{text}</span>);
+      out.push(<span key={index} className="text-code-fn">{text}</span>);
     } else {
       out.push(text);
     }
