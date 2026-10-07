@@ -7,13 +7,14 @@
 //    intro. Move it below the intro (before the latest release) and name its headings like
 //    the rest of the file: Added / Changed (breaking) / Fixed.
 // 3. src/version.ts and the VERSION example in the installation docs (en/tr) get the new version.
-//
-// The docs changelog (apps/web/content/docs/reference/changelog*.mdx) stays manual: it is
-// written for users, with links, in English and Turkish. Edit it in the release PR.
+// 4. The docs changelog (apps/web/content/docs/reference/changelog*.mdx) gets the new version's
+//    section, from the `<!-- docs -->` block of each changeset (scripts/docs-changelog.mjs).
+//    A changeset without one falls back to its summary, in English on both pages.
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { BUMP_SECTIONS, docsSection, readChangesets } from './docs-changelog.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pkgDir = `${root}packages/better-payment/`;
@@ -24,6 +25,8 @@ const version = () => JSON.parse(read(`${pkgDir}package.json`)).version;
 
 const before = version();
 const changelogBefore = read(changelogPath);
+// `changeset version` deletes the changesets, so read their docs entries first
+const changesets = readChangesets(`${root}.changeset`).filter((changeset) => changeset.bump);
 
 execFileSync('pnpm', ['exec', 'changeset', 'version'], { cwd: root, stdio: 'inherit' });
 
@@ -80,5 +83,34 @@ if (installationPages.length !== 2)
 for (const file of installationPages)
   replaceIn(`${docsDir}${file}`, `// '${before}'`, `// '${next}'`);
 
+// 4. Docs changelog
+const entries = changesets.map((changeset) => {
+  if (changeset.docs) return changeset.docs;
+  console.warn(`${changeset.file}: ${changeset.error}; using its summary on both docs pages`);
+  const { summary } = changeset;
+  return { section: BUMP_SECTIONS[changeset.bump], en: summary, tr: summary };
+});
+const referenceDir = `${docsDir}reference/`;
+for (const [file, lang] of [
+  ['changelog.mdx', 'en'],
+  ['changelog.tr.mdx', 'tr'],
+]) {
+  const path = `${referenceDir}${file}`;
+  const text = read(path);
+  if (text.split('\n').includes(`## ${next}`)) continue;
+  const latest = text.indexOf('\n## ');
+  const section = docsSection(next, entries, lang);
+  writeFileSync(
+    path,
+    latest === -1
+      ? `${text.trimEnd()}\n\n${section}\n`
+      : `${text.slice(0, latest + 1)}${section}\n\n${text.slice(latest + 1)}`
+  );
+}
+// Turkish headings keep the English heading ids ([#added-2] ...)
+execFileSync('node', ['apps/web/scripts/check-translations.mjs', '--fix'], {
+  cwd: root,
+  stdio: 'inherit',
+});
+
 console.log(`better-payment ${before} → ${next}`);
-console.log('Docs changelog (en/tr) is manual: add the release to the release PR.');

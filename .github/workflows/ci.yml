@@ -21,6 +21,9 @@ jobs:
       - name: Every docs page exists in English and Turkish, with the same code and headings
         run: node apps/web/scripts/check-translations.mjs
 
+      - name: Every changeset has a docs changelog entry (en/tr)
+        run: node scripts/check-changesets.mjs
+
   package:
     name: better-payment (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
