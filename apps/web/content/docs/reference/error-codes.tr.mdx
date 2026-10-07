@@ -64,7 +64,7 @@ Aşağıdaki önerilen mesajlar [localizedErrors](/docs/plugins/localized-errors
 | iyzico | Ödeme hata kodları (`10005`, `10051`, `10054`, `10084`, `102xx`, ...). Tablo `IYZICO_ERROR_CODES` olarak dışa açılır. |
 | PayTR | `failed_reason_code` 1–3, 6, 8–11 ve 99. `0` kodunun sebebi serbest metindir ve `UNKNOWN` kalır. Tablo `PAYTR_ERROR_CODES` olarak dışa açılır. |
 | Akbank | Bankanın ISO 8583 `hostResponseCode`'u (`51`, `05`, `54`, ...); `ISO8583_ERROR_CODES` olarak dışa açılır. `VPS-xxxx` kodu `errorCode`'da kalır. |
-| Parampos | İmza, 3D Secure ve doğrulama hataları. Param'ın `Sonuc` kodları henüz eşlenmedi ve `UNKNOWN` olur. |
+| Parampos | Param döndürdüğünde bankanın `Banka_Sonuc_Kod` alanındaki ISO 8583 kodu (`51`, `05`, `54`, ...), yoksa Param'ın negatif `Sonuc` kodları (`-105`, `-119`, `-2xx`, ...). `Sonuc` tablosu `PARAMPOS_ERROR_CODES` olarak dışa açılır. `Sonuc` `errorCode`'da kalır. |
 
 Tüm sağlayıcılar better-payment'in kendi atadığı kodları da kullanır: `NETWORK_ERROR`, `INVALID_HASH`, 3D Secure hataları (`MD_STATUS_x`) ve istek doğrulama (`VALIDATION_ERROR` → `INVALID_REQUEST`).
 

@@ -20,6 +20,7 @@ import {
   maskCardNumber,
 } from '../../../src/providers/parampos/utils';
 import { PaymentStatus } from '../../../src/types';
+import { PaymentErrorCode } from '../../../src/core/error-codes';
 import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../fixtures/payment-data';
 
 // Reference values from Param's test environment (also used by the mews/pos test-suite)
@@ -291,6 +292,15 @@ describe('Parampos provider', () => {
       expect(result.errorMessage).toBe('Hesap bulunamadı.');
     });
 
+    it('maps the bank code of a declined TP_WMD_Pay', async () => {
+      post.mockResolvedValue({
+        data: soap('TP_WMD_Pay', { Sonuc: '-1', Banka_Sonuc_Kod: '51', Sonuc_Str: 'Yetersiz bakiye' }),
+      });
+      const result = await parampos.completeThreeDSPayment(callback);
+      expect(result.code).toBe(PaymentErrorCode.INSUFFICIENT_FUNDS);
+      expect(result.errorCode).toBe('-1');
+    });
+
     it('rejects forged callbacks without contacting Param', async () => {
       const attackerGuid = 'attacker';
       const forged = {
@@ -372,5 +382,64 @@ describe('Parampos provider', () => {
 
     post.mockResolvedValueOnce({ data: soap('BIN_SanalPos', { Sonuc: '-1', Sonuc_Str: 'Hata' }) });
     await expect(parampos.binCheck('000000')).rejects.toThrow('Hata');
+  });
+});
+
+describe('Parampos error codes', () => {
+  let parampos: Parampos;
+  let post: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    parampos = new Parampos({
+      clientCode: '10738',
+      clientUsername: 'Test',
+      clientPassword: 'Test',
+      guid: GUID,
+      baseUrl: 'https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx',
+    });
+    post = vi.fn();
+    (parampos as any).client.post = post;
+  });
+
+  async function declineWith(fields: Record<string, string>) {
+    post.mockResolvedValue({ data: soap('TP_WMD_UCD', { Islem_ID: '0', Sonuc_Str: 'Hata', ...fields }) });
+    return parampos.createPayment(mockPaymentRequest);
+  }
+
+  it.each([
+    ['51', PaymentErrorCode.INSUFFICIENT_FUNDS],
+    ['05', PaymentErrorCode.CARD_DECLINED],
+    ['54', PaymentErrorCode.EXPIRED_CARD],
+    ['82', PaymentErrorCode.INVALID_CVC],
+    ['5', PaymentErrorCode.CARD_DECLINED],
+  ])('maps bank code %s from Banka_Sonuc_Kod', async (bankCode, code) => {
+    const result = await declineWith({ Sonuc: '-1', Banka_Sonuc_Kod: bankCode });
+    expect(result.status).toBe(PaymentStatus.FAILURE);
+    expect(result.code).toBe(code);
+    expect(result.errorCode).toBe('-1');
+  });
+
+  it.each([
+    ['-105', PaymentErrorCode.INVALID_CVC],
+    ['-106', PaymentErrorCode.EXPIRED_CARD],
+    ['-119', PaymentErrorCode.INVALID_CARD],
+    ['-113', PaymentErrorCode.INVALID_REQUEST],
+    ['-101', PaymentErrorCode.PROVIDER_ERROR],
+    ['-220', PaymentErrorCode.CARD_DECLINED],
+  ])('maps Sonuc %s', async (sonuc, code) => {
+    const result = await declineWith({ Sonuc: sonuc });
+    expect(result.code).toBe(code);
+    expect(result.errorCode).toBe(sonuc);
+  });
+
+  it('falls back to Sonuc when the bank code is not mapped', async () => {
+    const result = await declineWith({ Sonuc: '-105', Banka_Sonuc_Kod: '99' });
+    expect(result.code).toBe(PaymentErrorCode.INVALID_CVC);
+  });
+
+  it('returns UNKNOWN with the raw value for unmapped codes', async () => {
+    const result = await declineWith({ Sonuc: '-999' });
+    expect(result.code).toBe(PaymentErrorCode.UNKNOWN);
+    expect(result.errorCode).toBe('-999');
   });
 });
