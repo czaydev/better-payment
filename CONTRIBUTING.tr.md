@@ -460,11 +460,13 @@ Proje [Changesets](https://github.com/changesets/changesets) kullanır.
    - Doküman changelog'u (`apps/web/content/docs/reference/changelog.mdx` ve `changelog.tr.mdx`)
      İngilizce ve Türkçe olarak, doküman linkleriyle elle yazılır. Yeni sürümün bölümü yoksa **Publish to NPM**
      durur.
-4. Release PR'ını birleştirmek sürümü hazırlar, henüz bir şey yayınlanmaz. Yayın, GitHub
-   Actions'taki **Publish to NPM** workflow'u ile elle başlatılır (`npm_tag` genelde `latest`).
-   Workflow lint, typecheck ve testleri çalıştırır, ardından npm **trusted publishing** (OIDC) ile
-   yayınlar; npm token gerekmez ve paket provenance kaydıyla yayınlanır. GitHub release'i
-   `CHANGELOG.md` bölümünden oluşturulur.
+4. Release PR'ını birleştirmek sürümü yayınlar: **Publish to NPM** workflow'u `main`'e yapılan her
+   push'ta çalışır ve paket sürümünün henüz GitHub release'i yoksa yayınlar. Workflow lint,
+   typecheck ve testleri çalıştırır, ardından npm **trusted publishing** (OIDC) ile `latest`
+   etiketinde yayınlar; npm token gerekmez ve paket provenance kaydıyla yayınlanır. GitHub
+   release'i `CHANGELOG.md` bölümünden oluşturulur. Workflow durduysa (örneğin doküman
+   changelog'unda bölüm eksikse) sorunu `main`'de düzeltin, sonraki push yayınlar. Dry run veya
+   başka bir `npm_tag` için workflow'u elle çalıştırın.
 
 Release PR'ı varsayılan `GITHUB_TOKEN` ile açıldığı için, `RELEASE_PR_TOKEN` secret'ı (Contents ve
 Pull requests yazma izni olan fine-grained bir token) tanımlanmadıkça üzerinde CI çalışmaz.

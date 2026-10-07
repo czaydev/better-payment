@@ -1,6 +1,12 @@
 name: Publish to NPM
 
+# Runs on every push to main and publishes when packages/better-payment/package.json has a version
+# that has no GitHub release yet (that is, right after the release PR is merged). Other pushes skip
+# the publish job. It can also be run by hand, for a dry run or another npm dist-tag.
+
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -14,9 +20,47 @@ on:
         default: 'latest'
         type: string
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
-  publish:
+  check:
+    name: Is there an unreleased version?
+    if: github.repository == 'czaydev/better-payment'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      unreleased: ${{ steps.check.outputs.unreleased }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Look for the version's GitHub release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(node -p "require('./packages/better-payment/package.json').version")"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "$TAG is already released"
+            echo "unreleased=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$TAG has no release yet"
+            echo "unreleased=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: check
+    # By hand it always runs (the release check below stops a real publish of a released version)
+    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.unreleased == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      # Pushes have no inputs: publish for real on the "latest" tag
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run == true || inputs.dry_run == 'true') }}
+      NPM_TAG: ${{ inputs.npm_tag || 'latest' }}
 
     permissions:
       contents: write # create the version tag and GitHub release
@@ -63,7 +107,7 @@ jobs:
           done
 
       - name: Check the release does not exist yet
-        if: ${{ inputs.dry_run == false || inputs.dry_run == 'false' }}
+        if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: v${{ steps.release.outputs.version }}
@@ -85,25 +129,20 @@ jobs:
         run: pnpm build
 
       - name: Publish to NPM
-        if: ${{ inputs.dry_run == false || inputs.dry_run == 'false' }}
+        if: env.DRY_RUN != 'true'
         working-directory: packages/better-payment
         run: npm publish --access public --tag "$NPM_TAG"
-        env:
-          NPM_TAG: ${{ inputs.npm_tag }}
 
       - name: Dry run publish
-        if: ${{ inputs.dry_run == true || inputs.dry_run == 'true' }}
+        if: env.DRY_RUN == 'true'
         working-directory: packages/better-payment
         run: npm publish --access public --tag "$NPM_TAG" --dry-run
-        env:
-          NPM_TAG: ${{ inputs.npm_tag }}
 
       - name: Create GitHub release
-        if: ${{ inputs.dry_run == false || inputs.dry_run == 'false' }}
+        if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: v${{ steps.release.outputs.version }}
-          NPM_TAG: ${{ inputs.npm_tag }}
         run: |
           # Only releases on the npm "latest" tag become GitHub's latest release
           if [ "$NPM_TAG" = "latest" ]; then FLAGS="--latest"; else FLAGS="--prerelease --latest=false"; fi
@@ -111,5 +150,5 @@ jobs:
             --notes-file "$RUNNER_TEMP/release-notes.md" $FLAGS
 
       - name: Show release notes (dry run)
-        if: ${{ inputs.dry_run == true || inputs.dry_run == 'true' }}
+        if: env.DRY_RUN == 'true'
         run: cat "$RUNNER_TEMP/release-notes.md"
