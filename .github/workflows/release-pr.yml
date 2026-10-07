@@ -1,8 +1,8 @@
 name: Release PR
 
 # Opens and updates the "chore(release): version packages" pull request whenever changesets land
-# on main. Merging it prepares the release; publishing stays in publish.yml (run by hand, npm
-# trusted publishing).
+# on main. Merging it publishes the release: publish.yml runs on the push to main (npm trusted
+# publishing).
 #
 # Pull requests opened with the default GITHUB_TOKEN do not trigger other workflows, so CI does
 # not run on the release PR. Add a fine-grained token with "Contents" and "Pull requests" write
