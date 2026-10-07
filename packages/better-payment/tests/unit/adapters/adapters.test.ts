@@ -19,6 +19,7 @@ import { toExpressHandler, toNodeHandler } from 'better-payment/express';
 import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
+import { toReactRouterHandler } from 'better-payment/react-router';
 import { mockPaymentRequest } from '../../fixtures/payment-data';
 
 const PAYTR = { merchantId: '123456', merchantKey: 'KEY', merchantSalt: 'SALT' };
@@ -85,6 +86,14 @@ const adapters: Record<string, () => Promise<Send>> = {
     const { GET, POST } = toNextJsHandler(() => (payment ??= createPayment()));
     return async (method, ...rest) =>
       fromResponse(await (method === 'GET' ? GET : POST)(webRequest(method, ...rest)));
+  },
+  'React Router (toReactRouterHandler, lazy)': async () => {
+    let payment: BetterPayment | undefined;
+    const { loader, action } = toReactRouterHandler(() => (payment ??= createPayment()));
+    return async (method, ...rest) =>
+      fromResponse(
+        await (method === 'GET' ? loader : action)({ request: webRequest(method, ...rest) })
+      );
   },
   Hono: async () => {
     const app = new Hono();

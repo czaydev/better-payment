@@ -1,6 +1,6 @@
 ---
 title: Express, Fastify, Hono
-description: Ödeme handler'ını Express, Fastify, Hono veya düz bir Node.js sunucusuna bağlayın.
+description: Ödeme handler'ını Express, Fastify, Hono, Elysia, React Router veya düz bir Node.js sunucusuna bağlayın.
 ---
 
 Her adapter ayrı bir import'tur ve hiç bağımlılığı yoktur; yalnızca kullandığınız yüklenir. Next.js için [Next.js rehberine](/docs/integrations/nextjs), Workers, Deno ve Bun için [edge ortamlarına](/docs/integrations/edge) bakın.
@@ -60,6 +60,20 @@ app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
 ```
 
 `{ parse: 'none' }` handler'a ham gövdeyi bırakır: banka callback'leri form-urlencoded gelir ve imzaları orijinal alanlarla doğrulanır. Bu ayar olmadan `body` okuyan herhangi bir hook (`onTransform`, `derive`, `onBeforeHandle` ya da bir plugin) Elysia'nın isteği önce tüketmesine yol açar. Elysia Bun için tasarlanmıştır, Node.js'te de çalışır.
+
+## React Router
+
+<Since version="0.8.0" />
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+Default export'u olmayan bir splat resource route'tur (`api.pay.$.ts`, `/api/pay` altındaki her şeyi yakalar): GET istekleri `loader`'a, POST istekleri (banka callback'leri dahil) `action`'a gider. Aynı kod Remix v2'de de çalışır. `routes.ts` yapılandırması kullanıyorsanız `route('api/pay/*', 'routes/api.pay.$.ts')` olarak kaydedin.
 
 ## Düz Node.js [#plain-nodejs]
 

@@ -26,6 +26,8 @@ const budgets = [
   { file: 'dist/fastify/index.js', maxGzipKb: 1 },
   { file: 'dist/elysia/index.mjs', maxGzipKb: 1 },
   { file: 'dist/elysia/index.js', maxGzipKb: 1 },
+  { file: 'dist/react-router/index.mjs', maxGzipKb: 1 },
+  { file: 'dist/react-router/index.js', maxGzipKb: 1 },
 ];
 
 // better-payment/client must stay browser-safe

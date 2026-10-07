@@ -1,6 +1,6 @@
 ---
 title: Express, Fastify, Hono
-description: Mount the payment handler in Express, Fastify, Hono or a plain Node.js server.
+description: Mount the payment handler in Express, Fastify, Hono, Elysia, React Router or a plain Node.js server.
 ---
 
 Each adapter is a separate import and has no dependencies, so you only load the one you use. For Next.js, see the [Next.js guide](/docs/integrations/nextjs); for Workers, Deno and Bun, see [edge runtimes](/docs/integrations/edge).
@@ -60,6 +60,20 @@ app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
 ```
 
 `{ parse: 'none' }` keeps the raw body for the handler: bank callbacks are form-urlencoded and their signatures are checked against the original fields. Without it, any hook that reads `body` (`onTransform`, `derive`, `onBeforeHandle` or a plugin) makes Elysia consume the request first. Elysia is built for Bun and also runs on Node.js.
+
+## React Router
+
+<Since version="0.8.0" />
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+A splat resource route (`api.pay.$.ts` matches everything under `/api/pay`) with no default export: GET requests go to `loader`, POST requests (bank callbacks included) to `action`. The same code works in Remix v2. With `routes.ts` config, register it as `route('api/pay/*', 'routes/api.pay.$.ts')`.
 
 ## Plain Node.js
 

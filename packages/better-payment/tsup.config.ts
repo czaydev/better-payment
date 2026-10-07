@@ -11,6 +11,7 @@ export default defineConfig({
     'hono/index': 'src/adapters/hono.ts',
     'fastify/index': 'src/adapters/fastify.ts',
     'elysia/index': 'src/adapters/elysia.ts',
+    'react-router/index': 'src/adapters/react-router.ts',
   },
   format: ['cjs', 'esm'],
   dts: {

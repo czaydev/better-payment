@@ -215,6 +215,7 @@ export const { GET, POST } = toNextJsHandler(getBetterPayment);
 // Fastify:  app.register(toFastifyPlugin(payment), { prefix: '/api/pay' }) — better-payment/fastify
 // Hono:     app.all('/api/pay/*', toHonoHandler(payment))               — better-payment/hono
 // Elysia:   app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' }) — better-payment/elysia
+// React Router / Remix: export const { loader, action } = toReactRouterHandler(getBetterPayment) — better-payment/react-router
 // Workers, Deno, Bun: toFetchHandler(payment)                            — better-payment
 ```
 

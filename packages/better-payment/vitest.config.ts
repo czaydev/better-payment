@@ -53,6 +53,7 @@ export default defineConfig({
       'better-payment/hono': path.resolve(__dirname, './src/adapters/hono.ts'),
       'better-payment/fastify': path.resolve(__dirname, './src/adapters/fastify.ts'),
       'better-payment/elysia': path.resolve(__dirname, './src/adapters/elysia.ts'),
+      'better-payment/react-router': path.resolve(__dirname, './src/adapters/react-router.ts'),
       'better-payment': path.resolve(__dirname, './src/index.ts'),
     },
   },
