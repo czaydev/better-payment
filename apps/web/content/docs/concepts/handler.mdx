@@ -208,6 +208,7 @@ Adapters connect the handler to your framework and handle the details that are e
 | Fastify | `better-payment/fastify` | `app.register(toFastifyPlugin(payment), { prefix: '/api/pay' })` |
 | Hono | `better-payment/hono` | `app.all('/api/pay/*', toHonoHandler(payment))` |
 | Elysia | `better-payment/elysia` | `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })` |
+| React Router v7, Remix v2 | `better-payment/react-router` | `export const { loader, action } = toReactRouterHandler(getBetterPayment)` |
 | `node:http` | `better-payment/express` | `createServer(toNodeHandler(payment))` |
 | Workers, Deno, Bun | `better-payment` | `toFetchHandler(payment)` |
 

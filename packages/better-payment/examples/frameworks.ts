@@ -12,6 +12,7 @@ import { toExpressHandler, toNodeHandler } from 'better-payment/express';
 import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
+import { toReactRouterHandler } from 'better-payment/react-router';
 import { Elysia } from 'elysia';
 
 const createPayment = () =>
@@ -27,6 +28,9 @@ export const getBetterPayment = () => (instance ??= createPayment());
 
 // Next.js: app/api/pay/[...path]/route.ts (lazy, so builds work without env vars)
 export const { GET, POST } = toNextJsHandler(getBetterPayment);
+
+// React Router v7 / Remix v2: app/routes/api.pay.$.ts (a splat resource route)
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
 
 // Express: no body parser needed for the payment routes
 const expressApp = express();

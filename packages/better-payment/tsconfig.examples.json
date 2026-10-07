@@ -40,6 +40,9 @@
       ],
       "better-payment/elysia": [
         "src/adapters/elysia.ts"
+      ],
+      "better-payment/react-router": [
+        "src/adapters/react-router.ts"
       ]
     },
     "noUnusedLocals": false,
