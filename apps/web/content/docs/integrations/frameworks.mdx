@@ -63,6 +63,8 @@ app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
 
 ## React Router
 
+<Since version="0.8.0" />
+
 ```typescript
 // app/routes/api.pay.$.ts
 import { toReactRouterHandler } from 'better-payment/react-router';
