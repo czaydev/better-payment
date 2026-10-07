@@ -6,6 +6,12 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.8.0
+
+### Added
+
+- Add React Router v7 (Remix v2) framework adapter: `better-payment/react-router` returns a `loader` and an `action` for a splat resource route
+
 ## 0.7.0
 
 ### Changed (breaking)
