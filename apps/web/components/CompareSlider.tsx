@@ -42,7 +42,7 @@ export default function CompareSlider({
         <span className="text-border" aria-hidden="true">
           /
         </span>
-        <span className="font-medium text-primary">{labels.with}</span>
+        <span className="font-medium text-accent-text">{labels.with}</span>
         <CopyButton text={after.code} labels={copy} />
       </div>
 
@@ -58,7 +58,7 @@ export default function CompareSlider({
         onPointerUp={() => (dragging.current = false)}
         onPointerCancel={() => (dragging.current = false)}
       >
-        <pre className={`${pre} bg-[#fbfbfe] text-foreground/75`} aria-label={`${labels.without}: ${before.file}`}>
+        <pre className={`${pre} bg-code-muted-bg text-foreground/75`} aria-label={`${labels.without}: ${before.file}`}>
           <code>{highlight(before.code)}</code>
         </pre>
         {/* The "after" side starts at the divider, so both sides read from the start of each line */}
@@ -82,7 +82,7 @@ export default function CompareSlider({
             if (e.key === "ArrowLeft") setPos((p) => Math.max(4, p - 5));
             if (e.key === "ArrowRight") setPos((p) => Math.min(96, p + 5));
           }}
-          className="absolute top-1/2 z-[3] grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_16px_-6px_rgb(67_56_242/0.7)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary"
+          className="absolute top-1/2 z-[3] grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_16px_-6px_var(--bp-glow)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary"
           style={{ left: `${pos}%` }}
         >
           <ChevronsLeftRight className="size-4" />

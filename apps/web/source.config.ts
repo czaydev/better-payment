@@ -53,36 +53,71 @@ function rehypeBrandCheckmarks() {
   return (tree: HastNode) => visit(tree);
 }
 
-/** Brand syntax colours (vault: Branding/06), light only */
-const brandTheme = {
-  name: 'better-payment',
-  type: 'light' as const,
-  colors: { 'editor.background': '#ffffff', 'editor.foreground': '#13132b' },
-  tokenColors: [
-    { scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: '#5a5a78', fontStyle: 'italic' } },
-    {
-      scope: [
-        'keyword',
-        'storage',
-        'storage.type',
-        'storage.modifier',
-        'keyword.control',
-        'keyword.operator.new',
-        'keyword.operator.expression',
-        'constant.language',
-      ],
-      settings: { foreground: '#4338f2' },
-    },
-    { scope: ['string', 'string.quoted', 'string.template', 'punctuation.definition.string'], settings: { foreground: '#087a55' } },
-    { scope: ['entity.name.function', 'support.function', 'meta.function-call.generic'], settings: { foreground: '#6a3fd8' } },
-    { scope: ['constant.numeric'], settings: { foreground: '#a86207' } },
-    { scope: ['entity.name.type', 'support.type', 'entity.name.class', 'support.class'], settings: { foreground: '#2b2496' } },
-  ],
+/** Brand syntax colours (vault: Branding/06), with a dark counterpart on the dark palette */
+type SyntaxPalette = {
+  background: string;
+  foreground: string;
+  comment: string;
+  keyword: string;
+  string: string;
+  fn: string;
+  number: string;
+  type: string;
 };
+
+function brandTheme(name: string, type: 'light' | 'dark', c: SyntaxPalette) {
+  return {
+    name,
+    type,
+    colors: { 'editor.background': c.background, 'editor.foreground': c.foreground },
+    tokenColors: [
+      { scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: c.comment, fontStyle: 'italic' } },
+      {
+        scope: [
+          'keyword',
+          'storage',
+          'storage.type',
+          'storage.modifier',
+          'keyword.control',
+          'keyword.operator.new',
+          'keyword.operator.expression',
+          'constant.language',
+        ],
+        settings: { foreground: c.keyword },
+      },
+      { scope: ['string', 'string.quoted', 'string.template', 'punctuation.definition.string'], settings: { foreground: c.string } },
+      { scope: ['entity.name.function', 'support.function', 'meta.function-call.generic'], settings: { foreground: c.fn } },
+      { scope: ['constant.numeric'], settings: { foreground: c.number } },
+      { scope: ['entity.name.type', 'support.type', 'entity.name.class', 'support.class'], settings: { foreground: c.type } },
+    ],
+  };
+}
+
+const lightTheme = brandTheme('better-payment', 'light', {
+  background: '#ffffff',
+  foreground: '#13132b',
+  comment: '#5a5a78',
+  keyword: '#4338f2',
+  string: '#087a55',
+  fn: '#6a3fd8',
+  number: '#a86207',
+  type: '#2b2496',
+});
+
+const darkTheme = brandTheme('better-payment-dark', 'dark', {
+  background: '#15152a',
+  foreground: '#ecebfa',
+  comment: '#8c8cab',
+  keyword: '#a29dff',
+  string: '#5fd6a8',
+  fn: '#c8a6ff',
+  number: '#f0b04a',
+  type: '#8fb8ff',
+});
 
 export default defineConfig({
   mdxOptions: {
-    rehypeCodeOptions: { themes: { light: brandTheme, dark: brandTheme } },
+    rehypeCodeOptions: { themes: { light: lightTheme, dark: darkTheme } },
     rehypePlugins: (plugins) => [rehypeBrandCheckmarks, ...plugins],
   },
 });

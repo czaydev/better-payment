@@ -11,7 +11,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "btn-fx-idle bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_6px_16px_-6px_rgb(67_56_242/0.67)] hover:bg-(--bp-primary-hover) hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_10px_24px_-8px_rgb(67_56_242/0.8)]",
+          "btn-fx-idle bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_6px_16px_-6px_var(--bp-glow)] hover:bg-(--bp-primary-hover) hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_10px_24px_-8px_var(--bp-glow)]",
         outline: "border-border bg-card text-foreground hover:border-line-strong",
         secondary: "bg-secondary text-secondary-foreground hover:bg-tint/70",
         ghost: "text-foreground hover:bg-accent",

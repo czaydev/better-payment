@@ -39,7 +39,7 @@ export default function Contributors({ lang, t }: { lang: Locale; t: Dictionary[
               </li>
             ))}
             <li>
-              <a href={guide} target="_blank" rel="noopener noreferrer" aria-label={t.join} className="group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-lilac bg-tint/50 px-2 py-6 text-primary transition-colors hover:bg-tint focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+              <a href={guide} target="_blank" rel="noopener noreferrer" aria-label={t.join} className="group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-lilac bg-tint/50 px-2 py-6 text-accent-text transition-colors hover:bg-tint focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
                 <span className="grid size-16 place-items-center rounded-full border border-dashed border-lilac"><Plus className="size-6" strokeWidth={1.5} /></span>
                 <span className="text-xs font-semibold">{t.you}</span>
               </a>
@@ -47,7 +47,7 @@ export default function Contributors({ lang, t }: { lang: Locale; t: Dictionary[
           </ul>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
             <p>{t.thanks}</p>
-            <a href={`${repository}/graphs/contributors`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">{t.all}<ChevronRight className="size-3.5" /></a>
+            <a href={`${repository}/graphs/contributors`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent-text underline-offset-4 hover:underline">{t.all}<ChevronRight className="size-3.5" /></a>
           </div>
         </div>
       </div>

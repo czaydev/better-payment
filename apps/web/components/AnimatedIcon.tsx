@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * Looping frosted-glass icon (vault: Asset_Pipeline/Web/Animasyon). The video
- * is encoded on pure white and blended with multiply, so it only belongs on
- * light surfaces. With reduced motion it stays on its poster frame.
+ * is encoded on pure white and blended with multiply. In dark mode it is
+ * inverted with the hue turned back and blended with screen, so the white
+ * becomes black and drops out. With reduced motion it stays on its poster frame.
  */
 export default function AnimatedIcon({ name, className }: { name: string; className?: string }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -27,7 +28,7 @@ export default function AnimatedIcon({ name, className }: { name: string; classN
   return (
     <video
       ref={video}
-      className={cn("size-24 mix-blend-multiply", className)}
+      className={cn("size-24 mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180", className)}
       poster={`/brand/icons/icon-${name}.webp`}
       autoPlay
       muted

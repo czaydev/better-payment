@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ChevronRight, Menu, X } from "lucide-react";
 import { GitHubIcon } from "@/components/icons";
+import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
@@ -97,7 +98,15 @@ export default function Navbar({
             height={155}
             alt="Better Payment"
             priority
-            className="h-6 w-auto"
+            className="h-6 w-auto dark:hidden"
+          />
+          <Image
+            src="/brand/better-payment-horizontal-dark.svg"
+            width={1226}
+            height={155}
+            alt="Better Payment"
+            priority
+            className="hidden h-6 w-auto dark:block"
           />
           <Badge
             variant="secondary"
@@ -123,6 +132,7 @@ export default function Navbar({
 
         {/* Desktop actions */}
         <div className="hidden lg:flex items-center gap-1.5">
+          <ThemeToggle label={t.theme} />
           <LanguageSwitch lang={lang} label={t.language} />
           <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
           <a
@@ -169,6 +179,7 @@ export default function Navbar({
           ))}
           <Separator className="my-2.5" />
           <div className="flex gap-2 pb-1">
+            <ThemeToggle label={t.theme} className="h-9 shrink-0" />
             <LanguageSwitch lang={lang} label={t.language} />
             <a
               href="https://github.com/czaydev/better-payment"

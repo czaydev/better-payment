@@ -50,7 +50,7 @@ export default function Integrations({
                   : "border-border bg-card text-muted-foreground hover:border-line-strong hover:text-foreground",
               )}
             >
-              <span className="grid size-8 place-items-center rounded-lg border border-border bg-background">
+              <span className="grid size-8 place-items-center rounded-lg border border-border bg-background dark:bg-logo">
                 <Image src={item.logo} alt="" width={28} height={16} className="h-4 w-7 object-contain" />
               </span>
               {item.name}
@@ -61,7 +61,7 @@ export default function Integrations({
         <div className="bp-reveal grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
             <div className="mb-4 flex items-center gap-3">
-              <span className="grid size-12 place-items-center rounded-xl border border-border bg-background">
+              <span className="grid size-12 place-items-center rounded-xl border border-border bg-background dark:bg-logo">
                 <Image src={p.logo} alt="" width={40} height={24} className="h-6 w-10 object-contain" />
               </span>
               <div>
@@ -75,7 +75,7 @@ export default function Integrations({
             <ul className="grid gap-2.5">
               {info.features.map((feature) => (
                 <li key={feature} className="flex items-center gap-2.5 text-sm text-foreground">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-tint text-primary">
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-tint text-accent-text">
                     <Check className="size-3" strokeWidth={3} />
                   </span>
                   {feature}
