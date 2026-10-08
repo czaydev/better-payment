@@ -88,6 +88,16 @@ jobs:
           node -e "const { localizedErrors } = require('better-payment/plugins'); const bp = require('better-payment'); try { localizedErrors({ locale: 'xx' }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
           node --input-type=module -e "import { localizedErrors } from 'better-payment/plugins'; import { betterPayment } from 'better-payment'; const p = betterPayment({ providers: {}, plugins: [localizedErrors({ locale: 'tr' })] }); if (!p.errors.message('INSUFFICIENT_FUNDS').startsWith('Kart')) process.exit(1)"
 
+      - name: Smoke test framework adapter subpaths (CJS and ESM)
+        run: |
+          # Resolve by package name so a missing exports mapping fails, even if dist exists.
+          for entry in next:toNextJsHandler express:toExpressHandler hono:toHonoHandler fastify:toFastifyPlugin elysia:toElysiaHandler react-router:toReactRouterHandler; do
+            adapter="${entry%%:*}"
+            handler="${entry#*:}"
+            node -e "const assert = require('node:assert/strict'); const path = 'better-payment/' + process.argv[1]; assert.equal(typeof require(path)[process.argv[2]], 'function', path + ' CJS handler export')" "$adapter" "$handler"
+            node --input-type=module -e "import assert from 'node:assert/strict'; const path = 'better-payment/' + process.argv[1]; assert.equal(typeof (await import(path))[process.argv[2]], 'function', path + ' ESM handler export')" "$adapter" "$handler"
+          done
+
       - name: Edge runtime smoke test (built bundle in the Vercel Edge VM)
         run: pnpm test:edge-smoke
 
@@ -100,4 +110,9 @@ jobs:
           test -f dist/client/index.js && test -f dist/client/index.d.ts
           test -f dist/testing/index.js && test -f dist/testing/index.mjs && test -f dist/testing/index.d.ts
           test -f dist/plugins/index.js && test -f dist/plugins/index.mjs && test -f dist/plugins/index.d.ts
+          for adapter in next express hono fastify elysia react-router; do
+            for extension in js mjs d.ts; do
+              test -f "dist/$adapter/index.$extension"
+            done
+          done
           npm pack --dry-run
