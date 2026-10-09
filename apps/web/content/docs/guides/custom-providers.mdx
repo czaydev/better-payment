@@ -1,12 +1,12 @@
 ---
 title: Custom Providers
-description: Add a payment provider that better-payment does not support yet, with the same API as the built-in ones.
+description: Add a payment provider that Better Payment does not support yet, with the same API as the built-in ones.
 ---
 
 A provider is a class that extends `PaymentProvider`. The built-in providers are written the same way, so a custom provider works with everything else: plugins and [events](/docs/concepts/events), the [HTTP handler](/docs/concepts/handler) (at `/api/pay/<id>/...`), the browser client (`client.use('<id>')`) and request validation.
 
 <Callout type="info">
-  If the provider is useful to others (a Turkish bank or payment institution), consider contributing it to better-payment. See the contributing guide in the repository.
+  If the provider is useful to others (a Turkish bank or payment institution), consider contributing it to Better Payment. See the contributing guide in the repository.
 </Callout>
 
 ## Implement the provider

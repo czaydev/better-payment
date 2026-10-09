@@ -66,6 +66,6 @@ The suggested messages below are built into the [localizedErrors](/docs/plugins/
 | Akbank | The bank's ISO 8583 `hostResponseCode` (`51`, `05`, `54`, ...), exported as `ISO8583_ERROR_CODES`. The `VPS-xxxx` code stays in `errorCode`. |
 | Parampos | Signature, 3D Secure and validation failures. Param's `Sonuc` codes are not mapped yet and become `UNKNOWN`. |
 
-All providers also use the codes better-payment sets itself: `NETWORK_ERROR`, `INVALID_HASH`, 3D Secure failures (`MD_STATUS_x`) and request validation (`VALIDATION_ERROR` → `INVALID_REQUEST`).
+All providers also use the codes Better Payment sets itself: `NETWORK_ERROR`, `INVALID_HASH`, 3D Secure failures (`MD_STATUS_x`) and request validation (`VALIDATION_ERROR` → `INVALID_REQUEST`).
 
 Missing a code? Open an issue with the provider, the raw `errorCode` and its message.
