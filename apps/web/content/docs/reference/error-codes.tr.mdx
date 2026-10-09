@@ -66,6 +66,6 @@ Aşağıdaki önerilen mesajlar [localizedErrors](/docs/plugins/localized-errors
 | Akbank | Bankanın ISO 8583 `hostResponseCode`'u (`51`, `05`, `54`, ...); `ISO8583_ERROR_CODES` olarak dışa açılır. `VPS-xxxx` kodu `errorCode`'da kalır. |
 | Parampos | İmza, 3D Secure ve doğrulama hataları. Param'ın `Sonuc` kodları henüz eşlenmedi ve `UNKNOWN` olur. |
 
-Tüm sağlayıcılar better-payment'in kendi atadığı kodları da kullanır: `NETWORK_ERROR`, `INVALID_HASH`, 3D Secure hataları (`MD_STATUS_x`) ve istek doğrulama (`VALIDATION_ERROR` → `INVALID_REQUEST`).
+Tüm sağlayıcılar Better Payment'in kendi atadığı kodları da kullanır: `NETWORK_ERROR`, `INVALID_HASH`, 3D Secure hataları (`MD_STATUS_x`) ve istek doğrulama (`VALIDATION_ERROR` → `INVALID_REQUEST`).
 
 Eksik bir kod mu var? Sağlayıcıyı, ham `errorCode`'u ve mesajını yazarak bir issue açın.

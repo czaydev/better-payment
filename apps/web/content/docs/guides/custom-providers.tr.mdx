@@ -1,12 +1,12 @@
 ---
 title: Özel Sağlayıcılar
-description: better-payment'in henüz desteklemediği bir ödeme sağlayıcısını, yerleşik olanlarla aynı API ile ekleyin.
+description: Better Payment'in henüz desteklemediği bir ödeme sağlayıcısını, yerleşik olanlarla aynı API ile ekleyin.
 ---
 
 Sağlayıcı, `PaymentProvider` sınıfını genişleten bir sınıftır. Yerleşik sağlayıcılar da aynı şekilde yazılır; bu yüzden özel bir sağlayıcı diğer her şeyle çalışır: plugin'ler ve [olaylar](/docs/concepts/events), [HTTP handler](/docs/concepts/handler) (`/api/pay/<id>/...` altında), tarayıcı client'ı (`client.use('<id>')`) ve istek doğrulama.
 
 <Callout type="info">
-  Sağlayıcı başkalarının da işine yarayacaksa (bir Türk bankası ya da ödeme kuruluşu), onu better-payment'e eklemeyi düşünün. Depodaki katkı rehberine bakın.
+  Sağlayıcı başkalarının da işine yarayacaksa (bir Türk bankası ya da ödeme kuruluşu), onu Better Payment'e eklemeyi düşünün. Depodaki katkı rehberine bakın.
 </Callout>
 
 ## Sağlayıcıyı yazmak [#implement-the-provider]
