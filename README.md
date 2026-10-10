@@ -277,6 +277,8 @@ import { localizedErrors } from 'better-payment/plugins';
 const payment = betterPayment({ providers: { ... }, plugins: [localizedErrors({ locale: 'tr' })] });
 ```
 
+`chaos` injects declines, lost responses (`NETWORK_ERROR`) and delays in tests, so you can check how your application handles them.
+
 `notifications` sends sales, refunds and failures to Slack, Discord, Telegram or your own channel, in the background.
 
 See [Plugins](https://better-payment.czaylabs.com/docs/concepts/plugins),
