@@ -7,6 +7,16 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.8.1
+
+### Fixed
+
+- Framework adapters answer 413 for request bodies over 1 MiB instead of reading them into memory; change the limit with `maxBodySize`.
+- Akbank: 3D Secure callbacks are confirmed with an order history query; a callback that does not match the order at Akbank is rejected.
+- The HTTP handler accepts form bodies only for provider callbacks; other actions answer 415, so a form on another site cannot call them with the user's cookies.
+- Errors passed to the logger no longer contain the provider request's body or headers (card data, credentials).
+- iyzico: a failed 3D Secure result no longer carries a paymentId or conversationId taken from the callback request.
+
 ## 0.8.0
 
 React Router adapter.

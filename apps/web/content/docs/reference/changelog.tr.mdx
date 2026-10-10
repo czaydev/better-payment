@@ -7,6 +7,16 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
   Sürüm geçmişi sıfırlandı. `0.0.1`, yeniden yazılan paketin ilk sürümüdür. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bunları kullanmayın. Gerekçe ve adım adım geçiş rehberi için [0.0.1'deki yenilikler](/docs/whats-new) sayfasına bakın.
 </Callout>
 
+## 0.8.1
+
+### Düzeltilenler [#fixed]
+
+- Framework adapter'ları 1 MiB'tan büyük istek gövdelerini belleğe okumak yerine 413 ile yanıtlar; sınırı `maxBodySize` ile değiştirebilirsiniz.
+- Akbank: 3D Secure callback'leri sipariş geçmişi sorgusuyla doğrulanır; Akbank'taki sipariş kaydıyla eşleşmeyen callback reddedilir.
+- HTTP handler form gövdesini yalnızca sağlayıcı callback'lerinde kabul eder; diğer aksiyonlar 415 döner, böylece başka bir sitedeki form bunları kullanıcının cookie'leriyle çağıramaz.
+- Logger'a verilen hatalar artık sağlayıcı isteğinin gövdesini ve başlıklarını (kart verisi, kimlik bilgileri) içermiyor.
+- iyzico: başarısız bir 3D Secure sonucu artık callback isteğinden alınan paymentId veya conversationId taşımıyor.
+
 ## 0.8.0
 
 React Router adaptörü.
