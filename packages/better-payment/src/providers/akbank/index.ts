@@ -324,22 +324,31 @@ export class Akbank extends PaymentProvider<AkbankConfig> {
   /**
    * Verifies the okUrl/failUrl POST from Akbank.
    *
-   * The result is trusted only when the HMAC signature is valid and covers
-   * responseCode, orderId and the terminal ids. Payment succeeded only when
-   * responseCode is VPS-0000.
+   * 1. The HMAC signature must be valid and cover responseCode, orderId and the
+   *    terminal ids.
+   * 2. The signed values are concatenated without a separator, so a signature
+   *    alone does not pin which value is the orderId. The outcome is therefore
+   *    confirmed with an order history query (txnCode 1010): a callback whose
+   *    result does not match Akbank's record for that order is rejected as
+   *    INVALID_HASH.
+   *
+   * Payment succeeded only when the callback and the query both report an
+   * approved transaction for the order.
    */
   async completeThreeDSPayment(callbackData: Akbank3DCallbackData): Promise<PaymentResponse> {
     const orderId = callbackData?.orderId;
-
-    if (!(await verifyAkbank3DCallback(callbackData ?? {}, this.config.secretKey))) {
-      return this.withErrorCode({
+    const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
+      this.withErrorCode({
         status: PaymentStatus.FAILURE,
         paymentId: orderId,
         conversationId: orderId,
         errorCode: 'INVALID_HASH',
-        errorMessage: 'Invalid 3D Secure callback signature',
-        rawResponse: callbackData,
+        errorMessage,
+        rawResponse,
       });
+
+    if (!(await verifyAkbank3DCallback(callbackData ?? {}, this.config.secretKey))) {
+      return untrusted('Invalid 3D Secure callback signature', callbackData);
     }
 
     if (
@@ -357,6 +366,30 @@ export class Akbank extends PaymentProvider<AkbankConfig> {
     }
 
     const approved = callbackData.responseCode === AKBANK_SUCCESS_CODE;
+
+    let inquiry: AkbankApiResponse;
+    try {
+      inquiry = await this.process(
+        {
+          ...this.baseRequest(AKBANK_TXN_CODES.ORDER_HISTORY),
+          order: { orderId },
+        },
+        true
+      );
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, '3D Secure result could not be confirmed', {
+        paymentId: orderId,
+        conversationId: orderId,
+      });
+    }
+
+    const confirmed = (inquiry.txnDetailList ?? []).find((tx) => isApprovedPayment(tx, orderId));
+    if (approved !== Boolean(confirmed)) {
+      return untrusted('3D Secure callback does not match the order at Akbank', {
+        callback: callbackData,
+        inquiry,
+      });
+    }
 
     return this.withErrorCode({
       status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
@@ -518,6 +551,23 @@ export class Akbank extends PaymentProvider<AkbankConfig> {
       });
     }
   }
+}
+
+const PAYMENT_TXN_CODES: string[] = [
+  AKBANK_TXN_CODES.SALE,
+  AKBANK_TXN_CODES.SECURE_SALE,
+  AKBANK_TXN_CODES.PRE_AUTH,
+  AKBANK_TXN_CODES.SECURE_PRE_AUTH,
+];
+
+/** An approved, not reversed sale or pre-authorization of this order */
+function isApprovedPayment(tx: AkbankTxnDetail, orderId: string | undefined): boolean {
+  return (
+    !!orderId &&
+    (tx.orderId === undefined || tx.orderId === orderId) &&
+    (tx.txnCode === undefined || PAYMENT_TXN_CODES.includes(tx.txnCode)) &&
+    mapAkbankTxnStatus(tx) === PaymentStatus.SUCCESS
+  );
 }
 
 /**

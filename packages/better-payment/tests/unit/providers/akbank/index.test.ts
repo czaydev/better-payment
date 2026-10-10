@@ -80,16 +80,88 @@ describe('Akbank provider', () => {
   });
 
   describe('completeThreeDSPayment', () => {
-    it('accepts a correctly signed successful callback', async () => {
+    const history = (txnDetailList: Record<string, unknown>[]) => ({
+      data: { responseCode: 'VPS-0000', txnDetailList },
+    });
+    const approvedSale = { txnCode: '3000', responseCode: 'VPS-0000', txnStatus: 'N', orderId: '2024041811DA' };
+
+    it('accepts a correctly signed successful callback confirmed by the order history', async () => {
+      post.mockResolvedValue(history([approvedSale]));
       const result = await akbank.completeThreeDSPayment(AKBANK_3DPAY_CALLBACK);
       expect(result.status).toBe(PaymentStatus.SUCCESS);
       expect(result.paymentId).toBe('2024041811DA');
+      expect(sent().body).toMatchObject({ txnCode: '1010', order: { orderId: '2024041811DA' } });
     });
 
-    it('rejects an unsigned/forged callback', async () => {
+    it('rejects a signed success callback that Akbank has no approved payment for', async () => {
+      post.mockResolvedValue(history([{ ...approvedSale, responseCode: 'VPS-1005', txnStatus: 'S' }]));
+      const result = await akbank.completeThreeDSPayment(AKBANK_3DPAY_CALLBACK);
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('INVALID_HASH');
+    });
+
+    it('rejects a signed callback whose fields were re-split to name another order', async () => {
+      // Same signed string, different field boundaries: orderId becomes "2024"
+      const { hashParams, hash, merchantSafeId, terminalSafeId } = AKBANK_3DPAY_CALLBACK;
+      const values = AKBANK_3DPAY_CALLBACK as Record<string, string>;
+      const signed = hashParams.split('+').map((k) => values[k]).join('');
+      const start = signed.indexOf(terminalSafeId) + terminalSafeId.length;
+      const resplit = {
+        before: signed.slice(0, signed.indexOf('VPS-0000')),
+        responseCode: 'VPS-0000',
+        middle: signed.slice(signed.indexOf('VPS-0000') + 8, signed.indexOf(merchantSafeId)),
+        merchantSafeId,
+        terminalSafeId,
+        orderId: '2024',
+        after: signed.slice(start + 4),
+        hashParams: 'before+responseCode+middle+merchantSafeId+terminalSafeId+orderId+after',
+        hash,
+      };
+      post.mockResolvedValue(history([]));
+
+      const result = await akbank.completeThreeDSPayment(resplit);
+
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expect(sent().body.order).toEqual({ orderId: '2024' });
+    });
+
+    it('rejects a signed decline when Akbank reports the order as paid', async () => {
+      const decline = { ...AKBANK_3DPAY_CALLBACK, responseCode: 'VPS-1005' };
+      const signed = decline.hashParams.split('+').map((k) => (decline as Record<string, string>)[k]).join('');
+      decline.hash = await akbankSign(signed, AKBANK_TEST.secretKey);
+      post.mockResolvedValue(history([approvedSale]));
+
+      const result = await akbank.completeThreeDSPayment(decline);
+
+      expect(result.errorCode).toBe('INVALID_HASH');
+    });
+
+    it('returns a confirmed decline as a failure', async () => {
+      const decline = { ...AKBANK_3DPAY_CALLBACK, responseCode: 'VPS-1005', hostMessage: 'RED' };
+      const signed = decline.hashParams.split('+').map((k) => (decline as Record<string, string>)[k]).join('');
+      decline.hash = await akbankSign(signed, AKBANK_TEST.secretKey);
+      post.mockResolvedValue(history([{ ...approvedSale, responseCode: 'VPS-1005', txnStatus: 'S' }]));
+
+      const result = await akbank.completeThreeDSPayment(decline);
+
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('VPS-1005');
+      expect(result.errorMessage).toBe('RED');
+    });
+
+    it('is pending when the order history query gets no response', async () => {
+      post.mockRejectedValue(new HttpError('timeout', {}, { code: 'ETIMEDOUT' }));
+      const result = await akbank.completeThreeDSPayment(AKBANK_3DPAY_CALLBACK);
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.errorCode).toBe('NETWORK_ERROR');
+    });
+
+    it('rejects an unsigned/forged callback without calling Akbank', async () => {
       const result = await akbank.completeThreeDSPayment({ ...AKBANK_3DPAY_CALLBACK, hash: 'forged' });
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.errorCode).toBe('INVALID_HASH');
+      expect(post).not.toHaveBeenCalled();
     });
 
     it('does not default to success when responseCode is missing', async () => {

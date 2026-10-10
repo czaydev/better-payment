@@ -55,10 +55,16 @@ The result is trusted only if:
 
 - the HMAC `hash` over the fields in `hashParams` is valid, **and** covers
   `responseCode`, `orderId`, `merchantSafeId` and `terminalSafeId`;
-- the terminal ids match your configuration.
+- the terminal ids match your configuration;
+- an order history query (txnCode 1010) for the `orderId` agrees with the
+  callback. The signed values are joined without a separator, so the signature
+  alone does not pin the order id; a callback that does not match Akbank's
+  record is rejected as `INVALID_HASH`.
 
-It is `success` only when `responseCode` is `VPS-0000`. A missing result code is
-never treated as success.
+It is `success` only when `responseCode` is `VPS-0000` and Akbank reports an
+approved payment for the order. A missing result code is never treated as
+success. If the query gets no response, the result is `pending` with
+`NETWORK_ERROR`; check it later with `getPayment()`.
 
 ## Refund, Cancel & Status
 
