@@ -4,6 +4,7 @@
   "defaultOpen": true,
   "pages": [
     "localized-errors",
-    "chaos"
+    "chaos",
+    "notifications"
   ]
 }

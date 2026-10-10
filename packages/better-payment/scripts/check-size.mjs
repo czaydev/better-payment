@@ -15,9 +15,11 @@ const budgets = [
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },
   { file: 'dist/testing/index.js', maxGzipKb: 8 },
   // Official plugins, with every built-in error message language. Raise this for new
-  // languages; translations are never shortened to fit it.
-  { file: 'dist/plugins/index.mjs', maxGzipKb: 5 },
-  { file: 'dist/plugins/index.js', maxGzipKb: 5 },
+  // languages; translations are never shortened to fit it. 7 kB since the
+  // notifications plugin (its messages in the same five languages). ESM bundlers
+  // drop the plugins an application does not import.
+  { file: 'dist/plugins/index.mjs', maxGzipKb: 7 },
+  { file: 'dist/plugins/index.js', maxGzipKb: 7 },
   { file: 'dist/next/index.mjs', maxGzipKb: 1 },
   { file: 'dist/next/index.js', maxGzipKb: 1 },
   { file: 'dist/express/index.mjs', maxGzipKb: 1 },

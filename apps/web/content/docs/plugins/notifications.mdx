@@ -1,0 +1,88 @@
+---
+title: Notifications
+description: Send sales, refunds and failures to Slack, Discord, Telegram or email.
+---
+
+<Since version="0.11.0" />
+
+Small teams want to see sales, refunds and failed payments in the chat app they already use, without building a webhook receiver. The `notifications` plugin turns [payment events](/docs/concepts/events) into short, readable messages and sends them to Slack, Discord, Telegram or your own channel (email, SMS, a queue).
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { notifications } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    notifications({
+      locale: 'tr',
+      minAmount: 100,
+      channels: [
+        { type: 'slack', webhookUrl: process.env.SLACK_WEBHOOK!, events: ['payment.succeeded', 'refund.succeeded'] },
+        { type: 'discord', webhookUrl: process.env.DISCORD_WEBHOOK!, events: ['payment.failed'] },
+        { type: 'telegram', botToken: process.env.TG_TOKEN!, chatId: '-1001234567890' },
+        { type: 'custom', name: 'email', send: (message) => sendEmail('sales@shop.com', message) },
+      ],
+    }),
+  ],
+});
+```
+
+A successful payment sends:
+
+```text
+✅ Ödeme alındı: 150.00 TRY (iyzico)
+Ödeme: 23456789 · Sipariş: order-1001
+```
+
+## Channels
+
+| Type | Fields | How to get them |
+| ---- | ------ | --------------- |
+| `slack` | `webhookUrl` | An [incoming webhook](https://api.slack.com/messaging/webhooks) of a Slack app |
+| `discord` | `webhookUrl` | Channel settings → Integrations → Webhooks |
+| `telegram` | `botToken`, `chatId` | A bot from [@BotFather](https://t.me/BotFather), added to the chat |
+| `custom` | `send(message, event)`, `name` | Your own function: email, SMS, a queue... |
+
+Every channel takes `events`: the [event types](/docs/concepts/events) it receives, `['*']` (all) by default.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `channels` | — | Where messages go |
+| `locale` | `'en'` | Language of the messages: `'en'`, `'tr'`, `'de'`, `'ru'` or `'ar'`, like [`localizedErrors`](/docs/plugins/localized-errors) |
+| `format` | — | `(event) => string`: builds the message instead of the default one |
+| `minAmount` | — | Skip events with a smaller amount. Compared as a number, whatever the currency; events without an amount are sent. |
+| `filter` | — | `(event) => boolean`: return `false` to skip an event |
+| `waitUntil` | — | Keeps a serverless function alive until messages are sent (see below) |
+| `onError` | logger | `(error, channel, event) => void`, called when a channel fails |
+| `timeout` | `10000` | Milliseconds before a channel is given up |
+| `fetch` | global `fetch` | The `fetch` used for Slack, Discord and Telegram |
+
+## No card data
+
+`format`, `filter` and custom channels get the event without its `request` and `result`, so card numbers can never reach a message. They get the event type, provider, operation, payment id, order id (`conversationId`), amount, currency and error `code`.
+
+## Payments never wait for messages
+
+Messages are sent in the background: the payment returns without waiting for them. A channel that fails, times out or throws is reported to `onError` (or the payment logger) and never affects the payment.
+
+On serverless platforms the function may stop once the response is sent. Pass `waitUntil` so that messages are still sent:
+
+```typescript
+import { waitUntil } from '@vercel/functions';
+
+notifications({ waitUntil, channels: [/* ... */] });
+```
+
+On Cloudflare Workers, create the payment object per request and pass `waitUntil: (p) => ctx.waitUntil(p)`.
+
+In tests, wait for the messages with `flush()`:
+
+```typescript
+await payment.createPayment(request);
+await payment.notifications.flush();
+```

@@ -11,3 +11,11 @@ export {
   type ErrorMessageDictionary,
 } from './localized-errors';
 export { chaos, type ChaosOptions, type ChaosRule } from './chaos';
+export {
+  notifications,
+  formatNotification,
+  type NotificationsOptions,
+  type NotificationChannel,
+  type NotificationEvent,
+  type NotificationLocale,
+} from './notifications';
