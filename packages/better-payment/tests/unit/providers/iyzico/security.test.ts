@@ -75,8 +75,35 @@ describe('Iyzico - payment status and request semantics', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it('does not take paymentId/conversationId of a rejected callback from the request', async () => {
+    const result = await iyzico.completeThreeDSPayment({
+      status: 'failure',
+      paymentId: 'P-OTHER',
+      mdStatus: '0',
+      conversationId: 'ORDER-OTHER',
+    });
+    expect(result.status).toBe(PaymentStatus.FAILURE);
+    expect(result.paymentId).toBeUndefined();
+    expect(result.conversationId).toBeUndefined();
+  });
+
+  it('does not carry the echoed conversationId when iyzico rejects the 3DS auth', async () => {
+    request.mockResolvedValue({
+      data: { status: 'failure', errorCode: '5005', errorMessage: 'x', conversationId: 'ORDER-OTHER' },
+    });
+    const result = await iyzico.completeThreeDSPayment({
+      status: 'success',
+      paymentId: 'P-OTHER',
+      mdStatus: '1',
+      conversationId: 'ORDER-OTHER',
+    });
+    expect(result.status).toBe(PaymentStatus.FAILURE);
+    expect(result.paymentId).toBeUndefined();
+    expect(result.conversationId).toBeUndefined();
+  });
+
   it('authorizes a 3DS payment when status=success and mdStatus=1', async () => {
-    request.mockResolvedValue({ data: { status: 'success', paymentId: '123' } });
+    request.mockResolvedValue({ data: { status: 'success', paymentId: '123', conversationId: 'c1' } });
     const result = await iyzico.completeThreeDSPayment({
       status: 'success',
       paymentId: '123',
@@ -84,6 +111,8 @@ describe('Iyzico - payment status and request semantics', () => {
       conversationId: 'c1',
     });
     expect(result.status).toBe(PaymentStatus.SUCCESS);
+    expect(result.paymentId).toBe('123');
+    expect(result.conversationId).toBe('c1');
     expect(request.mock.calls[0][0].url).toBe('/payment/3dsecure/auth');
   });
 
