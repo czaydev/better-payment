@@ -53,9 +53,10 @@ const result = await payment.akbank.completeThreeDSPayment(callbackBody);
 Sonuca yalnızca şu durumda güvenilir:
 
 - `hashParams` içindeki alanlar üzerinden hesaplanan HMAC `hash` geçerlidir **ve** `responseCode`, `orderId`, `merchantSafeId` ile `terminalSafeId` alanlarını kapsar;
-- terminal kimlikleri yapılandırmanızla eşleşir.
+- terminal kimlikleri yapılandırmanızla eşleşir;
+- `orderId` için yapılan sipariş geçmişi sorgusu (txnCode 1010) callback ile aynı sonucu verir. İmzalı değerler ayraçsız birleştirildiği için imza tek başına sipariş numarasını sabitlemez; Akbank'taki kayıtla eşleşmeyen callback `INVALID_HASH` olarak reddedilir.
 
-Yalnızca `responseCode` `VPS-0000` olduğunda `success` döner. Eksik bir sonuç kodu asla başarı sayılmaz.
+Yalnızca `responseCode` `VPS-0000` olduğunda ve Akbank sipariş için onaylı bir ödeme bildirdiğinde `success` döner. Eksik bir sonuç kodu asla başarı sayılmaz. Sorgu yanıt alamazsa sonuç `NETWORK_ERROR` ile `pending` olur; durumu daha sonra `getPayment()` ile sorgulayın.
 
 ## İade, iptal ve durum sorgusu [#refund-cancel--status]
 
