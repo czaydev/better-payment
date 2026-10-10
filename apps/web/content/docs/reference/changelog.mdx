@@ -7,6 +7,16 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.9.0
+
+### Added
+
+- Handler responses leave out the provider's `rawResponse` unless `exposeRawResponse: true` is set, and `idempotency.scope` keeps the Idempotency-Key responses of different callers apart.
+
+### Fixed
+
+- `buyer.email` validation rejects empty domain labels and no longer uses a backtracking regular expression.
+
 ## 0.8.1
 
 ### Fixed

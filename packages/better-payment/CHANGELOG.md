@@ -6,6 +6,16 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.9.0
+
+### Added
+
+- Handler: responses no longer include the provider's `rawResponse`, which can hold merchant data (commission rates, fraud status) and stored-card keys. `onCallback`, `callbackRedirect` and events still receive it. Set `exposeRawResponse: true` to keep the previous behavior. New `idempotency.scope(ctx)` option keeps the `Idempotency-Key` responses of different callers apart.
+
+### Fixed
+
+- Validation: the `buyer.email` check and the handler's path trimming no longer use regular expressions that can backtrack on long input. Emails with an empty domain label (`a@b..c`, `a@.b.c`) are now rejected.
+
 ## 0.8.1
 
 ### Fixed
