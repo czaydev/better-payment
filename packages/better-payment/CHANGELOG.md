@@ -6,6 +6,12 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.10.0
+
+### Added
+
+- Add the Kuveyt Türk provider (KT Pay Gate): 3D Secure payments completed with `Provision`, same-day cancel, full and partial refunds, and status queries
+
 ## 0.9.0
 
 ### Added
