@@ -3,6 +3,7 @@
   "icon": "plugins",
   "defaultOpen": true,
   "pages": [
-    "localized-errors"
+    "localized-errors",
+    "notifications"
   ]
 }

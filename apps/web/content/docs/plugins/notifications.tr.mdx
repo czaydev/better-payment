@@ -1,0 +1,88 @@
+---
+title: Bildirimler
+description: Satışları, iadeleri ve hataları Slack, Discord, Telegram veya e-postaya gönderin.
+---
+
+<Since version="0.11.0" />
+
+Küçük ekipler satışları, iadeleri ve başarısız ödemeleri bir webhook alıcısı yazmadan, zaten kullandıkları sohbet uygulamasında görmek ister. `notifications` plugin'i [ödeme olaylarını](/docs/concepts/events) kısa ve okunur mesajlara çevirir ve Slack, Discord, Telegram veya kendi kanalınıza (e-posta, SMS, bir kuyruk) gönderir.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { notifications } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    notifications({
+      locale: 'tr',
+      minAmount: 100,
+      channels: [
+        { type: 'slack', webhookUrl: process.env.SLACK_WEBHOOK!, events: ['payment.succeeded', 'refund.succeeded'] },
+        { type: 'discord', webhookUrl: process.env.DISCORD_WEBHOOK!, events: ['payment.failed'] },
+        { type: 'telegram', botToken: process.env.TG_TOKEN!, chatId: '-1001234567890' },
+        { type: 'custom', name: 'email', send: (message) => sendEmail('sales@shop.com', message) },
+      ],
+    }),
+  ],
+});
+```
+
+Başarılı bir ödeme şu mesajı gönderir:
+
+```text
+✅ Ödeme alındı: 150.00 TRY (iyzico)
+Ödeme: 23456789 · Sipariş: order-1001
+```
+
+## Kanallar [#channels]
+
+| Tür | Alanlar | Nereden alınır |
+| --- | ------- | -------------- |
+| `slack` | `webhookUrl` | Bir Slack uygulamasının [incoming webhook](https://api.slack.com/messaging/webhooks) adresi |
+| `discord` | `webhookUrl` | Kanal ayarları → Entegrasyonlar → Webhook'lar |
+| `telegram` | `botToken`, `chatId` | [@BotFather](https://t.me/BotFather) ile oluşturulup sohbete eklenen bir bot |
+| `custom` | `send(message, event)`, `name` | Kendi fonksiyonunuz: e-posta, SMS, bir kuyruk... |
+
+Her kanal `events` alır: alacağı [olay türleri](/docs/concepts/events), varsayılan `['*']` (hepsi).
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `channels` | — | Mesajların gideceği yerler |
+| `locale` | `'en'` | Mesajların dili: [`localizedErrors`](/docs/plugins/localized-errors) gibi `'en'`, `'tr'`, `'de'`, `'ru'` veya `'ar'` |
+| `format` | — | `(event) => string`: varsayılan mesaj yerine kendi mesajınızı oluşturur |
+| `minAmount` | — | Tutarı bundan küçük olayları atlar. Para biriminden bağımsız olarak sayı olarak karşılaştırılır; tutarı olmayan olaylar gönderilir. |
+| `filter` | — | `(event) => boolean`: bir olayı atlamak için `false` döndürün |
+| `waitUntil` | — | Serverless bir fonksiyonu mesajlar gönderilene kadar ayakta tutar (aşağıya bakın) |
+| `onError` | logger | `(error, channel, event) => void`, bir kanal başarısız olduğunda çağrılır |
+| `timeout` | `10000` | Bir kanaldan vazgeçilmeden önceki milisaniye |
+| `fetch` | global `fetch` | Slack, Discord ve Telegram için kullanılan `fetch` |
+
+## Kart verisi yok [#no-card-data]
+
+`format`, `filter` ve custom kanallar olayı `request` ve `result` olmadan alır; böylece kart numaraları hiçbir mesaja ulaşamaz. Olay türünü, sağlayıcıyı, işlemi, ödeme id'sini, sipariş id'sini (`conversationId`), tutarı, para birimini ve hata `code` değerini alırlar.
+
+## Ödemeler mesajları beklemez [#payments-never-wait-for-messages]
+
+Mesajlar arka planda gönderilir: ödeme onları beklemeden döner. Başarısız olan, zaman aşımına uğrayan veya hata fırlatan bir kanal `onError`'a (veya ödeme logger'ına) bildirilir ve ödemeyi asla etkilemez.
+
+Serverless platformlarda fonksiyon yanıt gönderilince durabilir. Mesajların yine de gönderilmesi için `waitUntil` verin:
+
+```typescript
+import { waitUntil } from '@vercel/functions';
+
+notifications({ waitUntil, channels: [/* ... */] });
+```
+
+Cloudflare Workers'ta ödeme nesnesini her istekte oluşturun ve `waitUntil: (p) => ctx.waitUntil(p)` verin.
+
+Testlerde mesajları `flush()` ile bekleyin:
+
+```typescript
+await payment.createPayment(request);
+await payment.notifications.flush();
+```

@@ -277,6 +277,8 @@ import { localizedErrors } from 'better-payment/plugins';
 const payment = betterPayment({ providers: { ... }, plugins: [localizedErrors({ locale: 'tr' })] });
 ```
 
+`notifications` sends sales, refunds and failures to Slack, Discord, Telegram or your own channel, in the background.
+
 See [Plugins](https://better-payment.czaylabs.com/docs/concepts/plugins),
 [payment events](https://better-payment.czaylabs.com/docs/concepts/events) and
 [writing a plugin](https://better-payment.czaylabs.com/docs/guides/writing-plugins).
