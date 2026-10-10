@@ -48,6 +48,8 @@ export interface HttpClientOptions {
  * - `response` is set when the server answered with a status that failed `validateStatus`.
  * - `isNetworkError` is set when no response was received (timeout, connection reset,
  *   DNS failure). The provider may still have processed the request.
+ * - `config` is the request without its body and headers: they carry card data and
+ *   credentials, and the error is passed to the logger.
  */
 export class HttpError extends Error {
   readonly isNetworkError: boolean;
@@ -63,7 +65,7 @@ export class HttpError extends Error {
   ) {
     super(message);
     this.name = 'HttpError';
-    this.config = config;
+    this.config = { ...config, data: undefined, headers: undefined };
     this.response = details.response;
     this.code = details.code;
     this.isNetworkError = !details.response;

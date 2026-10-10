@@ -156,6 +156,30 @@ describe('HttpClient', () => {
     );
   });
 
+  it('does not keep the request body or headers on HttpError (it is logged)', async () => {
+    const logger: BetterPaymentLogger = { debug: vi.fn(), info: vi.fn(), error: vi.fn() };
+    const failing = [
+      recordingFetch(() => new Response('{}', { status: 500 })).fetchImpl,
+      (async () => {
+        throw new TypeError('fetch failed');
+      }) as typeof fetch,
+    ];
+    for (const fetchImpl of failing) {
+      const error = await http(fetchImpl, { logger })
+        .post('/pay', '{"cardNumber":"5528790000000008","cvc":"123"}', {
+          headers: { Authorization: 'IYZWSv2 secret' },
+        })
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).config).toMatchObject({ method: 'POST', url: '/pay' });
+      const logged = JSON.stringify((logger.error as ReturnType<typeof vi.fn>).mock.calls, (_k, v) =>
+        v instanceof Error ? { ...v } : v
+      );
+      expect(logged).not.toContain('5528790000000008');
+      expect(logged).not.toContain('IYZWSv2 secret');
+    }
+  });
+
   it('uses the fetch passed to BetterPayment for provider calls', async () => {
     const { calls, fetchImpl } = recordingFetch(
       () =>
