@@ -1,4 +1,4 @@
 /**
  * Package version. Kept in sync with package.json (checked by a unit test).
  */
-export const VERSION = '0.9.0';
+export const VERSION = '0.10.0';
