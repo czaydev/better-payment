@@ -229,6 +229,29 @@ describe('BetterPaymentHandler', () => {
       expect(mockProvider.completeThreeDSPayment).toHaveBeenCalledWith({ status: 'success', paymentId: '1', mdStatus: '1' });
     });
 
+    it.each(['application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'text/plain'])(
+      'rejects %s bodies on non-callback actions (CSRF)',
+      async (contentType) => {
+        const { payment, mockProvider } = buildMockPayment();
+        const res = await new BetterPaymentHandler(payment, allowAll).handle(
+          req('POST', '/api/pay/iyzico/refund', 'paymentId=1&price=100', { 'content-type': contentType })
+        );
+        expect(res.status).toBe(415);
+        expect(mockProvider.refund).not.toHaveBeenCalled();
+      }
+    );
+
+    it('rejects form bodies already parsed by a body parser on non-callback actions', async () => {
+      const { payment, mockProvider } = buildMockPayment();
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/iyzico/refund', { paymentId: '1', price: '100' }, {
+          'content-type': 'application/x-www-form-urlencoded',
+        })
+      );
+      expect(res.status).toBe(415);
+      expect(mockProvider.refund).not.toHaveBeenCalled();
+    });
+
     it('answers PayTR notifications with plain "OK" and calls onCallback', async () => {
       const { payment } = buildMockPayment({
         completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'failure', paymentId: 'O1', errorMessage: 'declined' }),

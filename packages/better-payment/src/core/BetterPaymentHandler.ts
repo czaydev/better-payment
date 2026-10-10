@@ -416,6 +416,11 @@ export class BetterPaymentHandler {
         return this.errorResponse(400, `Provider '${route.provider}' is not enabled or configured`);
       }
 
+      if (!CALLBACK_HANDLER_ACTIONS.includes(action) && this.isFormRequest(request)) {
+        // A cross-site HTML form can send these without a CORS preflight (CSRF)
+        return this.errorResponse(415, 'Content-Type must be application/json');
+      }
+
       const ctx: HandlerContext = {
         provider: route.provider,
         action,
@@ -581,6 +586,17 @@ export class BetterPaymentHandler {
       }
     }
     return body;
+  }
+
+  /**
+   * Content types a browser form can send cross-site without a CORS preflight.
+   * Only provider callbacks are posted this way.
+   */
+  private isFormRequest(request: BetterPaymentRequest): boolean {
+    const contentType = (this.header(request, 'content-type') || '').toLowerCase();
+    return ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'].some((type) =>
+      contentType.includes(type)
+    );
   }
 
   private header(request: BetterPaymentRequest, name: string): string | undefined {

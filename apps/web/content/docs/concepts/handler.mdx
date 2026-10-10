@@ -192,6 +192,12 @@ interface HandlerContext {
 (or cast after validating) before you use them. `onCallback` and `callbackRedirect`
 receive a `PaymentResponse`.
 
+Only provider callbacks accept form bodies. Other actions answer `415` for
+`application/x-www-form-urlencoded`, `multipart/form-data` and `text/plain`: a
+browser form on another site can send these without a CORS preflight, together
+with the user's cookies. Send JSON from your frontend (`better-payment/client`
+does).
+
 Plugins can add routes to the handler ([plugin endpoints](/docs/guides/writing-plugins#endpoints)). The `authorize` hook runs for them too, with `provider: undefined` and `action: 'plugin:<plugin id>/<endpoint name>'`. For callbacks, [payment events](/docs/concepts/events) are emitted right before `onCallback`, and are retried with it when a listener fails.
 
 ## Frameworks
