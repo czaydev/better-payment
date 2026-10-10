@@ -97,6 +97,7 @@ export { VERSION } from './version';
 export { PaymentErrorCode, ISO8583_ERROR_CODES } from './core/error-codes';
 export { IYZICO_ERROR_CODES } from './providers/iyzico/error-codes';
 export { PAYTR_ERROR_CODES } from './providers/paytr/error-codes';
+export { PARAMPOS_ERROR_CODES } from './providers/parampos/error-codes';
 
 export {
   PaymentStatus,

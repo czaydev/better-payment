@@ -34,6 +34,8 @@ import {
   PaymentStatus,
 } from '../../types';
 import { ParamposResult, Parampos3DSCallbackData, ParamposOrderStatus } from './types';
+import { PARAMPOS_ERROR_CODES } from './error-codes';
+import { ISO8583_ERROR_CODES, PaymentErrorCode, resolveErrorCode } from '../../core/error-codes';
 import {
   generateParamposPaymentHash,
   generateParamposPreAuthHash,
@@ -148,6 +150,29 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
 
     const response = await this.client.post('', envelope, requestConfig);
     return String(response.data);
+  }
+
+  protected errorCodeTable(): Record<string, PaymentErrorCode> {
+    return PARAMPOS_ERROR_CODES;
+  }
+
+  /**
+   * The bank's ISO 8583 code (`Banka_Sonuc_Kod`) is the most specific reason
+   * for a decline; Param's `Sonuc` is used when it is missing or not mapped.
+   */
+  protected resolveErrorCode(result: FailureResult): PaymentErrorCode {
+    const bankCode = Parampos.bankResultCode(result.rawResponse);
+    if (bankCode && ISO8583_ERROR_CODES[bankCode]) return ISO8583_ERROR_CODES[bankCode];
+    return resolveErrorCode(result.errorCode, this.errorCodeTable());
+  }
+
+  /** Reads `Banka_Sonuc_Kod` from a SOAP result, or from `payment` after 3D completion */
+  private static bankResultCode(raw: unknown): string | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const record = raw as { Banka_Sonuc_Kod?: unknown; payment?: { Banka_Sonuc_Kod?: unknown } };
+    const value = record.Banka_Sonuc_Kod ?? record.payment?.Banka_Sonuc_Kod;
+    if (typeof value !== 'string' || !/^\d{1,2}$/.test(value.trim())) return undefined;
+    return value.trim().padStart(2, '0');
   }
 
   private failure<T extends FailureResult>(
