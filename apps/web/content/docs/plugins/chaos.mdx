@@ -1,0 +1,67 @@
+---
+title: Chaos Testing
+description: Inject declines, lost responses and delays to test how your application handles them.
+---
+
+<Since version="0.11.0" />
+
+Payment code usually breaks on the paths nobody tests: a provider that doesn't answer, a response lost after the bank charged the card, a decline in the middle of a flow. Provider sandboxes rarely let you trigger these on demand. The `chaos` plugin injects them into your own setup, so you can check your error handling, retries and handling of `NETWORK_ERROR` results ([error codes](/docs/reference/error-codes)).
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { chaos } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  mode: 'sandbox',
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    chaos({
+      enabled: process.env.CHAOS === '1',
+      seed: 42,
+      rules: [
+        { operation: 'createPayment', probability: 0.2, fail: 'NETWORK_ERROR' },
+        { operation: 'refund', delay: '3s' },
+        { provider: 'iyzico', probability: 0.1, fail: 'PROVIDER_ERROR' },
+      ],
+    }),
+  ],
+});
+```
+
+A failure is returned as a normal result and the provider is not called. `NETWORK_ERROR` returns a `pending` result, the way a lost response does; every other code returns a `failure`. After hooks and [payment events](/docs/concepts/events) run for injected results too, so `localizedErrors` translates them and your `payment.failed` listeners see them.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `rules` | — | The rules, checked in order. The first matching rule that fires is applied. |
+| `enabled` | `true` | Turn the plugin on or off, for example from an environment variable |
+| `seed` | — | Makes runs reproducible: the same seed fires the same rules on the same calls |
+| `allowProduction` | `false` | Allow the plugin in `production` mode |
+
+## Rules
+
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `operation` | all | One operation or a list: `'createPayment'`, `'refund'`, `'initThreeDSPayment'`... |
+| `provider` | all | One provider id or a list |
+| `probability` | `1` | Chance that the rule fires on a matching call, from 0 to 1 |
+| `fail` | — | Return a failure with this [error code](/docs/reference/error-codes) |
+| `delay` | — | Wait before the call: milliseconds, or `'500ms'`, `'3s'`, `'1m'` |
+| `message` | — | The `errorMessage` of the injected failure |
+
+A rule with only `delay` slows the call down and then runs it on the provider. A rule with `delay` and `fail` waits, then fails.
+
+## Turn it on and off in tests
+
+```typescript
+payment.chaos.disable(); // operations run normally
+payment.chaos.enable();
+payment.chaos.enabled;   // true
+```
+
+## Production
+
+The plugin throws a `ConfigurationError` in `production` mode, on the first operation or on `payment.chaos.enable()`, so a test setup can't break real payments by accident. A disabled plugin (`enabled: false`) is allowed. Set `allowProduction: true` only if you know you want failures in production, for example in a game day exercise.

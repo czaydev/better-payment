@@ -10,3 +10,4 @@ export {
   type LocalizedErrorsOptions,
   type ErrorMessageDictionary,
 } from './localized-errors';
+export { chaos, type ChaosOptions, type ChaosRule } from './chaos';

@@ -1,0 +1,67 @@
+---
+title: Kaos Testi
+description: Uygulamanızın ret, kaybolan yanıt ve gecikmeleri nasıl karşıladığını test edin.
+---
+
+<Since version="0.11.0" />
+
+Ödeme kodu genellikle kimsenin test etmediği yollarda bozulur: yanıt vermeyen bir sağlayıcı, banka kartı çektikten sonra kaybolan bir yanıt, akışın ortasında gelen bir ret. Sağlayıcı sandbox'ları bunları istediğiniz an tetiklemenize nadiren izin verir. `chaos` plugin'i bu durumları kendi kurulumunuza enjekte eder; böylece hata yönetiminizi, tekrar denemelerinizi ve `NETWORK_ERROR` sonuçlarını ele alışınızı ([hata kodları](/docs/reference/error-codes)) kontrol edebilirsiniz.
+
+## Kurulum
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { chaos } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  mode: 'sandbox',
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    chaos({
+      enabled: process.env.CHAOS === '1',
+      seed: 42,
+      rules: [
+        { operation: 'createPayment', probability: 0.2, fail: 'NETWORK_ERROR' },
+        { operation: 'refund', delay: '3s' },
+        { provider: 'iyzico', probability: 0.1, fail: 'PROVIDER_ERROR' },
+      ],
+    }),
+  ],
+});
+```
+
+Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERROR`, kaybolan bir yanıt gibi `pending` sonuç döndürür; diğer tüm kodlar `failure` döndürür. Enjekte edilen sonuçlar için de after hook'lar ve [ödeme olayları](/docs/concepts/events) çalışır; yani `localizedErrors` bunları çevirir ve `payment.failed` dinleyicileriniz bunları görür.
+
+## Seçenekler
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `rules` | — | Kurallar, sırayla kontrol edilir. Eşleşen ve tetiklenen ilk kural uygulanır. |
+| `enabled` | `true` | Plugin'i açar veya kapatır, örneğin bir ortam değişkeniyle |
+| `seed` | — | Çalıştırmaları tekrarlanabilir yapar: aynı seed aynı çağrılarda aynı kuralları tetikler |
+| `allowProduction` | `false` | Plugin'in `production` modunda çalışmasına izin verir |
+
+## Kurallar
+
+| Alan | Varsayılan | Açıklama |
+| ---- | ---------- | -------- |
+| `operation` | hepsi | Tek bir işlem veya liste: `'createPayment'`, `'refund'`, `'initThreeDSPayment'`... |
+| `provider` | hepsi | Tek bir sağlayıcı id'si veya liste |
+| `probability` | `1` | Eşleşen bir çağrıda kuralın tetiklenme olasılığı, 0 ile 1 arası |
+| `fail` | — | Bu [hata koduyla](/docs/reference/error-codes) bir hata döndürür |
+| `delay` | — | Çağrıdan önce bekler: milisaniye veya `'500ms'`, `'3s'`, `'1m'` |
+| `message` | — | Enjekte edilen hatanın `errorMessage` değeri |
+
+Sadece `delay` olan bir kural çağrıyı yavaşlatır, sonra sağlayıcıda çalıştırır. `delay` ve `fail` olan bir kural önce bekler, sonra hata döndürür.
+
+## Testlerde açıp kapatma
+
+```typescript
+payment.chaos.disable(); // işlemler normal çalışır
+payment.chaos.enable();
+payment.chaos.enabled;   // true
+```
+
+## Production
+
+Plugin `production` modunda ilk işlemde veya `payment.chaos.enable()` çağrısında `ConfigurationError` fırlatır; böylece bir test kurulumu yanlışlıkla gerçek ödemeleri bozamaz. Kapalı bir plugin'e (`enabled: false`) izin verilir. `allowProduction: true` değerini sadece production'da gerçekten hata istiyorsanız (örneğin bir game day tatbikatında) kullanın.
