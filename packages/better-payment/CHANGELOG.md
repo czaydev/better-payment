@@ -6,6 +6,16 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.8.1
+
+### Fixed
+
+- Adapters: the Express/Node and fetch-based adapters read at most 1 MiB of a request body and answer 413 for larger ones, instead of buffering bodies of any size. Change the limit with `maxBodySize` on `toExpressHandler`, `toNodeHandler` or `toFetchHandler`.
+- Akbank: `completeThreeDSPayment()` confirms the 3D Secure result with an order history query (txnCode 1010) and rejects a callback that does not match Akbank's record for the order as `INVALID_HASH`. A query that gets no response returns `pending` with `NETWORK_ERROR`.
+- Handler: only provider callbacks accept form bodies. Other actions answer 415 for `application/x-www-form-urlencoded`, `multipart/form-data` and `text/plain`, which a cross-site HTML form can send with the user's cookies and without a CORS preflight.
+- `HttpError.config` no longer keeps the request body and headers. The error is passed to the logger, and the body carried card data and Parampos credentials, the headers the iyzico authorization.
+- iyzico: a failed `completeThreeDSPayment()` result no longer carries `paymentId` or `conversationId` taken from the callback request or echoed by iyzico's error response. They are set only for a successful payment, from iyzico's response.
+
 ## 0.8.0
 
 ### Added
