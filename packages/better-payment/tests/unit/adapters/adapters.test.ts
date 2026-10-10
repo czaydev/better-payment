@@ -212,11 +212,64 @@ describe.each(Object.entries(adapters))('%s', (_name, create) => {
     expect(forged.status).toBe(400);
   });
 
+  it('answers 413 for a body larger than 1 MiB', async () => {
+    const res = await send(
+      'POST',
+      '/api/pay/paytr/callback',
+      'a=' + 'x'.repeat(2 * 1024 * 1024),
+      FORM
+    );
+    expect(res.status).toBe(413);
+  });
+
   it('rejects invalid JSON and serves the health check', async () => {
     const bad = await send('POST', '/api/pay/mock/payment', '{not json', 'application/json');
     expect(bad.status).toBe(400);
     const health = await send('GET', '/api/pay/health');
     expect(health.status).toBe(200);
     expect(JSON.parse(health.text)).toMatchObject({ status: 'ok' });
+  });
+});
+
+describe('body size limit', () => {
+  const stream = (bytes: number, chunk = 64 * 1024) => {
+    let sent = 0;
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= bytes) return controller.close();
+        controller.enqueue(new Uint8Array(chunk).fill(97));
+        sent += chunk;
+      },
+    });
+  };
+
+  it('stops reading a streamed body without Content-Length at maxBodySize', async () => {
+    const handler = toFetchHandler(createPayment(), { maxBodySize: 100 * 1024 });
+    const body = stream(10 * 1024 * 1024);
+    const res = await handler(
+      new Request('http://localhost/api/pay/paytr/callback', {
+        method: 'POST',
+        body,
+        headers: { 'content-type': FORM },
+        duplex: 'half',
+      } as RequestInit)
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it('accepts a body up to maxBodySize', async () => {
+    const handler = toFetchHandler(createPayment(), { maxBodySize: 10 });
+    const res = await handler(
+      webRequest('POST', '/api/pay/mock/payment', '{"a":1}', 'application/json')
+    );
+    expect(res.status).not.toBe(413);
+  });
+
+  it('applies maxBodySize in the Express adapter', async () => {
+    const send = await listen(
+      createServer(toExpressHandler(createPayment(), { maxBodySize: 1024 }))
+    );
+    const res = await send('POST', '/api/pay/paytr/callback', 'a=' + 'x'.repeat(4096), FORM);
+    expect(res.status).toBe(413);
   });
 });

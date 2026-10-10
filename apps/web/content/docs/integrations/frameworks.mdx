@@ -96,3 +96,15 @@ const getPayment = () => (instance ??= createPayment());
 
 app.all('/api/pay/*path', toExpressHandler(getPayment));
 ```
+
+## Request body size
+
+<Since version="0.8.1" />
+
+The Express, Node.js and fetch-based adapters read at most 1 MiB of a request body and answer `413` for larger ones. Bank callbacks are a few kB. Change the limit with `maxBodySize` (in bytes) on `toExpressHandler`, `toNodeHandler` or `toFetchHandler`:
+
+```typescript
+app.all('/api/pay/*path', toExpressHandler(payment, { maxBodySize: 64 * 1024 }));
+```
+
+Fastify applies its own `bodyLimit` (1 MiB by default).

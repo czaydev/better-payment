@@ -11,9 +11,18 @@
  * app.all('/api/pay/*', toExpressHandler(payment)); // no body parser needed
  * ```
  */
-import { resolveHandler, serializeResponse, type HandlerSource } from 'better-payment';
+import {
+  resolveHandler,
+  serializeResponse,
+  payloadTooLarge,
+  BodyTooLargeError,
+  DEFAULT_MAX_BODY_SIZE,
+  type AdapterOptions,
+  type BetterPaymentResponse,
+  type HandlerSource,
+} from 'better-payment';
 
-export type { HandlerSource };
+export type { AdapterOptions, HandlerSource };
 
 /** The parts of Express's (and Node's) request the adapter uses */
 export interface NodeRequestLike extends AsyncIterable<Uint8Array | string> {
@@ -37,17 +46,24 @@ export interface NodeResponseLike {
 
 export type NodeNext = (error?: unknown) => void;
 
-async function readBody(req: NodeRequestLike): Promise<unknown> {
+async function readBody(req: NodeRequestLike, limit: number): Promise<unknown> {
   const method = (req.method ?? 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return undefined;
 
   // A body parser already consumed the stream: use what it produced
   if (req.readableEnded) return req.body;
 
+  if (Number(req.headers['content-length']) > limit) throw new BodyTooLargeError();
+
   // Read the raw body, so form-urlencoded callbacks reach the handler untouched
+  const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  let size = 0;
   let text = '';
   for await (const chunk of req) {
+    size += typeof chunk === 'string' ? encoder.encode(chunk).byteLength : chunk.byteLength;
+    // Leaving the loop stops reading the stream
+    if (size > limit) throw new BodyTooLargeError();
     text += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
   }
   text += decoder.decode();
@@ -68,22 +84,29 @@ function flattenHeaders(headers: NodeRequestLike['headers']): Record<string, str
  * parser ran first, its result is used. Unexpected errors go to `next(error)`.
  */
 export function toExpressHandler(
-  source: HandlerSource
+  source: HandlerSource,
+  { maxBodySize = DEFAULT_MAX_BODY_SIZE }: AdapterOptions = {}
 ): (req: NodeRequestLike, res: NodeResponseLike, next?: NodeNext) => Promise<void> {
+  const send = (res: NodeResponseLike, response: BetterPaymentResponse) => {
+    const { status, headers, body } = serializeResponse(response);
+    res.statusCode = status;
+    for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+    res.end(body ?? undefined);
+  };
   return async (req, res, next) => {
     try {
-      const response = await resolveHandler(source).handle({
-        method: (req.method ?? 'GET').toUpperCase(),
-        url: req.originalUrl ?? req.url ?? '/',
-        headers: flattenHeaders(req.headers),
-        body: await readBody(req),
-      });
-      const { status, headers, body } = serializeResponse(response);
-      res.statusCode = status;
-      for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
-      res.end(body ?? undefined);
+      send(
+        res,
+        await resolveHandler(source).handle({
+          method: (req.method ?? 'GET').toUpperCase(),
+          url: req.originalUrl ?? req.url ?? '/',
+          headers: flattenHeaders(req.headers),
+          body: await readBody(req, maxBodySize),
+        })
+      );
     } catch (error: unknown) {
-      if (next) next(error);
+      if (error instanceof BodyTooLargeError) send(res, payloadTooLarge());
+      else if (next) next(error);
       else {
         res.statusCode = 500;
         res.end();
