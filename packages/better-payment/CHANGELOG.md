@@ -6,6 +6,13 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.11.0
+
+### Added
+
+- `chaos` plugin in `better-payment/plugins`: inject declines, lost responses (`NETWORK_ERROR`) and delays into operations to test error handling. Refuses to run in `production` mode unless `allowProduction` is set.
+- `notifications` plugin in `better-payment/plugins`: sends payment events as readable messages to Slack, Discord, Telegram or a custom channel (email, SMS...), in English, Turkish, German, Russian or Arabic. Messages are sent in the background, without card data; a failing channel never affects the payment.
+
 ## 0.10.0
 
 ### Added
