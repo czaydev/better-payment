@@ -55,8 +55,11 @@ export {
   toWebResponse,
   resolveHandler,
   serializeResponse,
+  payloadTooLarge,
+  BodyTooLargeError,
+  DEFAULT_MAX_BODY_SIZE,
 } from './adapters/fetch';
-export type { HandlerSource } from './adapters/fetch';
+export type { HandlerSource, AdapterOptions } from './adapters/fetch';
 export type { HttpRequestConfig, HttpResponse, HttpMethod } from './core/http';
 
 export {

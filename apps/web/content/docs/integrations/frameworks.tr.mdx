@@ -96,3 +96,15 @@ const getPayment = () => (instance ??= createPayment());
 
 app.all('/api/pay/*path', toExpressHandler(getPayment));
 ```
+
+## İstek gövdesi boyutu [#request-body-size]
+
+<Since version="0.8.1" />
+
+Express, Node.js ve fetch tabanlı adapter'lar bir istek gövdesinin en fazla 1 MiB'ını okur ve daha büyükleri için `413` döner. Banka callback'leri birkaç kB'tır. Sınırı `toExpressHandler`, `toNodeHandler` veya `toFetchHandler` üzerinde `maxBodySize` (bayt) ile değiştirin:
+
+```typescript
+app.all('/api/pay/*path', toExpressHandler(payment, { maxBodySize: 64 * 1024 }));
+```
+
+Fastify kendi `bodyLimit` ayarını uygular (varsayılan 1 MiB).

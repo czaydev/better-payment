@@ -44,10 +44,62 @@ export function serializeResponse(response: BetterPaymentResponse): {
   return { status: response.status, headers, body: JSON.stringify(response.body) };
 }
 
-/** Converts a web `Request` for the handler. The body is passed as raw text. */
-export async function fromWebRequest(request: Request): Promise<BetterPaymentRequest> {
+/** Default limit for request bodies read by the adapters: 1 MiB (bank callbacks are a few kB) */
+export const DEFAULT_MAX_BODY_SIZE = 1024 * 1024;
+
+export interface AdapterOptions {
+  /** Largest request body read, in bytes. Larger requests get 413. Default: 1 MiB */
+  maxBodySize?: number;
+}
+
+/** Thrown by the adapters when a request body is larger than `maxBodySize` */
+export class BodyTooLargeError extends Error {
+  constructor() {
+    super('Request body too large');
+    this.name = 'BodyTooLargeError';
+  }
+}
+
+/** The 413 response the adapters send for a body larger than `maxBodySize` */
+export function payloadTooLarge(): BetterPaymentResponse {
+  return {
+    status: 413,
+    headers: { 'Content-Type': 'application/json' },
+    body: { error: true, message: 'Request body too large' },
+  };
+}
+
+/** Reads the body as text, stopping as soon as it grows past `limit` bytes */
+async function readText(request: Request, limit: number): Promise<string> {
+  if (Number(request.headers.get('content-length')) > limit) throw new BodyTooLargeError();
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      throw new BodyTooLargeError();
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/**
+ * Converts a web `Request` for the handler. The body is passed as raw text.
+ * Throws BodyTooLargeError when it is larger than `maxBodySize`.
+ */
+export async function fromWebRequest(
+  request: Request,
+  { maxBodySize = DEFAULT_MAX_BODY_SIZE }: AdapterOptions = {}
+): Promise<BetterPaymentRequest> {
   const method = request.method.toUpperCase();
-  const text = method === 'GET' || method === 'HEAD' ? '' : await request.text();
+  const text = method === 'GET' || method === 'HEAD' ? '' : await readText(request, maxBodySize);
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
     headers[key] = value;
@@ -75,7 +127,18 @@ export function toWebResponse(response: BetterPaymentResponse): Response {
  * Deno.serve(toFetchHandler(payment));
  * ```
  */
-export function toFetchHandler(source: HandlerSource): (request: Request) => Promise<Response> {
-  return async (request) =>
-    toWebResponse(await resolveHandler(source).handle(await fromWebRequest(request)));
+export function toFetchHandler(
+  source: HandlerSource,
+  options: AdapterOptions = {}
+): (request: Request) => Promise<Response> {
+  return async (request) => {
+    let converted: BetterPaymentRequest;
+    try {
+      converted = await fromWebRequest(request, options);
+    } catch (error) {
+      if (error instanceof BodyTooLargeError) return toWebResponse(payloadTooLarge());
+      throw error;
+    }
+    return toWebResponse(await resolveHandler(source).handle(converted));
+  };
 }
