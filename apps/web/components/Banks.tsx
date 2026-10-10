@@ -21,9 +21,10 @@ type RouteItem = {
   issue?: number;
 };
 
-// Akbank is live; the rest are tracked in issues (logo sources: public/brand/banks/SOURCES.md)
+// Akbank and Kuveyt Türk are live; the rest are tracked in issues (logo sources: public/brand/banks/SOURCES.md)
 const banks: RouteItem[] = [
   { name: "Akbank", logo: "/akbank.svg", w: 75, h: 38, live: true },
+  { name: "Kuveyt Türk", logo: "/brand/banks/kuveyt-turk.svg", w: 227, h: 41, live: true },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
   { name: "İş Bankası", logo: "/brand/banks/is-bankasi.svg", w: 157, h: 49, issue: 36 },
@@ -33,7 +34,6 @@ const banks: RouteItem[] = [
   { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },
   { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, issue: 39 },
   { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, issue: 133 },
-  { name: "Kuveyt Türk", logo: "/brand/banks/kuveyt-turk.svg", w: 227, h: 41, issue: 134 },
 ];
 
 const institutions: RouteItem[] = [
