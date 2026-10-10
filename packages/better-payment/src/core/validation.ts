@@ -25,7 +25,8 @@ export interface PaymentValidationRules {
 }
 
 const DECIMAL = /^\d+(\.\d{1,2})?$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Domain labels exclude '.', so the pattern matches in linear time
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 const IPV6 = /^[0-9a-fA-F:]+(%\w+)?$/;
 

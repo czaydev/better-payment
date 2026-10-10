@@ -114,6 +114,17 @@ describe('validatePaymentRequest', () => {
     ).toEqual(['buyer.identityNumber']);
   });
 
+  it('checks the email domain', () => {
+    for (const email of ['a@b', 'a@b.', 'a@.b', 'a@b..c', '!@!.' + '!.'.repeat(1000)]) {
+      const request = { ...mockPaymentRequest, buyer: { ...mockPaymentRequest.buyer, email } };
+      expect(issuesOf(() => validatePaymentRequest(request))).toEqual(['buyer.email']);
+    }
+    const valid = { ...mockPaymentRequest.buyer, email: 'first.last@mail.example.com.tr' };
+    expect(issuesOf(() => validatePaymentRequest({ ...mockPaymentRequest, buyer: valid }))).toEqual(
+      []
+    );
+  });
+
   it('accepts IPv6 addresses', () => {
     const request = {
       ...mockPaymentRequest,
