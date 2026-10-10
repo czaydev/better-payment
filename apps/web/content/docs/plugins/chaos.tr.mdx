@@ -7,7 +7,7 @@ description: Uygulamanızın ret, kaybolan yanıt ve gecikmeleri nasıl karşıl
 
 Ödeme kodu genellikle kimsenin test etmediği yollarda bozulur: yanıt vermeyen bir sağlayıcı, banka kartı çektikten sonra kaybolan bir yanıt, akışın ortasında gelen bir ret. Sağlayıcı sandbox'ları bunları istediğiniz an tetiklemenize nadiren izin verir. `chaos` plugin'i bu durumları kendi kurulumunuza enjekte eder; böylece hata yönetiminizi, tekrar denemelerinizi ve `NETWORK_ERROR` sonuçlarını ele alışınızı ([hata kodları](/docs/reference/error-codes)) kontrol edebilirsiniz.
 
-## Kurulum
+## Kurulum [#setup]
 
 ```typescript
 import { betterPayment, iyzico } from 'better-payment';
@@ -32,7 +32,7 @@ const payment = betterPayment({
 
 Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERROR`, kaybolan bir yanıt gibi `pending` sonuç döndürür; diğer tüm kodlar `failure` döndürür. Enjekte edilen sonuçlar için de after hook'lar ve [ödeme olayları](/docs/concepts/events) çalışır; yani `localizedErrors` bunları çevirir ve `payment.failed` dinleyicileriniz bunları görür.
 
-## Seçenekler
+## Seçenekler [#options]
 
 | Seçenek | Varsayılan | Açıklama |
 | ------- | ---------- | -------- |
@@ -41,7 +41,7 @@ Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERRO
 | `seed` | — | Çalıştırmaları tekrarlanabilir yapar: aynı seed aynı çağrılarda aynı kuralları tetikler |
 | `allowProduction` | `false` | Plugin'in `production` modunda çalışmasına izin verir |
 
-## Kurallar
+## Kurallar [#rules]
 
 | Alan | Varsayılan | Açıklama |
 | ---- | ---------- | -------- |
@@ -54,10 +54,10 @@ Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERRO
 
 Sadece `delay` olan bir kural çağrıyı yavaşlatır, sonra sağlayıcıda çalıştırır. `delay` ve `fail` olan bir kural önce bekler, sonra hata döndürür.
 
-## Testlerde açıp kapatma
+## Testlerde açıp kapatma [#turn-it-on-and-off-in-tests]
 
 ```typescript
-payment.chaos.disable(); // işlemler normal çalışır
+payment.chaos.disable(); // operations run normally
 payment.chaos.enable();
 payment.chaos.enabled;   // true
 ```
