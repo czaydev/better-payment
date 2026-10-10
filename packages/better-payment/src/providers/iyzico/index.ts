@@ -456,7 +456,13 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * 3D Secure ödeme tamamla
+   * Completes a 3D Secure payment.
+   *
+   * The callback POST is not signed, so its values are untrusted: only the
+   * response of `/payment/3dsecure/auth` decides the result. `paymentId` and
+   * `conversationId` are set from iyzico's response of a successful payment
+   * only; a failure never carries ids taken from the request, so a forged
+   * callback cannot name an existing order.
    */
   async completeThreeDSPayment(callbackData: IyzicoThreeDSCallbackData): Promise<PaymentResponse> {
     // iyzico posts status=success and mdStatus=1 only when 3D authentication
@@ -468,8 +474,6 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
     ) {
       return this.withErrorCode({
         status: PaymentStatus.FAILURE,
-        paymentId: callbackData?.paymentId,
-        conversationId: callbackData?.conversationId,
         errorCode:
           callbackData?.mdStatus !== undefined
             ? `MD_STATUS_${callbackData.mdStatus}`
@@ -488,10 +492,14 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
         conversationData: callbackData.conversationData,
       });
 
+      const status = this.mapStatus(response.status);
+      const succeeded = status === PaymentStatus.SUCCESS;
+
       return this.withErrorCode({
-        status: this.mapStatus(response.status),
-        paymentId: response.paymentId,
-        conversationId: response.conversationId,
+        status,
+        // iyzico echoes the request's conversationId in error responses
+        paymentId: succeeded ? response.paymentId : undefined,
+        conversationId: succeeded ? response.conversationId : undefined,
         errorCode: response.errorCode,
         errorMessage: response.errorMessage,
         errorGroup: response.errorGroup,
