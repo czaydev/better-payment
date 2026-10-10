@@ -158,6 +158,8 @@ export type { AkbankConfig, Akbank3DCallbackData } from './providers/akbank/type
 export { Parampos, parampos } from './providers/parampos';
 export type { ParamposConfig } from './providers/parampos';
 export type { Parampos3DSCallbackData } from './providers/parampos/types';
+export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
+export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
 
 export { BetterPaymentClient, createBetterPaymentClient } from './client';
 export type { BetterPaymentClientConfig } from './client';

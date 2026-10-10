@@ -1,0 +1,84 @@
+---
+title: Kuveyt Türk
+description: Kuveyt Türk Sanal POS (KT Pay Gate) integration reference.
+---
+
+Uses Kuveyt Türk's KT Pay Gate JSON API. Every request carries a `hashData`
+signature: `base64(HMAC-SHA512(fields + hashPassword, hashPassword))`, where
+`hashPassword` is `base64(SHA1(password))`.
+
+<Callout type="warn">
+  The 3D Secure → `Provision` → refund flow has not been verified end to end yet: the public test merchant in Kuveyt Türk's document rejects payments. The request signatures are verified against the KT Pay Gate test environment. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, kuveytturk } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    kuveytturk: kuveytturk({
+      merchantId: process.env.KUVEYTTURK_MERCHANT_ID!,
+      customerId: process.env.KUVEYTTURK_CUSTOMER_ID!,
+      username: process.env.KUVEYTTURK_USERNAME!,
+      password: process.env.KUVEYTTURK_PASSWORD!,
+      // paymentType?: number (default 1; required by the API)
+      // baseUrl: defaults from mode (boatest.kuveytturk.com.tr / sanalpos.kuveytturk.com.tr)
+    }),
+  },
+});
+```
+
+`merchantId` and `customerId` come with your Sanal POS approval. `username` and
+`password` belong to a user with the API role, created in the Kuveyt Türk
+corporate panel (Yönetim → Kullanıcı İşlemleri).
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+## 3D Secure
+
+KT Pay Gate processes 3D Secure payments only; `createPayment()` throws `NOT_SUPPORTED`.
+
+```typescript
+const init = await payment.kuveytturk.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/kuveytturk/payment/complete-3ds',
+  // failUrl?: string (defaults to callbackUrl)
+});
+// init.threeDSHtmlContent is the bank's card verification page
+```
+
+The request needs `buyer.ip`, `buyer.email` and a Turkish `buyer.gsmNumber`.
+Callback URLs cannot contain `&`. Currencies: TRY, USD and EUR; installments: 1 to 12.
+
+After card verification, Kuveyt Türk POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.kuveytturk.completeThreeDSPayment(callbackBody);
+```
+
+The callback is not signed, so it is never trusted on its own:
+
+- a callback without `Success=True` fails; one without `MD`, `OrderId` and `MerchantOrderId` is rejected as `INVALID_HASH`;
+- the order is looked up at the bank, and the bank's `OrderId` must match the callback, otherwise it is rejected as `INVALID_HASH`;
+- the card is charged with `Provision`, using the amount recorded at the bank.
+
+The payment is `success` only when `Provision` succeeds. `paymentId` and `conversationId` are set only once the order is confirmed at the bank, so a failure never carries an order id taken from the callback.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.kuveytturk.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+await payment.kuveytturk.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Drawback / PartialDrawback
+const status = await payment.kuveytturk.getPayment('ORDER123');                                          // GetTransactions
+// status: 'success', 'cancelled' (fully cancelled or refunded), 'failure'
+```
+
+`cancel()` voids a payment on the same day, before end of day. After end of day,
+use `refund()`: the full amount sends `Drawback`, a lower amount `PartialDrawback`.
+
+<Callout type="info">
+  BIN and installment queries are not supported for Kuveyt Türk: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates.
+</Callout>
