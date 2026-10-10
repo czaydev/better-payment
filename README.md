@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos and Akbank.
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Akbank and Kuveyt Türk.
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
 [![license](https://img.shields.io/npm/l/better-payment)](./LICENSE)
@@ -127,18 +127,19 @@ list and suggested customer messages.
 if (result.code === PaymentErrorCode.INSUFFICIENT_FUNDS) askForAnotherCard();
 ```
 
-For PayTR, Parampos and Akbank, `paymentId` is your **order id**: the
+For PayTR, Parampos, Akbank and Kuveyt Türk, `paymentId` is your **order id**: the
 `conversationId` you pass in, or an alphanumeric id generated for you. Pass
 this id to `refund`, `cancel` and `getPayment`.
 
 ## Providers
 
-| Provider | Non-3D                    | 3D Secure                   | Refund | Cancel             | Status | BIN | Installments      |
-| -------- | ------------------------- | --------------------------- | :----: | ------------------ | :----: | :-: | ----------------- |
-| iyzico   | ✓                         | ✓                           |   ✓    | ✓                  |   ✓    |  ✓  | ✓                 |
-| PayTR    | ✓ (needs non-3D approval) | ✓ iFrame                    |   ✓    | ✓ (full refund)    |   ✓    |  ✓  | ✓ (account rates) |
-| Parampos | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓                  |   ✓    |  ✓  | ✓ (account rates) |
-| Akbank   | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓                  |   ✓    |  —  | —                 |
+| Provider    | Non-3D                    | 3D Secure                   | Refund | Cancel          | Status | BIN | Installments      |
+| ----------- | ------------------------- | --------------------------- | :----: | --------------- | :----: | :-: | ----------------- |
+| iyzico      | ✓                         | ✓                           |   ✓    | ✓               |   ✓    |  ✓  | ✓                 |
+| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame                    |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
+| Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
+| Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
+| Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 
 ### 3D Secure completion
 
@@ -146,6 +147,10 @@ this id to `refund`, `cancel` and `getPayment`.
   POST body to `completeThreeDSPayment()`. The signature is verified with your
   credentials before anything is trusted. Parampos then finalizes the payment
   with `TP_WMD_Pay`.
+- **Kuveyt Türk:** the bank POSTs to your `callbackUrl` too, but the POST is not
+  signed. `completeThreeDSPayment()` looks the order up at the bank, checks the
+  bank's order id and charges the card with `Provision`; the payment is `success`
+  only when `Provision` succeeds.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

@@ -1,0 +1,78 @@
+---
+title: Kuveyt Türk
+description: Kuveyt Türk Sanal POS (KT Pay Gate) entegrasyon referansı.
+---
+
+Kuveyt Türk'ün KT Pay Gate JSON API'sini kullanır. Her istek bir `hashData` imzası taşır: `base64(HMAC-SHA512(alanlar + hashPassword, hashPassword))`; burada `hashPassword`, `base64(SHA1(şifre))` değeridir.
+
+<Callout type="warn">
+  3D Secure → `Provision` → iade akışı henüz uçtan uca doğrulanmadı: Kuveyt Türk dokümanındaki ortak test mağazası ödemeleri reddediyor. İstek imzaları KT Pay Gate test ortamında doğrulandı. Canlıya geçmeden önce küçük bir tutarla test edin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, kuveytturk } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    kuveytturk: kuveytturk({
+      merchantId: process.env.KUVEYTTURK_MERCHANT_ID!,
+      customerId: process.env.KUVEYTTURK_CUSTOMER_ID!,
+      username: process.env.KUVEYTTURK_USERNAME!,
+      password: process.env.KUVEYTTURK_PASSWORD!,
+      // paymentType?: number (default 1; required by the API)
+      // baseUrl: defaults from mode (boatest.kuveytturk.com.tr / sanalpos.kuveytturk.com.tr)
+    }),
+  },
+});
+```
+
+`merchantId` ve `customerId` Sanal POS başvurunuz onaylandığında gelir. `username` ve `password`, Kuveyt Türk kurumsal panelinde (Yönetim → Kullanıcı İşlemleri) API rolüyle oluşturduğunuz kullanıcıya aittir.
+
+`paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+## 3D Secure [#3d-secure]
+
+KT Pay Gate yalnızca 3D Secure ödeme alır; `createPayment()` `NOT_SUPPORTED` fırlatır.
+
+```typescript
+const init = await payment.kuveytturk.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/kuveytturk/payment/complete-3ds',
+  // failUrl?: string (defaults to callbackUrl)
+});
+// init.threeDSHtmlContent is the bank's card verification page
+```
+
+İstekte `buyer.ip`, `buyer.email` ve Türkiye'ye ait bir `buyer.gsmNumber` olmalıdır. Callback adresleri `&` içeremez. Para birimleri: TRY, USD ve EUR; taksit: 1 ile 12 arası.
+
+Kart doğrulandıktan sonra Kuveyt Türk sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.kuveytturk.completeThreeDSPayment(callbackBody);
+```
+
+Callback imzalı değildir, bu yüzden tek başına asla güvenilmez:
+
+- `Success=True` içermeyen callback başarısız olur; `MD`, `OrderId` ve `MerchantOrderId` içermeyen callback `INVALID_HASH` olarak reddedilir;
+- sipariş bankada sorgulanır ve bankanın `OrderId` değeri callback ile eşleşmelidir, aksi halde `INVALID_HASH` olarak reddedilir;
+- kart, bankada kayıtlı tutar kullanılarak `Provision` ile tahsil edilir.
+
+Ödeme yalnızca `Provision` başarılı olduğunda `success` olur. `paymentId` ve `conversationId` yalnızca sipariş bankada doğrulandıktan sonra doldurulur; bu yüzden başarısız bir sonuç hiçbir zaman callback'ten alınan bir sipariş numarası taşımaz.
+
+## İade, iptal ve durum sorgusu [#refund-cancel--status]
+
+```typescript
+await payment.kuveytturk.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+await payment.kuveytturk.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Drawback / PartialDrawback
+const status = await payment.kuveytturk.getPayment('ORDER123');                                          // GetTransactions
+// status: 'success', 'cancelled' (fully cancelled or refunded), 'failure'
+```
+
+`cancel()` ödemeyi aynı gün, gün sonundan önce iptal eder. Gün sonundan sonra `refund()` kullanın: tutarın tamamı `Drawback`, daha düşük bir tutar `PartialDrawback` olarak gönderilir.
+
+<Callout type="info">
+  Kuveyt Türk için BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır. Ödeme isteğinde `installment` gönderin ve `paidPrice` değerini anlaşmalı oranlarınızdan hesaplayın.
+</Callout>

@@ -3,6 +3,7 @@
   "icon": "banks",
   "defaultOpen": true,
   "pages": [
-    "akbank"
+    "akbank",
+    "kuveytturk"
   ]
 }

@@ -14,6 +14,7 @@ export enum ProviderType {
   PAYTR = 'paytr',
   AKBANK = 'akbank',
   PARAMPOS = 'parampos',
+  KUVEYTTURK = 'kuveytturk',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -119,6 +120,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.PARAMPOS]: {
     sandbox: 'https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx',
     production: 'https://posws.param.com.tr/turkpos.ws/service_turkpos_prod.asmx',
+  },
+  [ProviderType.KUVEYTTURK]: {
+    sandbox: 'https://boatest.kuveytturk.com.tr/boa.virtualpos.services',
+    production: 'https://sanalpos.kuveytturk.com.tr/ServiceGateWay',
   },
 };
 

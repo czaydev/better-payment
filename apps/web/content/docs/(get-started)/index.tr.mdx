@@ -3,7 +3,7 @@ title: Giriş
 description: Node.js ve Türk ödeme sağlayıcıları için tip güvenli, birleşik ödeme kütüphanesi.
 ---
 
-**Better Payment**, Türk ödeme sağlayıcılarını (iyzico, PayTR, Akbank ve Parampos) tek bir TypeScript API'siyle entegre etmenizi sağlar.
+**Better Payment**, Türk ödeme sağlayıcılarını (iyzico, PayTR, Akbank, Parampos ve Kuveyt Türk) tek bir TypeScript API'siyle entegre etmenizi sağlar.
 
 <Callout type="warn">
   **0.0.1 yeni bir başlangıç.** Sürüm geçmişi sıfırlandı. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bu sürümler kullanımdan kaldırıldı. Nelerin değiştiğini ve nasıl geçiş yapacağınızı [0.0.1'deki yenilikler](/docs/whats-new) sayfasında okuyun.
@@ -29,9 +29,11 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 | PayTR    | ✅ ¹ | ✅ iFrame | ✅ | ✅ ² | ✅ | ✅ | ✅ |
 | Akbank   | ✅ | ✅ 3D_PAY | ✅ | ✅ | ✅ | — | — |
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 
 ¹ PayTR hesabınızın 3D'siz ödemeler için onaylanmış olması gerekir.
 ² PayTR'de iptal (void) uç noktası yoktur; bu yüzden `cancel()` tam iade yapar.
+³ Kuveyt Türk'te iptal aynı gün, gün sonundan önce yapılır; sonrasında `refund()` kullanın.
 
 ## Kısa örnek [#quick-example]
 
