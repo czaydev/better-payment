@@ -7,6 +7,13 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.11.0
+
+### Added
+
+- **[`chaos` plugin](/docs/plugins/chaos):** injects declines, lost responses (`NETWORK_ERROR`) and delays into operations, so you can test how your application handles them. It refuses to run in `production` mode unless `allowProduction` is set.
+- **[`notifications` plugin](/docs/plugins/notifications):** sends sales, refunds and failed payments to Slack, Discord, Telegram or your own channel, in the background and without card data. A failing channel never affects the payment.
+
 ## 0.10.0
 
 ### Added
