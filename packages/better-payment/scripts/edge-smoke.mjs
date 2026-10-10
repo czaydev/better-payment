@@ -158,7 +158,8 @@ const scenario = `(async (input) => {
   await bp.use('parampos').completeThreeDSPayment(input.PARAM_CALLBACK);
   out.paramposGenuineCalledParam = calls.length === before + 1 && calls.at(-1).body.includes('TP_WMD_Pay');
 
-  // Akbank: HMAC-SHA512 callback (reference vector), request auth-hash
+  // Akbank: HMAC-SHA512 callback (reference vector) confirmed by an order history query, request auth-hash
+  replies.push(JSON.stringify({ responseCode: 'VPS-0000', txnDetailList: [{ txnCode: '3000', responseCode: 'VPS-0000', txnStatus: 'N', orderId: input.AKBANK_CALLBACK.orderId }] }));
   out.akbankCallback = (await bp.use('akbank').completeThreeDSPayment(input.AKBANK_CALLBACK)).status;
   out.akbankForged = (await bp.use('akbank').completeThreeDSPayment({ ...input.AKBANK_CALLBACK, responseCode: 'VPS-1000' })).errorCode;
   replies.push(JSON.stringify({ responseCode: 'VPS-0000', hostResponseCode: '00', order: { orderId: 'A1' } }));
