@@ -260,6 +260,15 @@ type RequestRecord =
   | { state: 'processing'; request: string }
   | { state: 'done'; request: string; response: BetterPaymentResponse };
 
+/** Removes leading and trailing slashes without a backtracking regex */
+function trimSlashes(path: string): string {
+  let start = 0;
+  let end = path.length;
+  while (start < end && path[start] === '/') start++;
+  while (end > start && path[end - 1] === '/') end--;
+  return path.slice(start, end);
+}
+
 function parseRecord<T>(value: string | undefined): T | undefined {
   if (!value) return undefined;
   try {
@@ -334,7 +343,7 @@ export class BetterPaymentHandler {
     private core: PaymentCore,
     private options: BetterPaymentHandlerOptions = {}
   ) {
-    this.basePath = '/' + (options.basePath ?? '/api/pay').replace(/^\/+|\/+$/g, '');
+    this.basePath = '/' + trimSlashes(options.basePath ?? '/api/pay');
     const allowed =
       options.allowedActions === 'all'
         ? ALL_HANDLER_ACTIONS
@@ -351,7 +360,7 @@ export class BetterPaymentHandler {
 
     this.endpoints = new Map();
     for (const endpoint of core.endpoints) {
-      const path = '/' + endpoint.path.replace(/^\/+|\/+$/g, '');
+      const path = '/' + trimSlashes(endpoint.path);
       const first = path.split('/')[1];
       if (core.isProviderEnabled(first) || first === 'health' || first === 'ok') {
         throw new ConfigurationError(
