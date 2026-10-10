@@ -185,6 +185,8 @@ interface HandlerContext {
 
 `ctx.body` client'tan gelir, bu yüzden alanları `unknown` tipindedir: kullanmadan önce doğrulayın (ya da doğruladıktan sonra cast edin). `onCallback` ve `callbackRedirect` bir `PaymentResponse` alır.
 
+Form gövdesini yalnızca sağlayıcı callback'leri kabul eder. Diğer aksiyonlar `application/x-www-form-urlencoded`, `multipart/form-data` ve `text/plain` için `415` döner: başka bir sitedeki tarayıcı formu bunları CORS ön kontrolü olmadan, kullanıcının cookie'leriyle birlikte gönderebilir. Frontend'den JSON gönderin (`better-payment/client` bunu yapar).
+
 Plugin'ler handler'a yeni adresler ekleyebilir ([plugin endpoint'leri](/docs/guides/writing-plugins#endpoints)). `authorize` hook'u bunlar için de çalışır; `provider: undefined` ve `action: 'plugin:<plugin id>/<endpoint adı>'` olur. Callback'lerde [ödeme olayları](/docs/concepts/events) `onCallback`'ten hemen önce yayınlanır; bir dinleyici hata verirse `onCallback` ile birlikte yeniden denenir.
 
 ## Framework'ler [#frameworks]
