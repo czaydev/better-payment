@@ -61,6 +61,7 @@ const payment = betterPayment({
     callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
 
     exposeErrors: false, // default: 500 responses do not include internal error messages
+    exposeRawResponse: false, // default: responses leave out the provider's rawResponse
   },
 });
 ```
@@ -107,7 +108,7 @@ Paths are relative to `basePath` (default `/api/pay`).
 | Situation | HTTP status | Body |
 |-----------|-------------|------|
 | `success` / `pending` result | 200 | provider result |
-| `failure` result | 422 | provider result (`errorCode`, `errorMessage`, `rawResponse`) |
+| `failure` result | 422 | provider result (`errorCode`, `errorMessage`) |
 | PayTR notification (`/paytr/callback`) | 200 `text/plain` | `OK` (400 when the hash is invalid) |
 | `callbackRedirect` returned a URL | 303 | `Location` header |
 | Invalid input / wrong method / not enabled | 400 / 405 / 404 | `{ error, message }` |
@@ -117,6 +118,16 @@ Paths are relative to `basePath` (default `/api/pay`).
 <Callout type="warn">
   PayTR re-sends a notification until it receives exactly `OK`. Return `res.body` as plain text when `res.headers['Content-Type']` is `text/plain`; do not JSON-encode it. If `onCallback` throws, the handler returns 500 and PayTR retries the notification.
 </Callout>
+
+### Raw provider responses
+
+<Since version="0.9.0" />
+
+Responses leave out the provider's `rawResponse`. It can hold merchant data (iyzico commission rates and fraud status) and stored-card keys (`cardUserKey`, `cardToken`) that the customer's browser should not see. `onCallback`, `callbackRedirect` and the events still receive the full result. Set `exposeRawResponse: true` to include it, for example on an admin-only handler:
+
+```typescript
+const admin = payment.createHandler({ basePath: '/admin/pay', authorize: isAdmin, exposeRawResponse: true });
+```
 
 ## Duplicate callbacks and Idempotency-Key
 
@@ -162,6 +173,18 @@ betterPayment({
 <Callout type="info">
   `setIfAbsent` must be atomic: Redis `SET ... NX`, or an insert into a table with a unique key in SQL (`INSERT ... ON CONFLICT DO NOTHING` and check the affected rows).
 </Callout>
+
+### Scoping keys to the caller
+
+<Since version="0.9.0" />
+
+Keys are shared by all callers. When keys are predictable (such as `refund-<orderId>`) and `transformRequest` builds the body on the server, two users can send the same key and body and the second gets the first one's response. Return the caller from `idempotency.scope` so each user has their own keys:
+
+```typescript
+handler: {
+  idempotency: { scope: async (ctx) => (await getSession(ctx.request))?.userId },
+},
+```
 
 ## Interfaces
 

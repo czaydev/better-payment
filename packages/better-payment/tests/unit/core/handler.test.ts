@@ -218,6 +218,69 @@ describe('BetterPaymentHandler', () => {
     });
   });
 
+  describe('response data', () => {
+    const raw = { cardUserKey: 'card-user', merchantCommissionRate: '2.5' };
+
+    it('leaves out rawResponse by default', async () => {
+      const { payment } = buildMockPayment({
+        createPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
+        binCheck: vi.fn().mockResolvedValue({ binNumber: '454360', rawResponse: raw }),
+      });
+      const handler = new BetterPaymentHandler(payment, allowAll);
+      const res = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}));
+      expect(res.body).toEqual({ status: 'success', paymentId: 'PMT-1' });
+      const bin = await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' }));
+      expect(bin.body).toEqual({ binNumber: '454360' });
+    });
+
+    it('returns rawResponse with exposeRawResponse', async () => {
+      const { payment } = buildMockPayment({
+        createPayment: vi.fn().mockResolvedValue({ status: 'success', rawResponse: raw }),
+      });
+      const handler = new BetterPaymentHandler(payment, { ...allowAll, exposeRawResponse: true });
+      const res = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}));
+      expect(res.body.rawResponse).toEqual(raw);
+    });
+
+    it('passes rawResponse to onCallback', async () => {
+      const onCallback = vi.fn();
+      const { payment } = buildMockPayment({
+        completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
+      });
+      const handler = new BetterPaymentHandler(payment, { onCallback });
+      const res = await handler.handle(req('POST', '/api/pay/iyzico/payment/complete-3ds', { paymentId: 'PMT-1' }));
+      expect(res.body.rawResponse).toBeUndefined();
+      expect(onCallback.mock.calls[0][0].rawResponse).toEqual(raw);
+    });
+  });
+
+  describe('Idempotency-Key scope', () => {
+    const user = (id: string) => ({ 'idempotency-key': 'order-1', 'x-user': id });
+
+    it('shares stored responses between callers by default', async () => {
+      const { payment, mockProvider } = buildMockPayment();
+      const handler = new BetterPaymentHandler(payment, allowAll);
+      await handler.handle(req('POST', '/api/pay/iyzico/payment', {}, user('a')));
+      const second = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}, user('b')));
+      expect(second.headers['Idempotent-Replayed']).toBe('true');
+      expect(mockProvider.createPayment).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the keys of different callers apart with scope', async () => {
+      const { payment, mockProvider } = buildMockPayment();
+      const handler = new BetterPaymentHandler(payment, {
+        ...allowAll,
+        idempotency: { scope: (ctx) => ctx.request.headers['x-user'] },
+      });
+      await handler.handle(req('POST', '/api/pay/iyzico/payment', {}, user('a')));
+      const other = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}, user('b')));
+      expect(other.headers['Idempotent-Replayed']).toBeUndefined();
+      const same = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}, user('a')));
+      expect(same.headers['Idempotent-Replayed']).toBe('true');
+      expect(mockProvider.createPayment).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('callbacks', () => {
     it('parses form-urlencoded callbacks', async () => {
       const { payment, mockProvider } = buildMockPayment();

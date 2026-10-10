@@ -57,6 +57,7 @@ const payment = betterPayment({
     callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
 
     exposeErrors: false, // default: 500 responses do not include internal error messages
+    exposeRawResponse: false, // default: responses leave out the provider's rawResponse
   },
 });
 ```
@@ -102,7 +103,7 @@ Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 | Durum | HTTP durum kodu | Gövde |
 |-----------|-------------|------|
 | `success` / `pending` sonucu | 200 | sağlayıcı sonucu |
-| `failure` sonucu | 422 | sağlayıcı sonucu (`errorCode`, `errorMessage`, `rawResponse`) |
+| `failure` sonucu | 422 | sağlayıcı sonucu (`errorCode`, `errorMessage`) |
 | PayTR bildirimi (`/paytr/callback`) | 200 `text/plain` | `OK` (hash geçersizse 400) |
 | `callbackRedirect` bir URL döndürdü | 303 | `Location` başlığı |
 | Geçersiz girdi / yanlış metot / etkin değil | 400 / 405 / 404 | `{ error, message }` |
@@ -112,6 +113,16 @@ Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 <Callout type="warn">
   PayTR, tam olarak `OK` alana kadar bildirimi yeniden gönderir. `res.headers['Content-Type']` `text/plain` olduğunda `res.body`'yi düz metin olarak döndürün; JSON'a çevirmeyin. `onCallback` hata fırlatırsa handler 500 döner ve PayTR bildirimi tekrar gönderir.
 </Callout>
+
+### Ham sağlayıcı yanıtları [#raw-provider-responses]
+
+<Since version="0.9.0" />
+
+Yanıtlar sağlayıcının `rawResponse` alanını içermez. Bu alan müşterinin tarayıcısının görmemesi gereken mağaza verilerini (iyzico komisyon oranları ve fraud durumu) ve kayıtlı kart anahtarlarını (`cardUserKey`, `cardToken`) taşıyabilir. `onCallback`, `callbackRedirect` ve event'ler sonucun tamamını almaya devam eder. Alanı yanıta eklemek için `exposeRawResponse: true` verin; örneğin yalnızca yöneticilere açık bir handler'da:
+
+```typescript
+const admin = payment.createHandler({ basePath: '/admin/pay', authorize: isAdmin, exposeRawResponse: true });
+```
 
 ## Tekrar eden callback'ler ve Idempotency-Key [#duplicate-callbacks-and-idempotency-key]
 
@@ -157,6 +168,18 @@ betterPayment({
 <Callout type="info">
   `setIfAbsent` atomik olmalıdır: Redis'te `SET ... NX`, SQL'de ise benzersiz anahtarlı bir tabloya ekleme (`INSERT ... ON CONFLICT DO NOTHING` ve etkilenen satır sayısını kontrol edin).
 </Callout>
+
+### Anahtarları çağırana bağlama [#scoping-keys-to-the-caller]
+
+<Since version="0.9.0" />
+
+Anahtarlar tüm çağıranlar arasında ortaktır. Anahtarlar tahmin edilebilirse (örneğin `refund-<orderId>`) ve gövdeyi `transformRequest` sunucuda kuruyorsa, iki kullanıcı aynı anahtar ve gövdeyi gönderebilir ve ikincisi ilkinin yanıtını alır. Her kullanıcının kendi anahtarları olması için `idempotency.scope` ile çağıranı döndürün:
+
+```typescript
+handler: {
+  idempotency: { scope: async (ctx) => (await getSession(ctx.request))?.userId },
+},
+```
 
 ## Arayüzler [#interfaces]
 

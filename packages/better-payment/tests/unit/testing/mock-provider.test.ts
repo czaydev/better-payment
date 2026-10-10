@@ -37,6 +37,7 @@ function setup(options: { onCallback?: (status: string) => void } = {}) {
     handler: {
       allowedActions: 'all',
       authorize: () => true,
+      exposeRawResponse: true,
       onCallback: async (result) => options.onCallback?.(result.status),
     },
   });

@@ -206,6 +206,12 @@ export interface BetterPaymentHandlerOptions {
   /** Include error messages of unexpected exceptions in 500 responses. Default: false */
   exposeErrors?: boolean;
   /**
+   * Include the provider's `rawResponse` in responses. It can hold merchant data
+   * (commission rates, fraud status) and stored-card keys, so it is left out by
+   * default. Your hooks (`onCallback`, events) always receive it. Default: false
+   */
+  exposeRawResponse?: boolean;
+  /**
    * Deduplication of provider callbacks and `Idempotency-Key` requests.
    * On by default with an in-memory store; pass a shared store (Redis, DB)
    * when running several instances, or `false` to turn it off.
@@ -223,6 +229,12 @@ export interface HandlerIdempotencyOptions {
   ttlSeconds?: number;
   /** How long an in-flight request holds its key if the process dies. Default: 60 */
   lockSeconds?: number;
+  /**
+   * Returns the caller an `Idempotency-Key` belongs to, such as the user or
+   * session id. Keys of different callers never share a stored response.
+   * Default: keys are shared by all callers
+   */
+  scope?: (ctx: HandlerContext) => string | undefined | Promise<string | undefined>;
 }
 
 /**
@@ -327,7 +339,8 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export class BetterPaymentHandler {
   private readonly basePath: string;
   private readonly allowed: Set<HandlerAction>;
-  private readonly idempotency?: Required<HandlerIdempotencyOptions>;
+  private readonly idempotency?: Required<Omit<HandlerIdempotencyOptions, 'scope'>> &
+    Pick<HandlerIdempotencyOptions, 'scope'>;
   private readonly endpoints: Map<string, RegisteredEndpoint>;
 
   constructor(
@@ -346,6 +359,7 @@ export class BetterPaymentHandler {
         store: options.idempotency?.store ?? new MemoryIdempotencyStore(),
         ttlSeconds: options.idempotency?.ttlSeconds ?? 86_400,
         lockSeconds: options.idempotency?.lockSeconds ?? 60,
+        scope: options.idempotency?.scope,
       };
     }
 
@@ -711,7 +725,7 @@ export class BetterPaymentHandler {
           throw new HttpError(400, 'binNumber must be 6-8 digits');
         }
         try {
-          return this.jsonResponse(200, await provider.binCheck(binNumber));
+          return this.jsonResponse(200, this.publicResult(await provider.binCheck(binNumber)));
         } catch (error: unknown) {
           return this.errorResponse(422, errorMessage(error, 'BIN check failed'));
         }
@@ -912,12 +926,17 @@ export class BetterPaymentHandler {
   private async withIdempotencyKey(
     ctx: HandlerContext,
     idempotencyKey: string,
-    { store, ttlSeconds, lockSeconds }: Required<HandlerIdempotencyOptions>
+    { store, ttlSeconds, lockSeconds, scope }: NonNullable<BetterPaymentHandler['idempotency']>
   ): Promise<BetterPaymentResponse> {
     if (idempotencyKey.length > 255) {
       throw new HttpError(400, 'Idempotency-Key must be at most 255 characters');
     }
-    const key = `bp:request:${ctx.provider}:${ctx.action}:${idempotencyKey}`;
+    const owner = scope ? await scope(ctx) : undefined;
+    // A scoped key is JSON, so neither its parts nor an unscoped key can imitate it
+    const key =
+      owner === undefined
+        ? `bp:request:${ctx.provider}:${ctx.action}:${idempotencyKey}`
+        : `bp:request:${JSON.stringify([ctx.provider, ctx.action, owner, idempotencyKey])}`;
     const request = await fingerprint(ctx.body);
 
     if (
@@ -953,7 +972,16 @@ export class BetterPaymentHandler {
    */
   private resultResponse(result: unknown): BetterPaymentResponse {
     const failed = asRecord(result)?.status === PaymentStatus.FAILURE;
-    return this.jsonResponse(failed ? 422 : 200, result);
+    return this.jsonResponse(failed ? 422 : 200, this.publicResult(result));
+  }
+
+  /** Leaves out `rawResponse` unless `exposeRawResponse` is set */
+  private publicResult(result: unknown): unknown {
+    const record = asRecord(result);
+    if (this.options.exposeRawResponse || !record || !('rawResponse' in record)) return result;
+    const rest = { ...record };
+    delete rest.rawResponse;
+    return rest;
   }
 
   private healthCheck(): BetterPaymentResponse {
