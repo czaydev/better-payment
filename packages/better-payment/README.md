@@ -137,7 +137,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Provider    | Non-3D                    | 3D Secure                   | Refund | Cancel          | Status | BIN | Installments      |
 | ----------- | ------------------------- | --------------------------- | :----: | --------------- | :----: | :-: | ----------------- |
 | iyzico      | ✓                         | ✓                           |   ✓    | ✓               |   ✓    |  ✓  | ✓                 |
-| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame                    |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
+| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame / Direct API       |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
 | Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |

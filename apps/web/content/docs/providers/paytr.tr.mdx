@@ -18,6 +18,7 @@ const payment = betterPayment({
       merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
       // testMode: defaults to mode === 'sandbox' (sends test_mode=1)
       // timeoutLimit: 30 (minutes)
+      // threeDSMode: 'iframe' | 'direct' (default 'iframe', see Direct API 3D Secure)
     }),
   },
 });
@@ -42,6 +43,29 @@ const init = await payment.paytr.initThreeDSPayment({
 ```
 
 `payment_amount`, `paidPrice`'tır (kuruş cinsinden). Sepet kalemleri TL fiyatlarıyla gönderilir.
+
+## Direct API ile 3D Secure (kendi kart formunuz) [#direct-api-3d-secure-your-own-card-form]
+
+`threeDSMode: 'direct'` ile `initThreeDSPayment()` PayTR'ın iFrame sayfasını göstermek yerine kartı istekten alır; böylece kendi ödeme sayfası tasarımınızı korursunuz. Direct API token'ıyla (`non_3d=0`) imzalanmış bir form döner ve bu formu müşterinin tarayıcısı PayTR'a gönderir; PayTR kart verisi için bunu şart koşar. PayTR 3D Secure'u çalıştırır, `callbackUrl` (veya `failUrl`) adresine yönlendirir ve sonucu iFrame'deki gibi bildirim adresine gönderir.
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    paytr: paytr({ merchantId, merchantKey, merchantSalt, threeDSMode: 'direct' }),
+  },
+});
+
+const init = await payment.paytr.initThreeDSPayment({
+  ...paymentRequest,            // paymentCard comes from your own checkout form
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/orders/ORDER123',
+  // failUrl?: string (defaults to callbackUrl)
+  // saveCard?: true (PayTR stores the card; the utoken comes in the notification)
+});
+// init.threeDSHtmlContent auto-submits the signed card form to https://www.paytr.com/odeme
+```
+
+PayTR hesabınızda Direct API açık olmalıdır. Kayıtlı kartlar `threeDSMode` ne olursa olsun her zaman bu yolu kullanır.
 
 ## Bildirim (Bildirim URL) [#notification-bildirim-url]
 

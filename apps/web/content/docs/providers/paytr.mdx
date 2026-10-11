@@ -19,6 +19,7 @@ const payment = betterPayment({
       merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
       // testMode: defaults to mode === 'sandbox' (sends test_mode=1)
       // timeoutLimit: 30 (minutes)
+      // threeDSMode: 'iframe' | 'direct' (default 'iframe', see Direct API 3D Secure)
     }),
   },
 });
@@ -46,6 +47,34 @@ const init = await payment.paytr.initThreeDSPayment({
 ```
 
 `payment_amount` is `paidPrice` (in kuruş). Basket items are sent with TL prices.
+
+## Direct API 3D Secure (your own card form)
+
+With `threeDSMode: 'direct'`, `initThreeDSPayment()` takes the card in the request instead of
+showing PayTR's iFrame, so you keep your own checkout design. It returns a form signed with the
+Direct API token (`non_3d=0`) that the customer's browser posts to PayTR, as PayTR requires for
+card data. PayTR runs 3D Secure, redirects to `callbackUrl` (or `failUrl`) and sends the result to
+the notification URL, as with the iFrame.
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    paytr: paytr({ merchantId, merchantKey, merchantSalt, threeDSMode: 'direct' }),
+  },
+});
+
+const init = await payment.paytr.initThreeDSPayment({
+  ...paymentRequest,            // paymentCard comes from your own checkout form
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/orders/ORDER123',
+  // failUrl?: string (defaults to callbackUrl)
+  // saveCard?: true (PayTR stores the card; the utoken comes in the notification)
+});
+// init.threeDSHtmlContent auto-submits the signed card form to https://www.paytr.com/odeme
+```
+
+The Direct API must be enabled on your PayTR account. Stored cards always use this path, whatever
+`threeDSMode` is.
 
 ## Notification (Bildirim URL)
 
