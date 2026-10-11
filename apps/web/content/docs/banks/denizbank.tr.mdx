@@ -1,6 +1,7 @@
 ---
 title: Denizbank
 description: Denizbank sanal POS (InterVPos) entegrasyon referansı.
+since: 0.12.0
 ---
 
 Denizbank InterVPos API'sini kullanır. 3D Model'de (varsayılan) banka kartı doğrular, ödeme ardından 3D Secure verileriyle tahsil edilir; 3D Pay'de kartı banka da tahsil eder. 3D formu `base64(SHA1(ShopCode + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))` ile imzalanır.
