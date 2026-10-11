@@ -1,0 +1,85 @@
+---
+title: Yapı Kredi
+description: Yapı Kredi virtual POS (Posnet XML) integration reference.
+---
+
+Uses the Yapı Kredi Posnet XML API. 3D Secure runs through Posnet OOS: the card is sent to
+`oosRequestData`, the bank's encrypted data is posted to its 3D service, and the result is
+resolved with `oosResolveMerchantData` and charged with `oosTranData`. Both are signed with a MAC:
+`base64(SHA256(XID;amount;currency;merchantId;base64(SHA256(encKey;terminalId))))`.
+
+<Callout type="warn">
+  The Yapı Kredi provider has not been verified with a test store yet: only the request format was checked against the test endpoint. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, yapikredi } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    yapikredi: yapikredi({
+      merchantId: process.env.YAPIKREDI_MERCHANT_ID!,
+      terminalId: process.env.YAPIKREDI_TERMINAL_ID!,
+      posnetId: process.env.YAPIKREDI_POSNET_ID!,
+      encKey: process.env.YAPIKREDI_ENC_KEY!,
+      // baseUrl: defaults from mode (setmpos.ykb.com / posnet.yapikredi.com.tr)
+    }),
+  },
+});
+```
+
+The order id (`conversationId`) can have at most 20 letters or digits; it is sent as the
+20-character XID. A successful payment returns the bank's host log key as `paymentId`, which
+`refund()` and `cancel()` take.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.yapikredi.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// result.paymentId is the host log key
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.yapikredi.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/payment/yapikredi/return',
+});
+// init.threeDSHtmlContent auto-submits the bank's encrypted data to its 3D service
+```
+
+Yapı Kredi POSTs `BankPacket`, `MerchantPacket` and `Sign` to `callbackUrl`. The MAC covers
+your order id, amount and currency, which the callback carries only encrypted, so complete
+the payment with the order from your own records. Spread the callback first so your values win:
+
+```typescript
+const result = await payment.yapikredi.completeThreeDSPayment({
+  ...callbackBody,
+  orderId: order.id,
+  amount: order.total, // as in the payment request, e.g. '1.20'
+  currency: 'TRY',
+});
+```
+
+Because of this, Yapı Kredi callbacks are completed in your own route, not with the handler's
+callback route. The result is confirmed with the bank:
+
+- the resolved XID, amount and currency must equal your order, otherwise it is rejected as `INVALID_HASH`;
+- the card is charged with `oosTranData` only when `mdStatus` is `1`, and the bank's answer decides.
+
+`paymentId` and `conversationId` are set only for a payment the bank approved.
+
+## Refund & Cancel
+
+```typescript
+await payment.yapikredi.refund({ paymentId: hostLogKey, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // return
+await payment.yapikredi.cancel({ paymentId: hostLogKey, ip: '1.2.3.4' });                               // reverse
+```
+
+<Callout type="info">
+  Order status, BIN and installment queries are not supported for Yapı Kredi yet: `getPayment()`, `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
+</Callout>

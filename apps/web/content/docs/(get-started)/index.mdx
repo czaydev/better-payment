@@ -3,7 +3,7 @@ title: Introduction
 description: A unified, type-safe payment gateway library for Node.js and Turkish payment providers.
 ---
 
-**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — through one TypeScript API.
+**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk, Yapı Kredi and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — through one TypeScript API.
 
 <Callout type="warn">
   **0.0.1 is a fresh start.** The version history was reset. Releases `1.x`–`3.x` contained incorrect provider integrations and callback checks that could be bypassed, and are deprecated. Read [What's New in 0.0.1](/docs/whats-new) for what changed and how to migrate.
@@ -32,6 +32,7 @@ Every payment provider has its own SDK, request format, signature scheme and err
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
+| Yapı Kredi | ✅ | ✅ Posnet OOS | ✅ | ✅ | — | — | — |
 
 ¹ Your PayTR account must be approved for non-3D payments.
 ² PayTR has no void endpoint, so `cancel()` issues a full refund.

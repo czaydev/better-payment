@@ -166,6 +166,12 @@ export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
 export { Est, est } from './providers/est';
 export type { EstConfig, Est3DCallbackData } from './providers/est/types';
 export type { EstBank, EstStoreType } from './providers/est/utils';
+export { YapiKredi, yapikredi } from './providers/yapikredi';
+export type {
+  YapiKrediConfig,
+  YapiKrediCallbackFields,
+  YapiKrediCompleteRequest,
+} from './providers/yapikredi/types';
 
 export { BetterPaymentClient, createBetterPaymentClient } from './client';
 export type { BetterPaymentClientConfig } from './client';
