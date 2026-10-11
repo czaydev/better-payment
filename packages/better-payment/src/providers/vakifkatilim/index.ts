@@ -112,6 +112,16 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
     };
   }
 
+  private static paymentIdOf(merchantOrderId: string, fields: Record<string, string>): string {
+    return encodeVakifKatilimPaymentId({
+      merchantOrderId,
+      orderId: fields.OrderId,
+      provisionNumber: fields.ProvisionNumber || undefined,
+      rrn: fields.RRN || undefined,
+      stan: fields.Stan || undefined,
+    });
+  }
+
   private account(): Record<string, XmlValue> {
     return {
       MerchantId: this.config.merchantId,
@@ -186,7 +196,7 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
     const approved = isVakifKatilimApproved(fields) && !!fields.OrderId && fields.OrderId !== '0';
     return this.withErrorCode({
       status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
-      paymentId: approved ? encodeVakifKatilimPaymentId(orderId, fields.OrderId) : undefined,
+      paymentId: approved ? VakifKatilim.paymentIdOf(orderId, fields) : undefined,
       conversationId: orderId,
       ...(approved ? {} : VakifKatilim.errorOf(fields)),
       rawResponse: fields,
@@ -339,7 +349,7 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
       }
       return this.withErrorCode({
         status: PaymentStatus.SUCCESS,
-        paymentId: encodeVakifKatilimPaymentId(data.orderId, fields.OrderId),
+        paymentId: VakifKatilim.paymentIdOf(data.orderId, fields),
         conversationId: orderId,
         rawResponse: { callback: data, payment: fields },
       });
@@ -359,23 +369,27 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
     amount: string | undefined,
     currency: string | undefined
   ): Promise<Record<string, string>> {
-    const { merchantOrderId, orderId } = decodeVakifKatilimPaymentId(paymentId);
-    const formatted = amount !== undefined ? formatVakifKatilimAmount(amount) : '';
+    const ref = decodeVakifKatilimPaymentId(paymentId);
+    if (amount === undefined) {
+      // The hash covers the amount: send the payment's amount, never a blank one
+      throw new ValidationError('Vakıf Katılım needs the payment amount as price');
+    }
+    const formatted = formatVakifKatilimAmount(amount);
     return this.api(path, {
       HashData: await createVakifKatilimHash(this.credentials, {
-        merchantOrderId,
+        merchantOrderId: ref.merchantOrderId,
         amount: formatted,
       }),
       ...this.account(),
-      MerchantOrderId: merchantOrderId,
-      OrderId: orderId,
-      ...(amount !== undefined
-        ? {
-            Amount: formatted,
-            DisplayAmount: formatted,
-            FECCurrencyCode: getVakifKatilimCurrencyCode(currency),
-          }
-        : {}),
+      MerchantOrderId: ref.merchantOrderId,
+      OrderId: ref.orderId,
+      // Only sent when the payment returned them (empty elements are left out)
+      ...(ref.provisionNumber ? { ProvisionNumber: ref.provisionNumber } : {}),
+      ...(ref.rrn ? { RRN: ref.rrn } : {}),
+      ...(ref.stan ? { Stan: ref.stan } : {}),
+      Amount: formatted,
+      DisplayAmount: formatted,
+      FECCurrencyCode: getVakifKatilimCurrencyCode(currency),
     });
   }
 
@@ -407,7 +421,8 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
   }
 
   /**
-   * Same-day cancel (`SaleReversal`). `paymentId` is the one the payment returned.
+   * Same-day cancel (`SaleReversal`). `paymentId` is the one the payment returned,
+   * and `price` the payment's amount (the hash covers it).
    */
   async cancel(request: CancelRequest): Promise<CancelResponse> {
     try {

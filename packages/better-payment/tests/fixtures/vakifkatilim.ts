@@ -15,8 +15,6 @@ export const VAKIFKATILIM_3D_HASH = 't9Q+Z1PYSpHNNWOJ1EG92T3uzNI=';
 export const VAKIFKATILIM_NON3D_HASH = 'iob562iJuVktLwURkJN9oY7OSPk=';
 /** Hash of a partial refund of 0.50 TRY for ORDER1 */
 export const VAKIFKATILIM_PARTIAL_HASH = 'z6XahCrZpQatk7K1HykOVI+haeI=';
-/** Hash of a reversal for ORDER1 without an amount */
-export const VAKIFKATILIM_REVERSAL_HASH = 'OWixgWJek2bjdW4LAK92ytKYDGY=';
 
 export const vakifKatilimResponse = (fields: Record<string, string> = {}) =>
   '<?xml version="1.0" encoding="utf-16"?><VPosTransactionResponseContract ' +

@@ -77,27 +77,44 @@ export function validateVakifKatilimOrderId(orderId: string): string {
   return orderId;
 }
 
-/**
- * paymentId: the merchant order id and the bank's OrderId, which cancel and
- * refund both need
- */
-export function encodeVakifKatilimPaymentId(merchantOrderId: string, orderId: string): string {
-  return `${merchantOrderId}:${orderId}`;
+export interface VakifKatilimPaymentRef {
+  merchantOrderId: string;
+  /** The bank's OrderId */
+  orderId: string;
+  provisionNumber?: string;
+  rrn?: string;
+  stan?: string;
 }
 
-export function decodeVakifKatilimPaymentId(paymentId: string): {
-  merchantOrderId: string;
-  orderId: string;
-} {
-  const index = paymentId.lastIndexOf(':');
-  const merchantOrderId = paymentId.slice(0, index);
-  const orderId = paymentId.slice(index + 1);
-  if (index <= 0 || !/^\d+$/.test(orderId) || orderId === '0') {
+/**
+ * paymentId: `<merchant order id>:<OrderId>[:<ProvisionNumber>:<RRN>:<Stan>]`.
+ * Cancel and refund need the OrderId, and the BOA gateway's cancel and refund
+ * also use the provision number, RRN and Stan, so they are kept when the bank
+ * returns them.
+ */
+export function encodeVakifKatilimPaymentId(ref: VakifKatilimPaymentRef): string {
+  const extra = [ref.provisionNumber, ref.rrn, ref.stan];
+  return [
+    ref.merchantOrderId,
+    ref.orderId,
+    ...(extra.some(Boolean) ? extra.map((v) => v ?? '') : []),
+  ].join(':');
+}
+
+export function decodeVakifKatilimPaymentId(paymentId: string): VakifKatilimPaymentRef {
+  const [merchantOrderId, orderId, provisionNumber, rrn, stan] = paymentId.split(':');
+  if (!merchantOrderId || !orderId || !/^\d+$/.test(orderId) || orderId === '0') {
     throw new ValidationError(
-      'Vakıf Katılım paymentId must be the one returned by the payment ("<merchant order id>:<OrderId>")'
+      'Vakıf Katılım paymentId must be the one returned by the payment ("<merchant order id>:<OrderId>...")'
     );
   }
-  return { merchantOrderId, orderId };
+  return {
+    merchantOrderId,
+    orderId,
+    provisionNumber: provisionNumber || undefined,
+    rrn: rrn || undefined,
+    stan: stan || undefined,
+  };
 }
 
 /**

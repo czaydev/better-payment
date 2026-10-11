@@ -18,7 +18,6 @@ import {
   VAKIFKATILIM_3D_HASH,
   VAKIFKATILIM_NON3D_HASH,
   VAKIFKATILIM_PARTIAL_HASH,
-  VAKIFKATILIM_REVERSAL_HASH,
   VAKIFKATILIM_REJECTED_3D_PAGE,
   VAKIFKATILIM_ACS_PAGE,
   VAKIFKATILIM_CALLBACK,
@@ -54,6 +53,14 @@ describe('Vakıf Katılım utils', () => {
     expect(decodeVakifKatilimPaymentId('ORDER1:123456')).toEqual({
       merchantOrderId: 'ORDER1',
       orderId: '123456',
+      provisionNumber: undefined,
+      rrn: undefined,
+      stan: undefined,
+    });
+    expect(decodeVakifKatilimPaymentId('ORDER1:123456:P1:R1:S1')).toMatchObject({
+      provisionNumber: 'P1',
+      rrn: 'R1',
+      stan: 'S1',
     });
     expect(() => decodeVakifKatilimPaymentId('ORDER1')).toThrow();
     expect(() => decodeVakifKatilimPaymentId('ORDER1:0')).toThrow();
@@ -104,7 +111,7 @@ describe('Vakıf Katılım provider', () => {
       expect(tag(xml, 'TransactionSecurity')).toBe('1');
       expect(xml).not.toContain('TESTPASS');
       expect(result.status).toBe(PaymentStatus.SUCCESS);
-      expect(result.paymentId).toBe('ORDER1:123456');
+      expect(result.paymentId).toBe('ORDER1:123456:P12345::');
       expect(result.conversationId).toBe('ORDER1');
     });
 
@@ -188,7 +195,7 @@ describe('Vakıf Katılım provider', () => {
         '<AdditionalData><AdditionalDataList><VPosAdditionalData><Key>MD</Key><Data>ENCRYPTEDMD==</Data></VPosAdditionalData></AdditionalDataList></AdditionalData>'
       );
       expect(result.status).toBe(PaymentStatus.SUCCESS);
-      expect(result.paymentId).toBe('ORDER1:123456');
+      expect(result.paymentId).toBe('ORDER1:123456:P12345::');
     });
 
     it('fails without ids when the card was not verified', async () => {
@@ -241,15 +248,29 @@ describe('Vakıf Katılım provider', () => {
   });
 
   describe('cancel and refund', () => {
-    it('cancels with SaleReversal and the bank OrderId', async () => {
+    it('cancels with SaleReversal, the bank OrderId and the provision data', async () => {
       post.mockResolvedValue({ data: vakifKatilimResponse() });
-      const result = await provider.cancel({ paymentId: 'ORDER1:123456', ip: '1.1.1.1' });
+      const result = await provider.cancel({
+        paymentId: 'ORDER1:123456:P12345:RRN1:STAN1',
+        price: '0.5',
+        ip: '1.1.1.1',
+      });
       expect(post.mock.calls[0][0]).toBe('/Home/SaleReversal');
       const xml = sentXml();
       expect(tag(xml, 'MerchantOrderId')).toBe('ORDER1');
       expect(tag(xml, 'OrderId')).toBe('123456');
-      expect(tag(xml, 'HashData')).toBe(VAKIFKATILIM_REVERSAL_HASH);
+      expect(tag(xml, 'ProvisionNumber')).toBe('P12345');
+      expect(tag(xml, 'RRN')).toBe('RRN1');
+      expect(tag(xml, 'Stan')).toBe('STAN1');
+      expect(tag(xml, 'Amount')).toBe('50');
+      expect(tag(xml, 'HashData')).toBe(VAKIFKATILIM_PARTIAL_HASH);
       expect(result.status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    it('needs the amount to cancel, since the hash covers it', async () => {
+      const result = await provider.cancel({ paymentId: 'ORDER1:123456', ip: '1.1.1.1' });
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorMessage).toMatch(/amount/);
     });
 
     it('refunds part of a payment with PartialDrawback', async () => {
