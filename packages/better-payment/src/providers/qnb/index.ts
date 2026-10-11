@@ -26,10 +26,12 @@ import {
 import {
   QNB_ENDPOINTS,
   QNB_MBR_ID,
+  ZIRAAT_KATILIM_ENDPOINTS,
   QNB_SECURE_TYPES,
   type QnbSecureType,
   createQnb3DHash,
   verifyQnbCallback,
+  verifyZiraatKatilimCallback,
   formatQnbAmount,
   getQnbCurrencyCode,
   formatQnbInstallment,
@@ -39,7 +41,7 @@ import {
   parseQnbXmlResponse,
   isQnbApproved,
 } from './utils';
-import type { QnbConfig, Qnb3DCallbackData } from './types';
+import type { QnbConfig, Qnb3DCallbackData, ZiraatKatilimConfig } from './types';
 
 function escapeHtml(value: string): string {
   return value
@@ -67,24 +69,50 @@ export class Qnb extends PaymentProvider<QnbConfig> {
   constructor(config: QnbConfig) {
     super(config);
 
-    this.client = this.createHttpClient('qnb', {
+    this.client = this.createHttpClient(this.providerId(), {
       timeout: 30000,
       headers: { 'Content-Type': 'application/xml' },
     });
   }
 
+  /** Provider id used in errors and logs */
+  protected providerId(): string {
+    return 'qnb';
+  }
+
+  /** Name used in error messages */
+  protected providerName(): string {
+    return 'QNB';
+  }
+
+  /** Paths of the 3D gateway and the XML API */
+  protected endpoints(): { GATE: string; API: string } {
+    return QNB_ENDPOINTS;
+  }
+
+  /** Institution code (`MbrId`) of the bank on the PayFor platform */
+  protected mbrId(): string {
+    return QNB_MBR_ID;
+  }
+
+  protected verifyCallback(data: Record<string, string | undefined>): Promise<boolean> {
+    return verifyQnbCallback(data, this.credentials);
+  }
+
   protected validateConfig(): void {
+    const name = this.providerName();
+    const id = this.providerId();
     const missing = (['merchantId', 'userCode', 'userPass', 'merchantPass'] as const).filter(
       (key) => !this.config[key]
     );
     if (missing.length > 0) {
-      throw new ConfigurationError(`QNB configuration is missing: ${missing.join(', ')}`, 'qnb');
+      throw new ConfigurationError(`${name} configuration is missing: ${missing.join(', ')}`, id);
     }
     if (!this.config.baseUrl) {
-      throw new ConfigurationError('QNB baseUrl is required', 'qnb');
+      throw new ConfigurationError(`${name} baseUrl is required`, id);
     }
     if (this.config.secureType && !QNB_SECURE_TYPES.includes(this.config.secureType)) {
-      throw new ConfigurationError(`Unknown QNB secureType: ${this.config.secureType}`, 'qnb');
+      throw new ConfigurationError(`Unknown ${name} secureType: ${this.config.secureType}`, id);
     }
   }
 
@@ -98,7 +126,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     };
   }
 
-  private get secureType(): QnbSecureType {
+  protected get secureType(): QnbSecureType {
     return this.config.secureType ?? '3DModel';
   }
 
@@ -106,7 +134,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     return (this.config.locale || 'tr').toLowerCase().startsWith('en') ? 'EN' : 'TR';
   }
 
-  private get credentials() {
+  protected get credentials() {
     return {
       merchantId: this.config.merchantId,
       merchantPass: this.config.merchantPass,
@@ -119,7 +147,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     fallback: string,
     extra: Partial<T> = {}
   ): T {
-    return this.withErrorCode(failureResult<T>('QNB', error, fallback, extra));
+    return this.withErrorCode(failureResult<T>(this.providerName(), error, fallback, extra));
   }
 
   private static errorOf(fields: Record<string, string | undefined>) {
@@ -134,9 +162,9 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     retryable = false
   ): Promise<Record<string, string>> {
     const response = await this.client.post<string>(
-      QNB_ENDPOINTS.API,
+      this.endpoints().API,
       buildQnbXml({
-        MbrId: QNB_MBR_ID,
+        MbrId: this.mbrId(),
         MerchantId: this.config.merchantId,
         UserCode: this.config.userCode,
         UserPass: this.config.userPass,
@@ -211,7 +239,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       }
 
       const fields: Record<string, string> = {
-        MbrId: QNB_MBR_ID,
+        MbrId: this.mbrId(),
         MerchantID: this.config.merchantId,
         UserCode: this.config.userCode,
         SecureType: this.secureType,
@@ -230,6 +258,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
         CardHolderName: card.cardHolderName,
       };
       fields.Hash = await createQnb3DHash({
+        mbrId: fields.MbrId,
         orderId,
         amount: fields.PurchAmount,
         okUrl: fields.OkUrl,
@@ -246,7 +275,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
             `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`
         )
         .join('');
-      const action = `${this.config.baseUrl}${QNB_ENDPOINTS.GATE}`;
+      const action = `${this.config.baseUrl}${this.endpoints().GATE}`;
       const html =
         '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' +
         `<form id="qnb-3d-form" method="POST" action="${escapeHtml(action)}">${inputs}</form>` +
@@ -289,7 +318,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
         rawResponse,
       });
 
-    if (!(await verifyQnbCallback(callbackData ?? {}, this.credentials))) {
+    if (!(await this.verifyCallback(callbackData ?? {}))) {
       return untrusted('Invalid 3D Secure callback hash', callbackData);
     }
     const orderId = callbackData.OrderId!;
@@ -476,6 +505,63 @@ export function mapQnbOrderStatus(inquiry: Record<string, string | undefined>): 
 export function isQnbCapturedSale(inquiry: Record<string, string | undefined>): boolean {
   return isQnbApproved(inquiry) && mapQnbOrderStatus(inquiry) === PaymentStatus.SUCCESS;
 }
+
+/**
+ * Ziraat Katılım virtual POS: the PayFor platform of QNB, with its own hosts,
+ * institution code (`mbrId`) and callback hash.
+ *
+ * - 3DModel callbacks are signed over MerchantID, MerchantPass, OrderId and
+ *   ResponseRnd only, so the 3D result itself is not covered; the payment is
+ *   decided by `3DModelPayment`, as with QNB
+ * - the XML API answers in `Key=Value;;` text, read like the XML answer
+ */
+export class ZiraatKatilim extends Qnb {
+  declare protected config: ZiraatKatilimConfig;
+
+  constructor(config: ZiraatKatilimConfig) {
+    super(config);
+  }
+
+  protected providerId(): string {
+    return 'ziraatkatilim';
+  }
+
+  protected providerName(): string {
+    return 'Ziraat Katılım';
+  }
+
+  protected endpoints(): { GATE: string; API: string } {
+    return ZIRAAT_KATILIM_ENDPOINTS;
+  }
+
+  protected mbrId(): string {
+    return this.config.mbrId;
+  }
+
+  protected verifyCallback(data: Record<string, string | undefined>): Promise<boolean> {
+    return verifyZiraatKatilimCallback(data, this.credentials, this.secureType);
+  }
+
+  protected validateConfig(): void {
+    if (!this.config.mbrId) {
+      throw new ConfigurationError(
+        'Ziraat Katılım configuration is missing: mbrId',
+        'ziraatkatilim'
+      );
+    }
+    super.validateConfig();
+  }
+}
+
+/**
+ * The Ziraat Katılım provider, for
+ * `betterPayment({ providers: { ziraatkatilim: ziraatKatilim({ mbrId, merchantId, userCode, userPass, merchantPass }) } })`.
+ * The base URL follows `mode` unless `baseUrl` is set.
+ */
+export const ziraatKatilim = (config: ZiraatKatilimConfig): ProviderDefinition<ZiraatKatilim> =>
+  defineProvider(
+    (ctx) => new ZiraatKatilim(withProviderDefaults(ProviderType.ZIRAATKATILIM, config, ctx))
+  );
 
 /**
  * The QNB provider, for
