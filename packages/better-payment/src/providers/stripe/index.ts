@@ -19,6 +19,11 @@ import {
   CancelResponse,
   CaptureRequest,
   VoidAuthorizationRequest,
+  ListCardsResponse,
+  DeleteCardRequest,
+  DeleteCardResponse,
+  SaveCardResponse,
+  SavedCardTokens,
   PaymentStatus,
 } from '../../types';
 import {
@@ -37,6 +42,7 @@ import type {
   StripeThreeDSPaymentRequest,
   Stripe3DCallbackData,
   StripePaymentIntent,
+  StripePaymentMethod,
   StripeRefund,
   StripeError,
 } from './types';
@@ -179,8 +185,11 @@ export class Stripe extends PaymentProvider<StripeConfig> {
   }
 
   /** The PaymentIntent parameters of a payment request */
-  private intentParams(request: StripePaymentRequest, orderId: string): Record<string, unknown> {
-    this.validatePayment(request, { storedCard: true });
+  private async intentParams(
+    request: StripePaymentRequest,
+    orderId: string
+  ): Promise<Record<string, unknown>> {
+    this.validatePayment(request, { storedCard: true, saveCard: true });
     if (request.installment !== undefined && request.installment > 1) {
       throw new ValidationError('Installments are not supported by the Stripe provider');
     }
@@ -213,7 +222,42 @@ export class Stripe extends PaymentProvider<StripeConfig> {
     } else {
       throw new ValidationError('paymentToken (from Stripe.js) or storedCard is required');
     }
+
+    if (request.saveCard) {
+      if (!token) {
+        throw new ValidationError('saveCard needs a new card from Stripe.js (paymentToken)');
+      }
+      const options = typeof request.saveCard === 'object' ? request.saveCard : {};
+      params.customer = options.customerToken || (await this.createCustomer(request));
+      params.setup_future_usage = 'off_session';
+    }
     return params;
+  }
+
+  /** A Customer for saving the card, from the buyer */
+  private async createCustomer(request: StripePaymentRequest): Promise<string> {
+    const result = await this.call<{ id: string }>('POST', '/v1/customers', {
+      email: request.buyer.email,
+      name: `${request.buyer.name} ${request.buyer.surname}`.trim(),
+      metadata: { buyer_id: request.buyer.id },
+    });
+    if (result.error) {
+      throw new ValidationError(
+        `Stripe customer could not be created: ${result.error.message ?? result.error.code}`
+      );
+    }
+    return result.data.id;
+  }
+
+  /** The saved card of a PaymentIntent confirmed with setup_future_usage */
+  private static storedCardOf(intent: StripePaymentIntent): { storedCard?: SavedCardTokens } {
+    const id = (value: string | { id: string } | null | undefined) =>
+      typeof value === 'object' && value ? value.id : value || undefined;
+    const customer = id(intent.customer);
+    const card = id(intent.payment_method);
+    return intent.setup_future_usage && customer && card
+      ? { storedCard: { customerToken: customer, cardToken: card } }
+      : {};
   }
 
   /** Builds the result of a confirmed PaymentIntent */
@@ -237,6 +281,7 @@ export class Stripe extends PaymentProvider<StripeConfig> {
       paymentId: intent.id,
       conversationId: orderId,
       ...(status === PaymentStatus.FAILURE ? Stripe.errorOf(intent.last_payment_error) : {}),
+      ...(status === PaymentStatus.SUCCESS ? Stripe.storedCardOf(intent) : {}),
       rawResponse: intent,
     });
   }
@@ -258,7 +303,7 @@ export class Stripe extends PaymentProvider<StripeConfig> {
   private async pay(request: StripePaymentRequest, preAuth: boolean): Promise<PaymentResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
-      const params = this.intentParams(request, orderId);
+      const params = await this.intentParams(request, orderId);
       const result = await this.call<StripePaymentIntent>('POST', '/v1/payment_intents', {
         ...params,
         capture_method: preAuth ? 'manual' : undefined,
@@ -300,7 +345,7 @@ export class Stripe extends PaymentProvider<StripeConfig> {
       if (!this.config.publishableKey) {
         throw new ValidationError('Stripe publishableKey is required for initThreeDSPayment()');
       }
-      const params = this.intentParams(request, orderId);
+      const params = await this.intentParams(request, orderId);
       const result = await this.call<StripePaymentIntent>('POST', '/v1/payment_intents', {
         ...params,
         capture_method: preAuth ? 'manual' : undefined,
@@ -389,6 +434,7 @@ export class Stripe extends PaymentProvider<StripeConfig> {
           status,
           paymentId: intent.id,
           conversationId: orderId,
+          ...(status === PaymentStatus.SUCCESS ? Stripe.storedCardOf(intent) : {}),
           rawResponse: intent,
         });
       }
@@ -570,6 +616,99 @@ export class Stripe extends PaymentProvider<StripeConfig> {
       return this.failure<CancelResponse>(error, 'Void failed', {
         conversationId: request.conversationId,
       });
+    }
+  }
+
+  /**
+   * Saving a card without a payment needs the card on the server, which Stripe
+   * does not allow: save it during a payment with `saveCard` instead.
+   */
+  async saveCard(): Promise<SaveCardResponse> {
+    throw this.notSupported(
+      'Saving a card without a payment',
+      'pass saveCard: true with a payment (paymentToken from Stripe.js)'
+    );
+  }
+
+  /** The cards saved on a Customer (`customerToken`) */
+  async listCards(request: { customerToken: string }): Promise<ListCardsResponse> {
+    try {
+      if (!/^cus_[A-Za-z0-9]+$/.test(request.customerToken ?? '')) {
+        throw new ValidationError('customerToken must be a Customer id (cus_...)');
+      }
+      const result = await this.call<{ data: StripePaymentMethod[] }>(
+        'GET',
+        `/v1/customers/${encodeURIComponent(request.customerToken)}/payment_methods`,
+        { type: 'card', limit: 100 },
+        true
+      );
+      if (result.error) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          customerToken: request.customerToken,
+          cards: [],
+          ...Stripe.errorOf(result.error),
+          rawResponse: result.error,
+        });
+      }
+      return {
+        status: PaymentStatus.SUCCESS,
+        customerToken: request.customerToken,
+        cards: result.data.data.map((method) => ({
+          cardToken: method.id,
+          lastFourDigits: method.card?.last4,
+          expireMonth: method.card?.exp_month
+            ? String(method.card.exp_month).padStart(2, '0')
+            : undefined,
+          expireYear: method.card?.exp_year ? String(method.card.exp_year) : undefined,
+          cardType: method.card?.funding ? `${method.card.funding.toUpperCase()}_CARD` : undefined,
+          cardAssociation: method.card?.brand?.toUpperCase().replace('MASTERCARD', 'MASTER_CARD'),
+        })),
+        rawResponse: result.data,
+      };
+    } catch (error) {
+      return this.failure<ListCardsResponse>(error, 'List cards failed', {
+        customerToken: request.customerToken,
+        cards: [],
+      });
+    }
+  }
+
+  /** Removes a saved card from its Customer (detaches the PaymentMethod) */
+  async deleteCard(request: DeleteCardRequest): Promise<DeleteCardResponse> {
+    try {
+      if (!/^pm_[A-Za-z0-9]+$/.test(request.cardToken ?? '')) {
+        throw new ValidationError('cardToken must be a PaymentMethod id (pm_...)');
+      }
+      const current = await this.call<StripePaymentMethod>(
+        'GET',
+        `/v1/payment_methods/${encodeURIComponent(request.cardToken)}`,
+        {},
+        true
+      );
+      if (current.error || current.data.customer !== request.customerToken) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          ...(current.error
+            ? Stripe.errorOf(current.error)
+            : {
+                errorCode: 'card_not_found',
+                errorMessage: 'The card does not belong to this customer',
+              }),
+          rawResponse: current.error ?? current.data,
+        });
+      }
+      const result = await this.call<StripePaymentMethod>(
+        'POST',
+        `/v1/payment_methods/${encodeURIComponent(request.cardToken)}/detach`
+      );
+      return this.withErrorCode({
+        status: result.error ? PaymentStatus.FAILURE : PaymentStatus.SUCCESS,
+        ...(result.error ? Stripe.errorOf(result.error) : {}),
+        rawResponse: result.error ?? result.data,
+      });
+    } catch (error) {
+      return this.failure<DeleteCardResponse>(error, 'Delete card failed');
     }
   }
 

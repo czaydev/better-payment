@@ -163,7 +163,10 @@ describe('Stripe provider', () => {
     it.each([
       [{ paymentToken: 'tok_123' }, /ctoken_/],
       [{ paymentToken: 'pm_1', installment: 3 }, /Installments/],
-      [{ paymentToken: 'pm_1', saveCard: true }, /saveCard/],
+      [
+        { storedCard: { customerToken: 'cus_1', cardToken: 'pm_1' }, saveCard: true },
+        /saveCard needs/,
+      ],
       [{}, /paymentToken/],
     ])('rejects %o', async (extra, message) => {
       const result = await provider.createPayment({ ...order, ...extra } as any);
@@ -450,6 +453,104 @@ describe('Stripe provider', () => {
       const result = await provider.getPayment('pi_3TEST000000000001');
       expect(result.status).toBe(PaymentStatus.SUCCESS);
       expect(result.conversationId).toBe('ORDER1');
+    });
+  });
+
+  describe('saved cards', () => {
+    it('saves the card during a payment on a new Customer', async () => {
+      request
+        .mockResolvedValueOnce(ok({ id: 'cus_NEW' }))
+        .mockResolvedValueOnce(
+          ok(
+            stripeIntent({
+              customer: 'cus_NEW',
+              payment_method: 'pm_SAVED',
+              setup_future_usage: 'off_session',
+            })
+          )
+        );
+
+      const result = await provider.createPayment({
+        ...order,
+        paymentToken: 'pm_card_visa',
+        saveCard: true,
+      });
+
+      expect(sent(0).url).toBe('/v1/customers');
+      expect(sentParams(0).get('email')).toBe(mockPaymentRequest.buyer.email);
+      expect(sentParams(1).get('customer')).toBe('cus_NEW');
+      expect(sentParams(1).get('setup_future_usage')).toBe('off_session');
+      expect(result.storedCard).toEqual({ customerToken: 'cus_NEW', cardToken: 'pm_SAVED' });
+    });
+
+    it('adds the card to an existing Customer', async () => {
+      request.mockResolvedValueOnce(
+        ok(
+          stripeIntent({
+            customer: 'cus_OLD',
+            payment_method: 'pm_SAVED',
+            setup_future_usage: 'off_session',
+          })
+        )
+      );
+      await provider.createPayment({
+        ...order,
+        paymentToken: 'pm_card_visa',
+        saveCard: { customerToken: 'cus_OLD' },
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(sentParams().get('customer')).toBe('cus_OLD');
+    });
+
+    it('lists the cards of a Customer', async () => {
+      request.mockResolvedValue(
+        ok({
+          data: [
+            {
+              id: 'pm_1',
+              customer: 'cus_1',
+              card: {
+                brand: 'mastercard',
+                last4: '4444',
+                exp_month: 3,
+                exp_year: 2031,
+                funding: 'debit',
+              },
+            },
+          ],
+        })
+      );
+      const result = await provider.listCards({ customerToken: 'cus_1' });
+      expect(sent().url).toBe('/v1/customers/cus_1/payment_methods?type=card&limit=100');
+      expect(result.cards).toEqual([
+        {
+          cardToken: 'pm_1',
+          lastFourDigits: '4444',
+          expireMonth: '03',
+          expireYear: '2031',
+          cardType: 'DEBIT_CARD',
+          cardAssociation: 'MASTER_CARD',
+        },
+      ]);
+    });
+
+    it('deletes a card only from its own Customer', async () => {
+      request
+        .mockResolvedValueOnce(ok({ id: 'pm_1', customer: 'cus_1' }))
+        .mockResolvedValueOnce(ok({ id: 'pm_1', customer: null }));
+      const deleted = await provider.deleteCard({ customerToken: 'cus_1', cardToken: 'pm_1' });
+      expect(sent(1).url).toBe('/v1/payment_methods/pm_1/detach');
+      expect(deleted.status).toBe(PaymentStatus.SUCCESS);
+
+      request.mockReset();
+      request.mockResolvedValueOnce(ok({ id: 'pm_1', customer: 'cus_OTHER' }));
+      const refused = await provider.deleteCard({ customerToken: 'cus_1', cardToken: 'pm_1' });
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(refused.errorCode).toBe('card_not_found');
+    });
+
+    it('saveCard() without a payment is not supported', async () => {
+      await expect(provider.saveCard({} as any)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
     });
   });
 

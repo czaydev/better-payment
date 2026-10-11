@@ -65,9 +65,27 @@ export interface StripePaymentIntent {
   capture_method?: string;
   livemode?: boolean;
   metadata?: Record<string, string>;
+  customer?: string | { id: string } | null;
+  payment_method?: string | { id: string } | null;
+  setup_future_usage?: string | null;
   next_action?: { type?: string } | null;
   last_payment_error?: StripeError | null;
   latest_charge?: string | StripeCharge | null;
+  [key: string]: unknown;
+}
+
+/** A saved card (PaymentMethod of type card) */
+export interface StripePaymentMethod {
+  id: string;
+  customer?: string | null;
+  card?: {
+    brand?: string;
+    last4?: string;
+    exp_month?: number;
+    exp_year?: number;
+    funding?: string;
+    country?: string;
+  };
   [key: string]: unknown;
 }
 

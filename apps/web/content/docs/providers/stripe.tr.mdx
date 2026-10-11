@@ -140,6 +140,19 @@ await payment.stripe.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.
 
 Stripe'ta tahsilattan sonra void yoktur; bu yüzden `cancel()` tahsil edilmiş bir ödemeyi tamamen iade eder, henüz tahsil edilmemiş olanı iptal eder. Kısmi tahsilat, provizyonun kalanını serbest bırakır.
 
+## Kayıtlı kartlar [#saved-cards]
+
+```typescript
+const result = await payment.stripe.createPayment({ ...paymentRequest, paymentToken, saveCard: true });
+// result.storedCard: { customerToken: 'cus_...', cardToken: 'pm_...' }
+
+await payment.stripe.createPayment({ ...paymentRequest, storedCard: result.storedCard });
+const { cards } = await payment.stripe.listCards({ customerToken: result.storedCard!.customerToken });
+await payment.stripe.deleteCard(result.storedCard!);
+```
+
+`saveCard` ile alıcıdan bir Stripe müşterisi (Customer) oluşturulur (ya da kartı mevcut bir müşteriye eklemek için `saveCard: { customerToken: 'cus_...' }` verin) ve kart `setup_future_usage: 'off_session'` ile kaydedilir. `deleteCard()` kartı yalnızca o müşteriye aitse kaldırır. Ödemesiz `saveCard()` desteklenmez, çünkü kartın sunucunuza gelmesi gerekirdi.
+
 ## Test [#testing]
 
 Stripe'ın test PaymentMethod'ları tarayıcı olmadan `paymentToken` olarak kullanılabilir:
@@ -153,5 +166,5 @@ await payment.stripe.initThreeDSPayment({ ...paymentRequest, paymentToken: 'pm_c
 Tarayıcıda Stripe'ın test kartlarını kullanın, örneğin `4242 4242 4242 4242` veya `4000 0027 6000 3184` (3D Secure).
 
 <Callout type="info">
-  Webhook'lar henüz sağlayıcı tarafından işlenmiyor. Taksit, BIN sorgusu ve `saveCard` desteklenmez; `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
+  Webhook'lar henüz sağlayıcı tarafından işlenmiyor. Taksit ve BIN sorgusu desteklenmez; `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
 </Callout>

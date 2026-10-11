@@ -157,6 +157,23 @@ await payment.stripe.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.
 Stripe has no void after a charge, so `cancel()` refunds a charged payment in full and cancels
 one that was not charged yet. A partial capture releases the rest of the authorization.
 
+## Saved Cards
+
+```typescript
+const result = await payment.stripe.createPayment({ ...paymentRequest, paymentToken, saveCard: true });
+// result.storedCard: { customerToken: 'cus_...', cardToken: 'pm_...' }
+
+await payment.stripe.createPayment({ ...paymentRequest, storedCard: result.storedCard });
+const { cards } = await payment.stripe.listCards({ customerToken: result.storedCard!.customerToken });
+await payment.stripe.deleteCard(result.storedCard!);
+```
+
+With `saveCard`, a Stripe Customer is created from the buyer (or pass
+`saveCard: { customerToken: 'cus_...' }` to add the card to an existing one), and the card is saved
+with `setup_future_usage: 'off_session'`. `deleteCard()` detaches the card only if it belongs to
+that Customer. `saveCard()` without a payment is not supported, since it would need the card on
+your server.
+
 ## Testing
 
 Stripe's test PaymentMethods work as `paymentToken` without a browser:
@@ -171,5 +188,5 @@ In the browser, use Stripe's test cards, such as `4242 4242 4242 4242` or `4000 
 (3D Secure).
 
 <Callout type="info">
-  Webhooks are not handled by the provider yet. Installments, BIN queries and `saveCard` are not supported; `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
+  Webhooks are not handled by the provider yet. Installments and BIN queries are not supported; `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
 </Callout>
