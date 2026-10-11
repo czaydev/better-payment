@@ -77,7 +77,7 @@ describe('BetterPayment', () => {
 
     it('should throw ProviderNotEnabledError for unknown string', () => {
       const bp = betterPayment({ providers: iyzicoConfig });
-      expect(() => bp.use('stripe' as any)).toThrow(ProviderNotEnabledError);
+      expect(() => bp.use('unknownpay' as any)).toThrow(ProviderNotEnabledError);
     });
   });
 

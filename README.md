@@ -143,8 +143,10 @@ this id to `refund`, `cancel` and `getPayment`.
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
+| Stripe ²    | ✓ (Stripe.js token)       | ✓ on your page              |   ✓    | ✓ (refund)      |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
+² For businesses with a Stripe account (Stripe does not onboard Turkish companies). The card is collected with Stripe.js and never reaches your server.
 
 ### 3D Secure completion
 
@@ -163,12 +165,15 @@ this id to `refund`, `cancel` and `getPayment`.
   result is confirmed with the bank: `3d` and `3d_host` only authenticate the card and
   charge it with the XML API, `3d_pay` / `3d_pay_hosting` are checked with an order
   status query.
+- **Stripe:** the 3D Secure page runs Stripe.js `handleNextAction()` on your page, with no
+  redirect, then POSTs the PaymentIntent id to `callbackUrl`. The status is always read
+  from Stripe.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies
   `OK`.
 
-Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay and Akbank:
+Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank and Stripe:
 `authorize()` / `initThreeDSAuthorize()`, then `capture({ paymentId, amount, ip })` or
 `voidAuthorization({ paymentId, ip })`. See the
 [pre-authorization guide](https://better-payment.czaylabs.com/docs/payments/pre-authorization).

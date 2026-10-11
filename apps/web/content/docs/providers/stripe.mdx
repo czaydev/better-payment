@@ -1,0 +1,175 @@
+---
+title: Stripe
+description: Stripe (PaymentIntents) integration reference.
+since: 0.12.0
+---
+
+Uses Stripe's PaymentIntents API. The card never reaches your server: Stripe.js collects it on
+your page and returns a token, and the 3D Secure window opens on your page too. There is no
+redirect to a Stripe page.
+
+<Callout type="info">
+  Verified in Stripe test mode: card payments, declines, 3D Secure end to end in a browser (completed and failed), partial refund, cancel, and pre-authorization with partial capture. Stripe does not onboard Turkish companies; the provider is for businesses with a Stripe account abroad. TRY works, with Stripe's minimum of about 0.50 USD.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, stripe } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    stripe: stripe({
+      secretKey: process.env.STRIPE_SECRET_KEY!, // sk_test_... / sk_live_...
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY!, // pk_test_... / pk_live_...
+      // paymentMethodTypes?: string[] (default ['card'])
+      // statementDescriptorSuffix?: string
+    }),
+  },
+});
+```
+
+The keys are in the Stripe Dashboard under **Developers → API keys**. Test keys run in test
+mode; `mode: 'sandbox'` refuses live keys. Stripe has one API host for both modes.
+
+`paymentId` is the PaymentIntent id (`pi_...`). `conversationId` is your order id: the
+`conversationId` you pass, or a generated id, kept in the PaymentIntent's `metadata.order_id`.
+
+## Collecting the Card
+
+Load Stripe.js from `js.stripe.com` and mount the Payment Element. When the customer submits,
+create a ConfirmationToken and send its id to your server as `paymentToken`. A PaymentMethod id
+(`pm_...`, from `stripe.createPaymentMethod()`) works too, and so does `storedCard`
+(`customerToken`: `cus_...`, `cardToken`: `pm_...`).
+
+```html
+<script src="https://js.stripe.com/v3/"></script>
+<form id="payment-form">
+  <div id="payment-element"></div>
+  <button>Pay</button>
+</form>
+<script>
+  const stripe = Stripe('pk_test_...');
+  const elements = stripe.elements({ mode: 'payment', amount: 10000, currency: 'try', paymentMethodTypes: ['card'] });
+  elements.create('payment').mount('#payment-element');
+
+  document.getElementById('payment-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const { error: submitError } = await elements.submit();
+    if (submitError) return showError(submitError.message);
+    const { error, confirmationToken } = await stripe.createConfirmationToken({ elements });
+    if (error) return showError(error.message);
+
+    // Your endpoint calls initThreeDSPayment() and returns threeDSHtmlContent
+    const { html } = await fetch('/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentToken: confirmationToken.id }),
+    }).then((res) => res.json());
+    document.open();
+    document.write(html);
+    document.close();
+  });
+</script>
+```
+
+A request with `paymentCard` is rejected: Stripe does not take card numbers from your server.
+
+## Apple Pay & Google Pay
+
+Apple Pay and Google Pay are card payments for Stripe: the wallet returns the same token, so they
+go through the same `paymentToken` flow with no extra server code. The Payment Element shows their
+buttons by itself when:
+
+- they are turned on in the Stripe Dashboard (**Settings → Payment methods**);
+- the page is served over HTTPS;
+- for Apple Pay, your domain is registered in the Dashboard (**Settings → Payment method domains**);
+- the customer's device and browser support them (Apple Pay: Safari with a card in Wallet; Google Pay: Chrome with a saved card).
+
+To show only the wallet buttons, use the Express Checkout Element:
+
+```javascript
+// Optional: Apple Pay / Google Pay buttons on their own, above your form
+const express = elements.create('expressCheckout');
+express.mount('#express-checkout');
+express.on('confirm', async () => {
+  const { error, confirmationToken } = await stripe.createConfirmationToken({ elements });
+  if (error) return showError(error.message);
+  // Send confirmationToken.id to your server as paymentToken, as with the card form
+});
+```
+
+Only card payments were tested in a browser; the wallets use the same path but were not tried on a device.
+
+## 3D Secure
+
+```typescript
+const init = await payment.stripe.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  paymentToken: body.paymentToken, // ctoken_... or pm_... from Stripe.js
+  callbackUrl: 'https://yoursite.com/api/pay/stripe/payment/complete-3ds',
+});
+// init.threeDSHtmlContent: render it in the customer's browser
+
+// In the callback route (the handler does this for you)
+const result = await payment.stripe.completeThreeDSPayment(callbackBody);
+// result.paymentId: the PaymentIntent id (pi_...); result.conversationId: 'ORDER123'
+```
+
+`initThreeDSPayment()` confirms the PaymentIntent. The page it returns loads Stripe.js, runs
+`handleNextAction()` when the bank asks for 3D Secure (the bank's window opens as a modal on the
+page), and then POSTs `payment_intent` to `callbackUrl`. When no 3D Secure step is needed, the
+page POSTs right away.
+
+`completeThreeDSPayment()` takes only the PaymentIntent id from the POST and fetches the
+PaymentIntent from Stripe; the status and the order id come from Stripe. `paymentId` and
+`conversationId` are set for a confirmed payment, and while the payment is still processing; a
+failure carries no ids.
+
+In a single-page app you can skip the returned page: read `client_secret` from `rawResponse`, call
+`stripe.handleNextAction({ clientSecret })` yourself, then call your callback route.
+
+## Non-3D Payment
+
+```typescript
+const result = await payment.stripe.createPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  paymentToken: 'pm_...',
+});
+// A card that needs 3D Secure fails with code THREEDS_FAILED (authentication_not_handled)
+```
+
+## Refund, Cancel, Status & Pre-authorization
+
+```typescript
+await payment.stripe.refund({ paymentId: 'pi_...', price: '30.00', currency: 'TRY', ip: '1.2.3.4' });
+await payment.stripe.cancel({ paymentId: 'pi_...', ip: '1.2.3.4' }); // refunds a charged payment in full
+const status = await payment.stripe.getPayment('pi_...');
+// status: 'success', 'cancelled' (canceled or refunded), 'failure', 'pending'
+
+const auth = await payment.stripe.authorize({ ...paymentRequest, paymentToken: 'pm_...' });
+await payment.stripe.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
+await payment.stripe.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.4' });
+```
+
+Stripe has no void after a charge, so `cancel()` refunds a charged payment in full and cancels
+one that was not charged yet. A partial capture releases the rest of the authorization.
+
+## Testing
+
+Stripe's test PaymentMethods work as `paymentToken` without a browser:
+
+```typescript
+await payment.stripe.createPayment({ ...paymentRequest, paymentToken: 'pm_card_visa' });
+await payment.stripe.createPayment({ ...paymentRequest, paymentToken: 'pm_card_chargeDeclinedInsufficientFunds' });
+await payment.stripe.initThreeDSPayment({ ...paymentRequest, paymentToken: 'pm_card_authenticationRequired', callbackUrl });
+```
+
+In the browser, use Stripe's test cards, such as `4242 4242 4242 4242` or `4000 0027 6000 3184`
+(3D Secure).
+
+<Callout type="info">
+  Webhooks are not handled by the provider yet. Installments, BIN queries and `saveCard` are not supported; `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
+</Callout>

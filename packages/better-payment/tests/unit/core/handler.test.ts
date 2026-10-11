@@ -66,7 +66,7 @@ describe('BetterPaymentHandler', () => {
       const { payment } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment, allowAll);
       expect((await handler.handle(req('POST', '/other/iyzico/payment', {}))).status).toBe(404);
-      expect((await handler.handle(req('POST', '/api/pay/stripe/payment', {}))).status).toBe(404);
+      expect((await handler.handle(req('POST', '/api/pay/unknownpay/payment', {}))).status).toBe(404);
       expect((await handler.handle(req('POST', '/api/pay/iyzico/unknown', {}))).status).toBe(404);
     });
 
