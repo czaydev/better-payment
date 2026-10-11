@@ -10,6 +10,15 @@ export const QNB_ENDPOINTS = {
   API: '/Gateway/XmlGate.aspx',
 } as const;
 
+/**
+ * Ziraat Katılım runs the same PayFor platform behind one path, for the 3D form
+ * and the XML API alike
+ */
+export const ZIRAAT_KATILIM_ENDPOINTS = {
+  GATE: '/MPI/Default.aspx',
+  API: '/MPI/Default.aspx',
+} as const;
+
 /** Institution code of QNB on the PayFor platform */
 export const QNB_MBR_ID = '5';
 
@@ -31,6 +40,8 @@ async function sha1Base64(data: string): Promise<string> {
  * base64(SHA1(MbrId + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))
  */
 export function createQnb3DHash(fields: {
+  /** Default: QNB's institution code */
+  mbrId?: string;
   orderId: string;
   amount: string;
   okUrl: string;
@@ -41,7 +52,7 @@ export function createQnb3DHash(fields: {
   merchantPass: string;
 }): Promise<string> {
   return sha1Base64(
-    QNB_MBR_ID +
+    (fields.mbrId ?? QNB_MBR_ID) +
       fields.orderId +
       fields.amount +
       fields.okUrl +
@@ -72,6 +83,25 @@ export async function verifyQnbCallback(
       (data['3DStatus'] ?? '') +
       data.ResponseRnd +
       credentials.userCode
+  );
+  return safeEqual(expected, data.ResponseHash);
+}
+
+/**
+ * Verifies the ResponseHash of a Ziraat Katılım 3D callback, with the merchant
+ * id taken from your configuration:
+ * - 3DModel: base64(SHA1(MerchantID + MerchantPass + OrderId + ResponseRnd))
+ * - 3DPay:   base64(SHA1(MerchantID + MerchantPass + OrderId + AuthCode + ProcReturnCode + ResponseRnd))
+ */
+export async function verifyZiraatKatilimCallback(
+  data: Record<string, string | undefined>,
+  credentials: { merchantId: string; merchantPass: string },
+  secureType: QnbSecureType
+): Promise<boolean> {
+  if (!data || !data.ResponseHash || !data.ResponseRnd || !data.OrderId) return false;
+  const result = secureType === '3DPay' ? (data.AuthCode ?? '') + (data.ProcReturnCode ?? '') : '';
+  const expected = await sha1Base64(
+    credentials.merchantId + credentials.merchantPass + data.OrderId + result + data.ResponseRnd
   );
   return safeEqual(expected, data.ResponseHash);
 }
@@ -125,16 +155,31 @@ export function buildQnbXml(fields: Record<string, XmlValue>): string {
 }
 
 /**
- * Fields of a PayforResponse; empty elements become ''. Throws when the body
- * is not one.
+ * Fields of a PayforResponse; empty elements become ''. Some PayFor hosts
+ * (Ziraat Katılım) answer an XML request with `Key=Value;;` text instead,
+ * which is read the same way. Throws when the body is neither.
  */
 export function parseQnbXmlResponse(xml: string): Record<string, string> {
   if (!xml.includes('<PayforResponse')) {
-    throw new Error('QNB returned an unexpected response');
+    if (/^\s*\w+=[\s\S]*;;/.test(xml)) {
+      return parsePayforText(xml);
+    }
+    throw new Error('PayFor returned an unexpected response');
   }
   const result: Record<string, string> = {};
   for (const [, tag, value] of xml.matchAll(/<([A-Za-z_][\w.-]*)(?:\s[^>]*)?>([^<]*)<\/\1>/g)) {
     if (!(tag in result)) result[tag] = unescapeXml(value).trim();
+  }
+  return result;
+}
+
+function parsePayforText(text: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const pair of text.split(';;')) {
+    const index = pair.indexOf('=');
+    if (index <= 0) continue;
+    const key = pair.slice(0, index).trim();
+    if (!(key in result)) result[key] = pair.slice(index + 1).trim();
   }
   return result;
 }
