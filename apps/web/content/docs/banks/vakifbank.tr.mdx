@@ -1,6 +1,7 @@
 ---
 title: VakıfBank
 description: VakıfBank sanal POS (VPOS 7/24) entegrasyon referansı.
+since: 0.12.0
 ---
 
 VakıfBank VPOS 7/24'ü kullanır. 3D Secure iki adımda çalışır: kart VakıfBank MPI'ına kaydedilir, müşteri kartı veren bankanın ACS sayfasında doğrulama yapar ve ödeme VPOS'ta `MpiTransactionId` ile onaylanır. VPOS kartı, tutarı ve 3D Secure sonucunu kendi MPI kaydından okur.
