@@ -1,0 +1,77 @@
+---
+title: Paratika (VakıfPay, ZiraatPay)
+description: Paratika (Payten) API v2 entegrasyon referansı; VakıfPay ve ZiraatPay için de geçerlidir.
+---
+
+Payten'in (Asseco SEE) Paratika API v2'sini kullanır. VakıfPay ve ZiraatPay aynı API'yi kendi adreslerinde çalıştırır; bu yüzden tek bir sağlayıcı üçünü de kapsar: `brand` adresleri seçer. İstekler form gönderimidir ve her çağrıda API kullanıcınızla doğrulanır.
+
+<Callout type="info">
+  Paratika'nın herkese açık API v2 dokümanından yazıldı. Henüz bir test mağazasıyla doğrulanmadı (test mağazaları talep üzerine verilir), ama üç test sunucusuna da sağlayıcı üzerinden ulaşıldı ve uydurma bilgiler için `ERR10020` (geçersiz kullanıcı) döndü.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, paratika } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    vakifpay: paratika({
+      brand: 'vakifpay', // 'paratika' | 'vakifpay' | 'ziraatpay' (default 'paratika')
+      merchant: process.env.VAKIFPAY_MERCHANT!,
+      merchantUser: process.env.VAKIFPAY_API_USER!, // an e-mail address
+      merchantPassword: process.env.VAKIFPAY_API_PASSWORD!,
+      secretKey: process.env.VAKIFPAY_SECRET_KEY, // optional, verifies the 3D callback hash
+      // baseUrl: defaults from mode and brand
+    }),
+  },
+});
+```
+
+`paymentId`, Paratika'nın `pgTranId` değeridir; `conversationId` sizin sipariş numaranızdır (`MERCHANTPAYMENTID`). Tarayıcı client'ında markaya anahtarıyla ulaşın: `client.use('vakifpay')`.
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.vakifpay.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/vakifpay/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the card to /post/sale3d/{sessionToken}
+
+const result = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+// result.paymentId: the pgTranId; result.conversationId: 'ORDER123'
+```
+
+`initThreeDSPayment()` siparişle bir ödeme oturumu (`SESSIONTOKEN`) açar, ardından müşterinin tarayıcısının kartı doğrudan Paratika'ya gönderdiği bir form döndürür (Direct POST 3D); kart bir daha sunucunuzdan geçmez. Paratika 3D Secure'u çalıştırır ve sonucu `callbackUrl` adresine POST eder.
+
+`completeThreeDSPayment()`, `secretKey` verilmişse `sdSha512` değerini (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`) kontrol eder ve ödemeyi her zaman `QUERYTRANSACTION` ile doğrular: aynı siparişe ait onaylı (`AP`) bir satış bulunmalıdır. Tutar, sunucunuzun açtığı oturumla belirlenmiştir. Başarısız bir sonuç numara taşımaz.
+
+## Ödemeler, iadeler ve sorgular [#payments-refunds--queries]
+
+```typescript
+await payment.vakifpay.createPayment({ ...paymentRequest, conversationId: 'ORDER124' }); // SALE
+await payment.vakifpay.refund({ paymentId, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // REFUND
+await payment.vakifpay.cancel({ paymentId, ip: '1.2.3.4' });                                 // VOID
+const status = await payment.vakifpay.getPayment(paymentId);                                 // QUERYTRANSACTION
+
+const auth = await payment.vakifpay.authorize({ ...paymentRequest, conversationId: 'ORDER125' }); // PREAUTH
+await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });   // POSTAUTH
+
+await payment.vakifpay.binCheck('450803');                                      // QUERYBIN
+await payment.vakifpay.installmentInfo({ binNumber: '450803', price: '100.00' }); // QUERYINSTALLMENT
+```
+
+İade, önceki günlerin satışları için yapılır; aynı gün içinde iptal edin. Siparişte onaylı bir `VOID` veya `REFUND` varsa `getPayment()` `cancelled` döner. Taksit toplamlarına hesabınızdaki müşteri komisyon oranı eklenir.
+
+## 3D ön provizyon [#3d-pre-authorization]
+
+```typescript
+const init = await payment.vakifpay.initThreeDSAuthorize({ ...paymentRequest, conversationId: 'ORDER126', callbackUrl });
+// In the callback route: blocks the amount with PREAUTH
+const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
+```
+
+`initThreeDSAuthorize()` aynı ödeme oturumunu kullanır, ama kart yalnızca 3D doğrulama yapan `/post/auth3d/{token}` adresine gider. Callback bir `auth3DToken` taşır; doğrulama başarılıysa ve `mdStatus` kabul edilen bir değerse (varsayılan olarak yalnızca `1`; bkz. `acceptedMdStatuses`), `completeThreeDSPayment()` aynı oturumla `PREAUTH` çağırarak tutarı bloke eder ve sonucu bankanın cevabı belirler.

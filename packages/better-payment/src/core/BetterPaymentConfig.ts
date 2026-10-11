@@ -16,6 +16,10 @@ export enum ProviderType {
   PARAMPOS = 'parampos',
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
+  /** Payten (Paratika) brands, all created with `paratika({ brand })` */
+  PARATIKA = 'paratika',
+  VAKIFPAY = 'vakifpay',
+  ZIRAATPAY = 'ziraatpay',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -135,6 +139,18 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SIPAY]: {
     sandbox: 'https://provisioning.sipay.com.tr',
     production: 'https://app.sipay.com.tr',
+  },
+  [ProviderType.PARATIKA]: {
+    sandbox: 'https://entegrasyon.paratika.com.tr/paratika/api/v2',
+    production: 'https://vpos.paratika.com.tr/paratika/api/v2',
+  },
+  [ProviderType.VAKIFPAY]: {
+    sandbox: 'https://testpos.vakifpays.com.tr/vakifpays/api/v2',
+    production: 'https://pos.vakifpays.com.tr/vakifpays/api/v2',
+  },
+  [ProviderType.ZIRAATPAY]: {
+    sandbox: 'https://test.ziraatpay.com.tr/ziraatpay/api/v2',
+    production: 'https://vpos.ziraatpay.com.tr/ziraatpay/api/v2',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {

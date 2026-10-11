@@ -1,0 +1,91 @@
+---
+title: Paratika (VakıfPay, ZiraatPay)
+description: Paratika (Payten) API v2 integration reference, also for VakıfPay and ZiraatPay.
+---
+
+Uses the Paratika API v2 by Payten (Asseco SEE). VakıfPay and ZiraatPay run the same API on their
+own hosts, so one provider covers all three: `brand` selects the hosts. Requests are form posts
+authenticated with your API user on every call.
+
+<Callout type="info">
+  Built from Paratika's public API v2 documentation. Not verified with a test merchant yet (test merchants are given on request), but all three test hosts were reached through the provider and answered `ERR10020` (invalid user) for made-up credentials.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, paratika } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    vakifpay: paratika({
+      brand: 'vakifpay', // 'paratika' | 'vakifpay' | 'ziraatpay' (default 'paratika')
+      merchant: process.env.VAKIFPAY_MERCHANT!,
+      merchantUser: process.env.VAKIFPAY_API_USER!, // an e-mail address
+      merchantPassword: process.env.VAKIFPAY_API_PASSWORD!,
+      secretKey: process.env.VAKIFPAY_SECRET_KEY, // optional, verifies the 3D callback hash
+      // baseUrl: defaults from mode and brand
+    }),
+  },
+});
+```
+
+`paymentId` is Paratika's `pgTranId`; `conversationId` is your order id (`MERCHANTPAYMENTID`). In
+the browser client, reach a brand by its key: `client.use('vakifpay')`.
+
+## 3D Secure
+
+```typescript
+const init = await payment.vakifpay.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/vakifpay/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the card to /post/sale3d/{sessionToken}
+
+const result = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+// result.paymentId: the pgTranId; result.conversationId: 'ORDER123'
+```
+
+`initThreeDSPayment()` creates a payment session (`SESSIONTOKEN`) with the order, then returns a
+form that the customer's browser posts straight to Paratika (Direct POST 3D); the card never goes
+through your server again. Paratika runs 3D Secure and POSTs the result to `callbackUrl`.
+
+`completeThreeDSPayment()` checks `sdSha512` (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`)
+when `secretKey` is set, and always confirms the payment with `QUERYTRANSACTION`: an approved (`AP`)
+sale of the same order must exist. The amount was fixed by the session your server created. A
+failure carries no ids.
+
+## Payments, Refunds & Queries
+
+```typescript
+await payment.vakifpay.createPayment({ ...paymentRequest, conversationId: 'ORDER124' }); // SALE
+await payment.vakifpay.refund({ paymentId, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // REFUND
+await payment.vakifpay.cancel({ paymentId, ip: '1.2.3.4' });                                 // VOID
+const status = await payment.vakifpay.getPayment(paymentId);                                 // QUERYTRANSACTION
+
+const auth = await payment.vakifpay.authorize({ ...paymentRequest, conversationId: 'ORDER125' }); // PREAUTH
+await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });   // POSTAUTH
+
+await payment.vakifpay.binCheck('450803');                                      // QUERYBIN
+await payment.vakifpay.installmentInfo({ binNumber: '450803', price: '100.00' }); // QUERYINSTALLMENT
+```
+
+Refunds apply to sales of an earlier day; on the same day, cancel instead. `getPayment()` returns
+`cancelled` once the order has an approved `VOID` or `REFUND`. Installment totals add the customer
+cost commission rate of your account.
+
+## 3D Pre-authorization
+
+```typescript
+const init = await payment.vakifpay.initThreeDSAuthorize({ ...paymentRequest, conversationId: 'ORDER126', callbackUrl });
+// In the callback route: blocks the amount with PREAUTH
+const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
+```
+
+`initThreeDSAuthorize()` uses the same payment session, but the card goes to `/post/auth3d/{token}`,
+which only runs 3D authentication. The callback carries an `auth3DToken`; when the authentication
+succeeded and `mdStatus` is accepted (only `1` by default; see `acceptedMdStatuses`),
+`completeThreeDSPayment()` blocks the amount with `PREAUTH` on that session, and the bank's answer
+decides.

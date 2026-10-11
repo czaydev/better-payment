@@ -47,9 +47,10 @@ await payment.use('akbank').voidAuthorization({ paymentId: auth.paymentId!, ip: 
 | Parampos | `TP_Islem_Odeme_OnProv_WMD` (NS) | `TP_Islem_Odeme_OnProv_WMD` (3D) | `TP_Islem_Odeme_OnProv_Kapa` | `TP_Islem_Iptal_OnProv` |
 | Akbank | txnCode `1004` | txnCode `3004` (3D_PAY) | txnCode `1005` | txnCode `1003` |
 | Sipay | `paySmart2D` (`PreAuth`) | `paySmart3D` (`PreAuth`) | `confirmPayment` (status 1) | `confirmPayment` (status 2) |
+| Paratika | `PREAUTH` | `/post/auth3d`, then `PREAUTH` | `POSTAUTH` | `VOID` |
 | PayTR | henüz yok ([#60](https://github.com/czaydev/better-payment/issues/60)) | — | — | — |
 
-- `paymentId`, iyzico'da iyzico'nun ödeme numarası; Parampos, Sipay ve Akbank'ta sizin sipariş numaranızdır.
+- `paymentId`, iyzico'da iyzico'nun ödeme numarası; Paratika'da pgTranId; Parampos, Sipay ve Akbank'ta sizin sipariş numaranızdır.
 - `capture()` için `amount` zorunludur. Kısmi capture için bloke edilen tutardan azını verin.
 - Desteklemeyen sağlayıcılar `NOT_SUPPORTED` fırlatır; HTTP handler `400` döner.
 
