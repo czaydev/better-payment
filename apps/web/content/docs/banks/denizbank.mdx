@@ -1,0 +1,74 @@
+---
+title: Denizbank
+description: Denizbank virtual POS (InterVPos) integration reference.
+---
+
+Uses the Denizbank InterVPos API with the 3D Model: the bank verifies the card, and the payment
+is then charged with the 3D Secure data. The 3D form is signed with
+`base64(SHA1(ShopCode + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))`.
+
+<Callout type="warn">
+  The Denizbank provider has not been verified with a test store yet: the test host was not reachable, and only the answer format was checked against the production endpoint (without card data). 3D Pay and order status are not supported yet. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, denizbank } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    denizbank: denizbank({
+      shopCode: process.env.DENIZBANK_SHOP_CODE!,
+      userCode: process.env.DENIZBANK_API_USER!,
+      userPass: process.env.DENIZBANK_API_PASSWORD!,
+      merchantPass: process.env.DENIZBANK_STORE_KEY!, // 3D Secure store key
+      // baseUrl: defaults from mode (test.inter-vpos.com.tr / inter-vpos.com.tr)
+    }),
+  },
+});
+```
+
+`merchantPass` is only used for the hashes and is never sent; the API password is never put in
+the 3D form. `paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.denizbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// Auth (NonSecure); success when ProcReturnCode is 00
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.denizbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/denizbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the signed form to InterVPos
+```
+
+Denizbank POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.denizbank.completeThreeDSPayment(callbackBody);
+```
+
+The `HASH` is rebuilt from the fields named in `HASHPARAMS` (never from `HASHPARAMSVAL`) and must
+cover `OrderId`; a callback that fails it, or names another shop, is rejected as `INVALID_HASH`.
+The values are joined without a separator, so the card is then charged with `Auth` carrying the
+callback's 3D Secure data (`MD`, `PayerTxnId`, `Eci`, `PayerAuthenticationCode`), and the bank's
+answer decides. `paymentId` and `conversationId` are set only for a payment the bank approved.
+
+## Refund & Cancel
+
+```typescript
+await payment.denizbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.denizbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Void
+```
+
+<Callout type="info">
+  Order status, BIN and installment queries are not supported for Denizbank yet: `getPayment()`, `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
+</Callout>
