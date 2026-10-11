@@ -1,6 +1,7 @@
 ---
 title: Vakıf Katılım
 description: Vakıf Katılım sanal POS (BOA VirtualPOS) entegrasyon referansı.
+since: 0.12.0
 ---
 
 Vakıf Katılım'ın BOA VirtualPOS altyapısını XML istekleriyle (`VPosMessageContract`) kullanır. İstekler `HashData` ile imzalanır: `base64(SHA1(MerchantId + MerchantOrderId + Amount + OkUrl + FailUrl + UserName + base64(SHA1(şifre))))`; dönüş adresi olmayan isteklerde bu alanlar boş bırakılır.
