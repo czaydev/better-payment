@@ -46,6 +46,8 @@ const init = await payment.paytr.initThreeDSPayment({
 
 ## Direct API ile 3D Secure (kendi kart formunuz) [#direct-api-3d-secure-your-own-card-form]
 
+<Since version="0.12.0" />
+
 `threeDSMode: 'direct'` ile `initThreeDSPayment()` PayTR'ın iFrame sayfasını göstermek yerine kartı istekten alır; böylece kendi ödeme sayfası tasarımınızı korursunuz. Direct API token'ıyla (`non_3d=0`) imzalanmış bir form döner ve bu formu müşterinin tarayıcısı PayTR'a gönderir; PayTR kart verisi için bunu şart koşar. PayTR 3D Secure'u çalıştırır, `callbackUrl` (veya `failUrl`) adresine yönlendirir ve sonucu iFrame'deki gibi bildirim adresine gönderir.
 
 ```typescript
