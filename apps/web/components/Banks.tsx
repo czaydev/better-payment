@@ -37,6 +37,7 @@ const banks: RouteItem[] = [
   { name: "Halkbank", logo: "/brand/banks/halkbank.svg", w: 512, h: 99, live: true },
   { name: "TEB", logo: "/brand/banks/teb.png", w: 971, h: 421, live: true },
   { name: "Şekerbank", live: true },
+  { name: "Vakıf Katılım", live: true },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
   { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },

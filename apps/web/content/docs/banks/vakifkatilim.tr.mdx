@@ -1,0 +1,75 @@
+---
+title: Vakıf Katılım
+description: Vakıf Katılım sanal POS (BOA VirtualPOS) entegrasyon referansı.
+---
+
+Vakıf Katılım'ın BOA VirtualPOS altyapısını XML istekleriyle (`VPosMessageContract`) kullanır. İstekler `HashData` ile imzalanır: `base64(SHA1(MerchantId + MerchantOrderId + Amount + OkUrl + FailUrl + UserName + base64(SHA1(şifre))))`; dönüş adresi olmayan isteklerde bu alanlar boş bırakılır.
+
+<Callout type="warn">
+  Henüz bir test mağazasıyla doğrulanmadı: Vakıf Katılım test mağazasını talep üzerine verir. Altyapıya sağlayıcı üzerinden ulaşıldı: satış, 3D, provizyon, iptal ve iade istekleri okundu ve uydurma üye işyeri için cevaplandı (`MerchantNotDefined`; provizyon, uydurma `MD` değerini çözmeye kadar ilerledi). İptal ve iade hash'leri doğrulanmadı. Canlıya geçmeden önce küçük bir tutarla test edin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, vakifKatilim } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    vakifkatilim: vakifKatilim({
+      merchantId: process.env.VAKIFKATILIM_MERCHANT_ID!,
+      customerId: process.env.VAKIFKATILIM_CUSTOMER_ID!,
+      username: process.env.VAKIFKATILIM_API_USER!,
+      password: process.env.VAKIFKATILIM_API_PASSWORD!,
+      // baseUrl: https://boa.vakifkatilim.com.tr/VirtualPOS.Gateway (test and live)
+    }),
+  },
+});
+```
+
+Tüm değerler Vakıf Katılım'dan alınır; şifre yalnızca hash için kullanılır ve hiç gönderilmez. Altyapının test ve canlı üye işyerleri için tek bir adresi vardır.
+
+`paymentId`, `<sipariş numarası>:<banka OrderId>` biçimindedir; çünkü iptal ve iade ikisine de ihtiyaç duyar. Olduğu gibi saklayın; `conversationId` sizin sipariş numaranızdır.
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.vakifkatilim.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// Non3DPayGate; result.paymentId is 'ORDER123:<bank OrderId>'
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.vakifkatilim.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/vakifkatilim/callback',
+});
+// init.threeDSHtmlContent is the bank's page that takes the customer to 3D Secure
+
+// In your callback route, with the order from your own records
+const result = await payment.vakifkatilim.completeThreeDSPayment({
+  ...callbackBody,
+  orderId: 'ORDER123',
+  amount: '100.00',
+  currency: 'TRY',
+  callbackUrl: 'https://yoursite.com/checkout/vakifkatilim/callback',
+});
+```
+
+`initThreeDSPayment()` kartı `ThreeDModelPayGate` adresine gönderir; banka müşteriyi 3D Secure'a götüren sayfayla cevap verir. Altyapının reddettiği bir istek (örneğin bilinmeyen üye işyeri) hemen başarısız olur.
+
+Callback `ResponseCode`, `MerchantOrderId`, `MD` ve formülü doğrulanmamış bir `HashData` taşır; bu yüzden hash kontrol edilmez. `ResponseCode` `00` ise ödeme, sizin kayıtlarınızdaki sipariş numarası, tutar ve adreslerle, callback'teki `MD` kullanılarak `ThreeDModelProvisionGate` üzerinden tahsil edilir ve sonucu bankanın cevabı belirler. Başka bir siparişe ait callback reddedilir; başarısız bir sonuç numara taşımaz. Handler'ın `complete-3ds` adresi yerine kendi callback adresinizi kullanın.
+
+## İptal ve iade [#cancel--refund]
+
+```typescript
+await payment.vakifkatilim.cancel({ paymentId, ip: '1.2.3.4' });                                   // SaleReversal
+await payment.vakifkatilim.refund({ paymentId, price: '50.00', currency: 'TRY', ip: '1.2.3.4' });   // PartialDrawback
+await payment.vakifkatilim.refund({ paymentId, price: '100.00', currency: 'TRY', ip: '1.2.3.4', fullRefund: true }); // Drawback
+```
+
+<Callout type="info">
+  `getPayment()` `NOT_SUPPORTED` fırlatır: altyapıda durum sorgusu bulunamadı. BIN ve taksit sorgusu da desteklenmez.
+</Callout>

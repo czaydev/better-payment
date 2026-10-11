@@ -8,9 +8,9 @@ const budgets = [
   // buildBasket() (ESM bundlers drop it when it is not imported), 29 kB since the
   // 0.8.1 security fixes (Akbank order check, body limits, response filtering),
   // 31 kB since the Kuveyt Türk provider, 34 kB since the EST provider, 38 kB since
-  // the Sipay provider
-  { file: 'dist/index.mjs', maxGzipKb: 38 },
-  { file: 'dist/index.js', maxGzipKb: 38 },
+  // the Sipay provider, 40 kB since the Vakıf Katılım provider
+  { file: 'dist/index.mjs', maxGzipKb: 40 },
+  { file: 'dist/index.js', maxGzipKb: 40 },
   { file: 'dist/client/index.mjs', maxGzipKb: 2 },
   { file: 'dist/client/index.js', maxGzipKb: 2 },
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },
