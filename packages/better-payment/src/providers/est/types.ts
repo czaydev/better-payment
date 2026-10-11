@@ -3,7 +3,7 @@ import type { EstBank, EstStoreType } from './utils';
 
 /**
  * EST (Asseco) virtual POS configuration: İş Bankası, Ziraat Bankası,
- * Halkbank, TEB and Şekerbank
+ * Halkbank, TEB, Şekerbank, Akbank (older virtual POS) and Halkbank Macedonia
  *
  * Values come from the bank's merchant panel:
  * - clientId: Mağaza (üye işyeri) numarası

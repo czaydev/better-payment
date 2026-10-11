@@ -17,7 +17,7 @@ import { betterPayment, est } from 'better-payment';
 const payment = betterPayment({
   providers: {
     isbank: est({
-      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank'
+      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd'
       clientId: process.env.EST_CLIENT_ID!,
       username: process.env.EST_API_USER!,
       password: process.env.EST_API_PASSWORD!,
@@ -34,6 +34,22 @@ const payment = betterPayment({
 `clientId` mağaza numaranızdır. `username` ve `password` API kullanıcısına (XML API), `storeKey` ise 3D Secure mağaza anahtarına aittir; hepsi bankanın üye işyeri panelinden alınır. `storeType`, bankanın mağazanız için tanımladığı 3D modeliyle aynı olmalıdır.
 
 `paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+### Bankalar [#banks]
+
+| Banka | `bank` | Canlı ortam adresi |
+| ----- | ------ | ------------------ |
+| İş Bankası | `isbank` | `https://sanalpos.isbank.com.tr` |
+| Ziraat Bankası | `ziraat` | `https://sanalpos2.ziraatbank.com.tr` |
+| Halkbank | `halkbank` | `https://sanalpos.halkbank.com.tr` |
+| TEB | `teb` | `https://sanalpos.teb.com.tr` |
+| Şekerbank | `sekerbank` | `https://sanalpos.sekerbank.com.tr` |
+| Akbank (eski sanal POS) | `akbankest` | `https://www.sanalakpos.com` |
+| Halkbank Makedonya | `halkbankmkd` | `https://epay.halkbank.mk` |
+
+<Since version="0.12.0" />
+
+`akbankest`, Akbank'ın eski EST sanal POS'unu (sanalakpos.com) kullanmaya devam eden üye işyerleri içindir; Akbank'ın yeni JSON API'si ayrı bir sağlayıcıdır: [`akbank`](/docs/banks/akbank). `halkbankmkd`, Halkbank Makedonya'dır (Halk Banka AD Skopje); Makedon dinarı için `currency: 'MKD'` gönderin (`807` olarak iletilir). İki adres de XML API'ye cevap verdi (uydurma bir mağazayla), ancak gerçek bir mağazayla denenmedi.
 
 ## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
 

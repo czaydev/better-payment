@@ -22,6 +22,10 @@ export enum ProviderType {
   HALKBANK = 'halkbank',
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
+  /** Akbank's older EST virtual POS (the `akbank` provider is its JSON API) */
+  AKBANKEST = 'akbankest',
+  /** Halkbank Macedonia (Halk Banka AD Skopje) */
+  HALKBANKMKD = 'halkbankmkd',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -156,6 +160,14 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SEKERBANK]: {
     sandbox: 'https://entegrasyon.asseco-see.com.tr',
     production: 'https://sanalpos.sekerbank.com.tr',
+  },
+  [ProviderType.AKBANKEST]: {
+    sandbox: 'https://entegrasyon.asseco-see.com.tr',
+    production: 'https://www.sanalakpos.com',
+  },
+  [ProviderType.HALKBANKMKD]: {
+    sandbox: 'https://entegrasyon.asseco-see.com.tr',
+    production: 'https://epay.halkbank.mk',
   },
 };
 

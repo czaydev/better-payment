@@ -183,6 +183,14 @@ describe('EST provider', () => {
       expect(formFields(result.threeDSHtmlContent!).failUrl).toBe('https://example.com/fail');
     });
 
+    it('sends Macedonian denars as 807 (Halkbank Macedonia)', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...mockThreeDSPaymentRequest,
+        currency: 'MKD',
+      });
+      expect(formFields(result.threeDSHtmlContent!).currency).toBe('807');
+    });
+
     it('rejects an unsupported currency', async () => {
       const result = await provider.initThreeDSPayment({
         ...mockThreeDSPaymentRequest,
@@ -504,7 +512,7 @@ describe('EST provider', () => {
   });
 
   describe('est()', () => {
-    it.each(['isbank', 'ziraat', 'halkbank', 'teb', 'sekerbank'] as const)(
+    it.each(['isbank', 'ziraat', 'halkbank', 'teb', 'sekerbank', 'akbankest', 'halkbankmkd'] as const)(
       'uses the shared test environment for %s in sandbox mode',
       (bank) => {
         const bp = betterPayment({
@@ -517,6 +525,9 @@ describe('EST provider', () => {
 
     it('registers each bank as a provider type with default URLs', () => {
       expect(ProviderType.ISBANK).toBe('isbank');
+      expect(ProviderType.AKBANKEST).toBe('akbankest');
+      expect(ProviderType.HALKBANKMKD).toBe('halkbankmkd');
+      expect(ProviderType.AKBANK).not.toBe(ProviderType.AKBANKEST);
       expect(PROVIDER_DEFAULT_URLS[ProviderType.SEKERBANK]).toEqual({
         sandbox: EST_SANDBOX_URL,
         production: 'https://sanalpos.sekerbank.com.tr',
@@ -535,6 +546,8 @@ describe('EST provider', () => {
       ['halkbank', 'https://sanalpos.halkbank.com.tr'],
       ['teb', 'https://sanalpos.teb.com.tr'],
       ['sekerbank', 'https://sanalpos.sekerbank.com.tr'],
+      ['akbankest', 'https://www.sanalakpos.com'],
+      ['halkbankmkd', 'https://epay.halkbank.mk'],
     ] as const)('uses the %s production host', (bank, url) => {
       const bp = betterPayment({ providers: { pos: est({ ...EST_TEST, bank }) } });
       expect((bp.pos as any).config.baseUrl).toBe(url);
