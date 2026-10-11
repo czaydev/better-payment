@@ -11,6 +11,36 @@ export const YAPIKREDI_BASE_URL = 'https://setmpos.ykb.com';
 
 export const YAPIKREDI_MAC = 'A301mJz3V6ewHXJuWUHMpyCCMaIYmq/JG+dBMSmG7m8=';
 
+/** The bank's MAC on the resolve answer (mdStatus 1) and on the charge answer, for ORDER3D */
+export const YAPIKREDI_RESOLVE_MAC = '0ITXwphcZczDOx/Fafm8X5OoxmMsDEo2cbU3Kc8xLSg=';
+export const YAPIKREDI_CHARGE_MAC = 'Oyy6eOQW74aps8f/NoY42T5qq9wEvaag+P4fFnAwYfQ=';
+
+/** An agreement (order inquiry) answer, as in the XML guide (utf-16 declared) */
+export const ykbAgreementXml = (transactions: Array<Record<string, string>>) =>
+  '<?xml version="1.0" encoding="utf-16"?><posnetResponse><approved>1</approved><transactions>' +
+  transactions
+    .map(
+      (t) =>
+        '<transaction>' +
+        Object.entries({
+          orderID: '000000000000000000ORDER1',
+          ccno: '4506 34** **** 4637',
+          amount: '1,20',
+          currencyCode: 'TL',
+          authCode: '504289',
+          tranDate: '2026-10-11 11:21:14.281',
+          state: 'Sale',
+          txnStatus: '1',
+          hostLogKey: '021450428990000191',
+          ...t,
+        })
+          .map(([key, value]) => `<${key}>${value}</${key}>`)
+          .join('') +
+        '</transaction>'
+    )
+    .join('') +
+  '</transactions></posnetResponse>';
+
 export const YAPIKREDI_CALLBACK = {
   BankPacket: 'BANKPACKET0123456789',
   MerchantPacket: 'MERCHANTPACKET0123456789',

@@ -10,6 +10,8 @@ import {
   formatYapiKrediInstallment,
   formatYapiKrediExpiry,
   toYapiKrediXid,
+  toYapiKrediOrderId,
+  createYapiKrediResponseMac,
   buildYapiKrediRequestBody,
   parseYapiKrediXmlResponse,
 } from '../../../../src/providers/yapikredi/utils';
@@ -19,6 +21,9 @@ import {
   YAPIKREDI_TEST,
   YAPIKREDI_BASE_URL,
   YAPIKREDI_MAC,
+  YAPIKREDI_RESOLVE_MAC,
+  YAPIKREDI_CHARGE_MAC,
+  ykbAgreementXml,
   YAPIKREDI_CALLBACK,
   YKB_OOS_REQUEST_XML,
   YKB_APPROVED_XML,
@@ -44,6 +49,31 @@ describe('Yapı Kredi utils', () => {
     ).toBe(YAPIKREDI_MAC);
   });
 
+  it("matches the bank's own MAC sample from the 3D guide", async () => {
+    // encKey 10,10,10,10,10,10,10,10, terminal 67005551, merchant 6706598320
+    expect(
+      await createYapiKrediMac({
+        xid: 'YKB_TST_190620093100_024',
+        amount: '175',
+        currency: 'TL',
+        merchantId: '6706598320',
+        terminalId: '67005551',
+        encKey: '10,10,10,10,10,10,10,10',
+      })
+    ).toBe('J/7/Xprj7F/KDf98luVfIGyUPRQzUCqGwpmvz3KT7oQ=');
+    expect(
+      await createYapiKrediResponseMac({
+        first: '1',
+        xid: '0000000000000ORDER3D',
+        amount: '120',
+        currency: 'TL',
+        merchantId: YAPIKREDI_TEST.merchantId,
+        terminalId: YAPIKREDI_TEST.terminalId,
+        encKey: YAPIKREDI_TEST.encKey,
+      })
+    ).toBe(YAPIKREDI_RESOLVE_MAC);
+  });
+
   it('formats amount, currency, installment, expiry and XID', () => {
     expect(formatYapiKrediAmount('1.2')).toBe('120');
     expect(getYapiKrediCurrencyCode(undefined)).toBe('TL');
@@ -53,7 +83,9 @@ describe('Yapı Kredi utils', () => {
     expect(formatYapiKrediInstallment(3)).toBe('03');
     expect(formatYapiKrediExpiry('1', '2030')).toBe('3001');
     expect(toYapiKrediXid('ORDER3D')).toBe('0000000000000ORDER3D');
-    expect(() => toYapiKrediXid('ORDER-3D')).toThrow(/letters or digits/);
+    expect(toYapiKrediXid('YKB_TST_1')).toBe('00000000000YKB_TST_1');
+    expect(toYapiKrediOrderId('ORDER1')).toBe('000000000000000000ORDER1');
+    expect(() => toYapiKrediXid('ORDER-3D')).toThrow(/letters, digits or "_"/);
     expect(() => toYapiKrediXid('A'.repeat(21))).toThrow();
   });
 
@@ -131,7 +163,7 @@ describe('Yapı Kredi provider', () => {
       expect(leaf(xml, 'currencyCode')).toBe('TL');
       expect(leaf(xml, 'expDate')).toBe('3012');
       expect(leaf(xml, 'installment')).toBe('00');
-      expect(leaf(xml, 'orderID')).toBe('00000000000000ORDER1');
+      expect(leaf(xml, 'orderID')).toBe('000000000000000000ORDER1');
       expect(result.status).toBe(PaymentStatus.SUCCESS);
       expect(result.paymentId).toBe('021000000000000123');
       expect(result.conversationId).toBe('ORDER1');
@@ -213,6 +245,42 @@ describe('Yapı Kredi provider', () => {
       expect(result.status).toBe(PaymentStatus.SUCCESS);
       expect(result.paymentId).toBe('021000000000000123');
       expect(result.conversationId).toBe('ORDER3D');
+    });
+
+    it("checks the bank's MACs on the resolve and charge answers", async () => {
+      post
+        .mockResolvedValueOnce({ data: ykbResolveXml({ mac: YAPIKREDI_RESOLVE_MAC }) })
+        .mockResolvedValueOnce({
+          data: ykbXml({
+            approved: '1',
+            hostlogkey: '021000000000000123',
+            mac: YAPIKREDI_CHARGE_MAC,
+          }),
+        });
+      const ok = await provider.completeThreeDSPayment({ ...YAPIKREDI_CALLBACK, ...ORDER });
+      expect(ok.status).toBe(PaymentStatus.SUCCESS);
+
+      post.mockReset();
+      post.mockResolvedValueOnce({ data: ykbResolveXml({ mac: 'FORGED=' }) });
+      const forged = await provider.completeThreeDSPayment({ ...YAPIKREDI_CALLBACK, ...ORDER });
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(forged.errorCode).toBe('INVALID_HASH');
+
+      post.mockReset();
+      post
+        .mockResolvedValueOnce({ data: ykbResolveXml({ mac: YAPIKREDI_RESOLVE_MAC }) })
+        .mockResolvedValueOnce({
+          data: ykbXml({ approved: '1', hostlogkey: '021000000000000123', mac: 'FORGED=' }),
+        });
+      const unknown = await provider.completeThreeDSPayment({ ...YAPIKREDI_CALLBACK, ...ORDER });
+      expect(unknown.status).toBe(PaymentStatus.PENDING);
+      expect(unknown.errorCode).toBe('INVALID_HASH');
+    });
+
+    it('charges half-secure mdStatus values only when accepted', async () => {
+      post.mockResolvedValueOnce({ data: ykbResolveXml({ mdStatus: '2' }) });
+      const rejected = await provider.completeThreeDSPayment({ ...YAPIKREDI_CALLBACK, ...ORDER });
+      expect(rejected.errorCode).toBe('MD_STATUS_2');
     });
 
     it('needs the order from your records', async () => {
@@ -312,8 +380,49 @@ describe('Yapı Kredi provider', () => {
       expect(result.errorCode).toBe('0225');
     });
 
-    it('does not support order status yet', async () => {
-      await expect(provider.getPayment('x')).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    it('getPayment queries agreement by order id: a successful sale is success', async () => {
+      post.mockResolvedValue({ data: ykbAgreementXml([{}]) });
+      const result = await provider.getPayment('ORDER1');
+      const xml = decodeURIComponent(post.mock.calls[0][1].slice('xmldata='.length));
+      expect(xml).toContain('<agreement><orderID>000000000000000000ORDER1</orderID></agreement>');
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+      expect(result.paymentId).toBe('021450428990000191');
+      expect(result.conversationId).toBe('ORDER1');
+    });
+
+    it('getPayment falls back to the 3D order id, and reports a reverse as cancelled', async () => {
+      post
+        .mockResolvedValueOnce({
+          data: ykbXml({ approved: '0', respCode: 'E219', respText: 'KAYIT BULUNAMADI' }),
+        })
+        .mockResolvedValueOnce({
+          data: ykbAgreementXml([
+            { orderID: 'TDS_000000000000ORDER1' },
+            { state: 'Sale_Reverse', hostLogKey: '021450428990000192' },
+          ]),
+        });
+      const result = await provider.getPayment('ORDER1');
+      const xml = decodeURIComponent(post.mock.calls[1][1].slice('xmldata='.length));
+      expect(xml).toContain('<orderID>TDS_00000000000000ORDER1</orderID>');
+      expect(result.status).toBe(PaymentStatus.CANCELLED);
+    });
+
+    it('getPayment reads an answer that arrives as UTF-16 text', async () => {
+      const utf16 = ykbAgreementXml([{}]).split('').join('\u0000');
+      post.mockResolvedValue({ data: utf16 });
+      expect((await provider.getPayment('ORDER1')).status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    it('getPayment: an order with no successful sale is failure', async () => {
+      post.mockResolvedValue({ data: ykbAgreementXml([{ txnStatus: '0' }]) });
+      expect((await provider.getPayment('ORDER1')).status).toBe(PaymentStatus.FAILURE);
+      post.mockReset();
+      post.mockResolvedValue({
+        data: ykbXml({ approved: '0', respCode: 'E219', respText: 'KAYIT BULUNAMADI' }),
+      });
+      const missing = await provider.getPayment('ORDER1');
+      expect(missing.status).toBe(PaymentStatus.FAILURE);
+      expect(missing.errorCode).toBe('E219');
     });
   });
 

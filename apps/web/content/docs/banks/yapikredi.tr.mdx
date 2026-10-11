@@ -6,7 +6,7 @@ description: Yapı Kredi sanal POS (Posnet XML) entegrasyon referansı.
 Yapı Kredi Posnet XML API'sini kullanır. 3D Secure, Posnet OOS üzerinden çalışır: kart `oosRequestData` servisine gönderilir, bankanın şifreli verisi 3D servisine POST edilir, sonuç `oosResolveMerchantData` ile çözülür ve `oosTranData` ile tahsil edilir. İkisi de bir MAC ile imzalanır: `base64(SHA256(XID;tutar;para birimi;üye işyeri no;base64(SHA256(encKey;terminal no))))`.
 
 <Callout type="warn">
-  Yapı Kredi sağlayıcısı henüz bir test mağazasıyla doğrulanmadı: test adresinde yalnızca istek formatı kontrol edildi. Canlıya geçmeden önce küçük bir tutarla test edin.
+  Yapı Kredi dokümanlarındaki test üye işyeriyle test ortamında kontrol edildi: sipariş sorgusu ve 3D veri isteği (`oosRequestData`) cevaplandı, MAC da dokümanın kendi örneğiyle aynı çıktı. Bu üye işyerinde 3D'siz satış açık değil ve 3D sayfası yerel bir test sayfasından gelen istekleri reddetti; bu yüzden uçtan uca bir ödeme yapılamadı. Canlıya geçmeden önce küçük bir tutarla test edin.
 </Callout>
 
 ## Yapılandırma [#configuration]
@@ -21,13 +21,14 @@ const payment = betterPayment({
       terminalId: process.env.YAPIKREDI_TERMINAL_ID!,
       posnetId: process.env.YAPIKREDI_POSNET_ID!,
       encKey: process.env.YAPIKREDI_ENC_KEY!,
+      // acceptedMdStatuses?: string[] (default ['1'])
       // baseUrl: defaults from mode (setmpos.ykb.com / posnet.yapikredi.com.tr)
     }),
   },
 });
 ```
 
-Sipariş numarası (`conversationId`) en fazla 20 harf veya rakam olabilir; 20 karakterlik XID olarak gönderilir. Başarılı bir ödeme `paymentId` olarak bankanın host log key değerini döndürür; `refund()` ve `cancel()` bu değeri alır.
+Sipariş numarası (`conversationId`) harf, rakam veya `_` içerir: 3D Secure ödemelerde en fazla 20 (20 karakterlik XID olarak gönderilir), 3D'siz satışlarda en fazla 24 karakter; soldan sıfırla tamamlanır. Başarılı bir ödeme `paymentId` olarak bankanın host log key değerini döndürür; `refund()` ve `cancel()` bu değeri alır.
 
 ## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
 
@@ -60,8 +61,8 @@ const result = await payment.yapikredi.completeThreeDSPayment({
 
 Bu yüzden Yapı Kredi callback'leri handler'ın callback route'u ile değil, kendi route'unuzda tamamlanır. Sonuç bankayla doğrulanır:
 
-- çözülen XID, tutar ve para birimi siparişinizle aynı olmalıdır, aksi halde `INVALID_HASH` olarak reddedilir;
-- kart yalnızca `mdStatus` `1` olduğunda `oosTranData` ile tahsil edilir ve sonucu bankanın cevabı belirler.
+- çözülen XID, tutar ve para birimi siparişinizle aynı olmalı ve bankanın cevaptaki MAC'i (`mdStatus;xid;amount;currency;merchantId;firstHash`) tutmalıdır, aksi halde `INVALID_HASH` olarak reddedilir;
+- kart yalnızca `mdStatus` kabul edilen bir değerse (varsayılan olarak yalnızca `1`; bkz. `acceptedMdStatuses`) `oosTranData` ile tahsil edilir ve sonucu bankanın cevabı belirler. Tahsilat cevabındaki MAC (`hostlogkey;xid;...`) tutmazsa sonuç `pending` olur: `getPayment()` ile kontrol edin.
 
 `paymentId` ve `conversationId` yalnızca bankanın onayladığı bir ödemede doldurulur.
 
@@ -70,8 +71,11 @@ Bu yüzden Yapı Kredi callback'leri handler'ın callback route'u ile değil, ke
 ```typescript
 await payment.yapikredi.refund({ paymentId: hostLogKey, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // return
 await payment.yapikredi.cancel({ paymentId: hostLogKey, ip: '1.2.3.4' });                               // reverse
+const status = await payment.yapikredi.getPayment('ORDER123'); // agreement, by order id
 ```
 
+`getPayment()`, bankanın `agreement` sorgusu gibi sizin **sipariş numaranızı** alır: önce 3D'siz sipariş numarasını, sonra 3D Secure numarasını (`TDS_` + XID) dener. Başarılı bir satış `success`, siparişte başarılı bir iptal veya iade varsa `cancelled`, başarılı satışı olmayan bir sipariş `failure` döner.
+
 <Callout type="info">
-  Yapı Kredi için sipariş durumu, BIN ve taksit sorgusu henüz desteklenmiyor: `getPayment()`, `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
+  BIN ve taksit sorgusu desteklenmez: Yapı Kredi'de bu servisler yoktur. `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
 </Callout>

@@ -6,7 +6,7 @@ import {
 } from '../../core/BetterPaymentConfig';
 import type { HttpClient } from '../../core/http';
 import { PaymentProvider } from '../../core/PaymentProvider';
-import { BetterPaymentError, ConfigurationError, ValidationError } from '../../core/errors';
+import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
 import { generateOrderId } from '../../core/utils';
@@ -30,7 +30,10 @@ import {
   formatYapiKrediInstallment,
   formatYapiKrediExpiry,
   toYapiKrediXid,
+  toYapiKrediOrderId,
+  toYapiKrediThreeDSOrderId,
   createYapiKrediMac,
+  createYapiKrediResponseMac,
   buildYapiKrediRequestBody,
   parseYapiKrediXmlResponse,
   isYapiKrediApproved,
@@ -66,7 +69,8 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
     super(config);
 
     this.client = this.createHttpClient('yapikredi', {
-      timeout: 30000,
+      // The bank may take up to 45 seconds and recommends a 1 minute timeout
+      timeout: 60000,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' },
     });
   }
@@ -139,7 +143,7 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
           cvc: card.cvc,
           expDate: formatYapiKrediExpiry(card.expireMonth, card.expireYear),
           installment: formatYapiKrediInstallment(request.installment),
-          orderID: toYapiKrediXid(orderId),
+          orderID: toYapiKrediOrderId(orderId),
         },
       });
       const approved = isYapiKrediApproved(result);
@@ -282,11 +286,22 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
         oosResolveMerchantData: { ...packets, wpAmount: '0', mac },
       });
       const data = resolved.oosResolveMerchantData;
+      const macFields = {
+        xid,
+        amount: minorAmount,
+        currency,
+        merchantId: this.config.merchantId,
+        terminalId: this.config.terminalId,
+        encKey: this.config.encKey,
+      };
       if (
         !isYapiKrediApproved(resolved) ||
         data.xid !== xid ||
         data.amount !== minorAmount ||
-        (data.currency !== undefined && data.currency !== currency)
+        (data.currency !== undefined && data.currency !== currency) ||
+        (data.mac &&
+          data.mac !==
+            (await createYapiKrediResponseMac({ ...macFields, first: data.mdStatus ?? '' })))
       ) {
         return this.withErrorCode({
           status: PaymentStatus.FAILURE,
@@ -295,7 +310,8 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
           rawResponse: { callback: callbackData, resolve: resolved },
         });
       }
-      if (data.mdStatus !== '1') {
+      const accepted = this.config.acceptedMdStatuses ?? ['1'];
+      if (!data.mdStatus || !accepted.includes(data.mdStatus)) {
         return this.withErrorCode({
           status: PaymentStatus.FAILURE,
           errorCode: `MD_STATUS_${data.mdStatus ?? ''}`,
@@ -310,6 +326,23 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
         return this.withErrorCode({
           status: PaymentStatus.FAILURE,
           ...YapiKredi.errorOf(payment),
+          rawResponse: { callback: callbackData, resolve: resolved, payment },
+        });
+      }
+      if (
+        payment.fields.mac &&
+        payment.fields.mac !==
+          (await createYapiKrediResponseMac({
+            ...macFields,
+            first: payment.fields.hostlogkey ?? '',
+          }))
+      ) {
+        // The charge answer did not come from the bank as sent: treat the outcome as unknown
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          errorCode: 'INVALID_HASH',
+          errorMessage: 'The charge answer MAC does not match; check the order with getPayment()',
+          conversationId: orderId,
           rawResponse: { callback: callbackData, resolve: resolved, payment },
         });
       }
@@ -384,15 +417,63 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
     }
   }
 
+  private async agreement(orderId: string): Promise<YapiKrediXmlResponse> {
+    return this.api({ agreement: { orderID: orderId } });
+  }
+
   /**
-   * Not available yet: the order inquiry of the Posnet API is not implemented.
+   * Order status (XML `agreement`). Unlike refund() and cancel(), it takes your
+   * **order id** (conversationId), as the bank's inquiry does: the non-3D order
+   * id is tried first, then the 3D Secure one ("TDS_" + XID).
+   *
+   * A successful sale is `success`, or `cancelled` once the order has a
+   * successful reverse or return; an order without a successful sale is `failure`.
    */
-  async getPayment(_paymentId: string): Promise<PaymentResponse> {
-    throw new BetterPaymentError(
-      'Order status queries are not supported for Yapı Kredi yet.',
-      'NOT_SUPPORTED',
-      'yapikredi'
-    );
+  async getPayment(paymentId: string): Promise<PaymentResponse> {
+    try {
+      let result = await this.agreement(toYapiKrediOrderId(paymentId));
+      if (!isYapiKrediApproved(result) || result.transactions.length === 0) {
+        const threeDS = await this.agreement(toYapiKrediThreeDSOrderId(paymentId));
+        if (isYapiKrediApproved(threeDS) || !isYapiKrediApproved(result)) result = threeDS;
+      }
+      if (!isYapiKrediApproved(result) || result.transactions.length === 0) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          conversationId: paymentId,
+          ...(isYapiKrediApproved(result)
+            ? { errorCode: 'E219', errorMessage: 'No transaction found for the order' }
+            : YapiKredi.errorOf(result)),
+          rawResponse: result,
+        });
+      }
+
+      const succeeded = (t: Record<string, string>) => t.txnStatus === '1';
+      const state = (t: Record<string, string>) => (t.state ?? '').toLowerCase();
+      const sale = result.transactions.find(
+        (t) => succeeded(t) && ['sale', 'vft_sale', 'capture', 'authorization'].includes(state(t))
+      );
+      const reversed = result.transactions.some(
+        (t) => succeeded(t) && /(_reverse|^return$|^vft_return$)/.test(state(t))
+      );
+      const status = !sale
+        ? reversed
+          ? PaymentStatus.CANCELLED
+          : PaymentStatus.FAILURE
+        : reversed
+          ? PaymentStatus.CANCELLED
+          : PaymentStatus.SUCCESS;
+
+      return this.withErrorCode({
+        status,
+        paymentId: sale?.hostLogKey || sale?.hostlogkey || undefined,
+        conversationId: paymentId,
+        rawResponse: result,
+      });
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, 'Get payment failed', {
+        conversationId: paymentId,
+      });
+    }
   }
 }
 

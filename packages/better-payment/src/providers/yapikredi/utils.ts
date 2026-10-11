@@ -15,17 +15,9 @@ export function formatYapiKrediAmount(amount: string | number): string {
   return String(toMinorUnits(amount));
 }
 
-/** Posnet currency codes */
+/** Posnet currency codes (the guides list TL, US and EU) */
 export function getYapiKrediCurrencyCode(currency: string | undefined): string {
-  const map: Record<string, string> = {
-    TRY: 'TL',
-    TL: 'TL',
-    USD: 'US',
-    EUR: 'EU',
-    GBP: 'GB',
-    JPY: 'JP',
-    RUB: 'RU',
-  };
+  const map: Record<string, string> = { TRY: 'TL', TL: 'TL', USD: 'US', EUR: 'EU' };
   const code = map[(currency || 'TRY').toUpperCase()];
   if (!code) {
     throw new ValidationError(`Currency ${currency} is not supported by Yapı Kredi`);
@@ -52,20 +44,54 @@ export function formatYapiKrediExpiry(month: string, year: string): string {
   return `${yy}${mm}`;
 }
 
-/**
- * Order id as the 20-character XID: alphanumeric, left-padded with zeros
- */
-export function toYapiKrediXid(orderId: string): string {
-  if (!/^[A-Za-z0-9]{1,20}$/.test(orderId)) {
+function padOrderId(orderId: string, length: number): string {
+  if (!new RegExp(`^[A-Za-z0-9_]{1,${length}}$`).test(orderId)) {
     throw new ValidationError(
-      `Yapı Kredi order ids must be 1 to 20 letters or digits, got: ${orderId}`
+      `Yapı Kredi order ids must be 1 to ${length} letters, digits or "_", got: ${orderId}`
     );
   }
-  return orderId.padStart(20, '0');
+  return orderId.padStart(length, '0');
+}
+
+/** Order id as the 20-character XID of a 3D Secure payment, left-padded with zeros */
+export function toYapiKrediXid(orderId: string): string {
+  return padOrderId(orderId, 20);
+}
+
+/** Order id of a non-3D sale: 24 characters, left-padded with zeros */
+export function toYapiKrediOrderId(orderId: string): string {
+  return padOrderId(orderId, 24);
+}
+
+/** The order id the order inquiry knows a 3D Secure payment by: "TDS_" + XID */
+export function toYapiKrediThreeDSOrderId(orderId: string): string {
+  return `TDS_${toYapiKrediXid(orderId)}`;
 }
 
 async function sha256Base64(data: string): Promise<string> {
   return toBase64(await digest('SHA-256', data));
+}
+
+/**
+ * The bank's MAC on its answers, which the 3D guide recommends checking:
+ * base64(SHA256(first;xid;amount;currency;merchantId;base64(SHA256(encKey;terminalId)))),
+ * where `first` is mdStatus (resolve answer) or hostlogkey (charge answer)
+ */
+export async function createYapiKrediResponseMac(fields: {
+  first: string;
+  xid: string;
+  amount: string;
+  currency: string;
+  merchantId: string;
+  terminalId: string;
+  encKey: string;
+}): Promise<string> {
+  const firstHash = await sha256Base64(`${fields.encKey};${fields.terminalId}`);
+  return sha256Base64(
+    [fields.first, fields.xid, fields.amount, fields.currency, fields.merchantId, firstHash].join(
+      ';'
+    )
+  );
 }
 
 /**
@@ -112,8 +138,10 @@ function block(xml: string, tag: string): string {
 }
 
 export interface YapiKrediXmlResponse {
-  /** Top-level fields: approved, respCode, respText, hostlogkey, authCode, ... */
+  /** Top-level fields: approved, respCode, respText, hostlogkey, authCode, mac, ... */
   fields: Record<string, string>;
+  /** agreement (order inquiry): transactions/transaction */
+  transactions: Record<string, string>[];
   /** oosRequestDataResponse: data1, data2, sign */
   oosRequestData: Record<string, string>;
   /** oosResolveMerchantDataResponse: xid, amount, currency, installment, mdStatus, ... */
@@ -123,17 +151,24 @@ export interface YapiKrediXmlResponse {
 /**
  * Parses a posnetResponse. Throws when the body is not one.
  */
-export function parseYapiKrediXmlResponse(xml: string): YapiKrediXmlResponse {
+export function parseYapiKrediXmlResponse(body: string): YapiKrediXmlResponse {
+  // The order inquiry declares utf-16; read as text, its ASCII comes with NULs
+  const xml = body.split('\u0000').join('');
   if (!xml.includes('<posnetResponse')) {
     throw new Error('Yapı Kredi returned an unexpected response');
   }
   const request = block(xml, 'oosRequestDataResponse');
   const resolve = block(xml, 'oosResolveMerchantDataResponse');
+  const list = block(xml, 'transactions');
   const top = xml
     .replace(`<oosRequestDataResponse>${request}</oosRequestDataResponse>`, '')
-    .replace(`<oosResolveMerchantDataResponse>${resolve}</oosResolveMerchantDataResponse>`, '');
+    .replace(`<oosResolveMerchantDataResponse>${resolve}</oosResolveMerchantDataResponse>`, '')
+    .replace(`<transactions>${list}</transactions>`, '');
   return {
     fields: leafFields(top),
+    transactions: [...list.matchAll(/<transaction>([\s\S]*?)<\/transaction>/g)].map((m) =>
+      leafFields(m[1])
+    ),
     oosRequestData: leafFields(request),
     oosResolveMerchantData: leafFields(resolve),
   };

@@ -13,6 +13,12 @@ export interface YapiKrediConfig extends PaymentProviderConfig {
   terminalId: string;
   posnetId: string;
   encKey: string;
+  /**
+   * `mdStatus` values that are charged after 3D Secure. Default: ['1'] (full
+   * authentication). 2, 3 and 4 are half-secure; accepting them can leave
+   * chargeback liability with the merchant.
+   */
+  acceptedMdStatuses?: string[];
 }
 
 /**

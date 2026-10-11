@@ -143,7 +143,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
-| Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
+| Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
 
