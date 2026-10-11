@@ -163,6 +163,12 @@ export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
 export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
 export { Sipay, sipay } from './providers/sipay';
 export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
+export { Albaraka, albaraka } from './providers/albaraka';
+export type {
+  AlbarakaConfig,
+  AlbarakaCallbackFields,
+  AlbarakaCompleteRequest,
+} from './providers/albaraka/types';
 export { Est, est } from './providers/est';
 export type { EstConfig, Est3DCallbackData } from './providers/est/types';
 export type { EstBank, EstStoreType } from './providers/est/utils';

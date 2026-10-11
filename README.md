@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk and the EST banks
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Albaraka Türk and the EST banks
 (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
@@ -143,8 +143,10 @@ this id to `refund`, `cancel` and `getPayment`.
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
+| Albaraka ²  | ✓                         | ✓ 3D                        |   ✓    | ✓ (same day)    |  ✓ ²   |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
+² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id and reports found orders as `pending` until the bank's answer format is confirmed.
 
 ### 3D Secure completion
 
@@ -163,12 +165,15 @@ this id to `refund`, `cancel` and `getPayment`.
   result is confirmed with the bank: `3d` and `3d_host` only authenticate the card and
   charge it with the XML API, `3d_pay` / `3d_pay_hosting` are checked with an order
   status query.
+- **Albaraka Türk:** the bank POSTs to your `callbackUrl`, unsigned. Call
+  `completeThreeDSPayment({ ...callbackBody, orderId, amount, currency })` with the order
+  from your records: the card is charged with the 3D data and the bank's answer decides.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies
   `OK`.
 
-Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay and Akbank:
+Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank and Albaraka Türk:
 `authorize()` / `initThreeDSAuthorize()`, then `capture({ paymentId, amount, ip })` or
 `voidAuthorization({ paymentId, ip })`. See the
 [pre-authorization guide](https://better-payment.czaylabs.com/docs/payments/pre-authorization).

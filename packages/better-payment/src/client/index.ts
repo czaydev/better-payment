@@ -328,6 +328,7 @@ export class BetterPaymentClient {
   readonly parampos: ProviderClient;
   readonly kuveytturk: ProviderClient;
   readonly sipay: ProviderClient;
+  readonly albaraka: ProviderClient;
   /** The in-memory test provider (`MockProvider` from `better-payment/testing`) */
   readonly mock: ProviderClient;
 
@@ -338,6 +339,7 @@ export class BetterPaymentClient {
     this.parampos = new ProviderClient(ProviderType.PARAMPOS, config);
     this.kuveytturk = new ProviderClient(ProviderType.KUVEYTTURK, config);
     this.sipay = new ProviderClient(ProviderType.SIPAY, config);
+    this.albaraka = new ProviderClient(ProviderType.ALBARAKA, config);
     this.mock = new ProviderClient(ProviderType.MOCK, config);
   }
 
