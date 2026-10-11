@@ -1,6 +1,7 @@
 ---
 title: QNB
 description: QNB sanal POS (PayFor) entegrasyon referansı.
+since: 0.12.0
 ---
 
 QNB sanal POS (PayFor) XML API'sini kullanır. 3D formu `base64(SHA1(MbrId + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))` ile imzalanır; callback'ler sonuç alanlarını kapsayan bir `ResponseHash` taşır.
