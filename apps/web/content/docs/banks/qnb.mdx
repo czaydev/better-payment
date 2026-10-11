@@ -1,0 +1,83 @@
+---
+title: QNB
+description: QNB virtual POS (PayFor) integration reference.
+---
+
+Uses the QNB virtual POS (PayFor) XML API. The 3D form is signed with
+`base64(SHA1(MbrId + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))`,
+and callbacks carry a `ResponseHash` over the result fields.
+
+<Callout type="info">
+  Verified in the QNB test environment with the published demo merchants: 3D Model and 3D Pay payments end to end, non-3D sale, order inquiry and cancel. Refunds apply to sales of an earlier day; on the same day, cancel instead.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, qnb } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    qnb: qnb({
+      merchantId: process.env.QNB_MERCHANT_ID!,
+      userCode: process.env.QNB_API_USER!,
+      userPass: process.env.QNB_API_PASSWORD!,
+      merchantPass: process.env.QNB_MERCHANT_PASS!, // 3D Secure password
+      // secureType?: '3DModel' | '3DPay' (default '3DModel')
+      // baseUrl: defaults from mode (vpostest.qnb.com.tr / vpos.qnb.com.tr)
+    }),
+  },
+});
+```
+
+`merchantPass` is only used for the hashes and is never sent; the API password is never put in
+the 3D form. `secureType` must match the 3D model of your merchant.
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id (letters, digits,
+`-` or `_`).
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.qnb.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML Auth (NonSecure); success when ProcReturnCode is 00
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.qnb.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/qnb/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the signed form to the 3D gateway
+```
+
+QNB POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.qnb.completeThreeDSPayment(callbackBody);
+```
+
+The `ResponseHash` is checked with your merchant id, user code and `merchantPass`. Its values are
+joined without a separator, so the result is also confirmed with the bank:
+
+- a callback with an invalid hash or for another merchant is rejected as `INVALID_HASH`;
+- `3DModel`: when `3DStatus` is `1`, the payment is charged with `3DModelPayment`, and the bank's answer decides;
+- `3DPay`: an approved callback is checked with an order inquiry (approved, not cancelled, same amount); a payment the bank does not confirm is rejected as `INVALID_HASH`.
+
+`paymentId` and `conversationId` are set only for a payment the bank confirmed.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.qnb.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.qnb.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Void
+const status = await payment.qnb.getPayment('ORDER123');                                          // OrderInquiry
+// status: 'success', 'cancelled' (voided or refunded), 'failure'
+```
+
+<Callout type="info">
+  BIN and installment queries are not supported for QNB: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates.
+</Callout>

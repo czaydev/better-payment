@@ -22,6 +22,7 @@ export enum ProviderType {
   HALKBANK = 'halkbank',
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
+  QNB = 'qnb',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -156,6 +157,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SEKERBANK]: {
     sandbox: 'https://entegrasyon.asseco-see.com.tr',
     production: 'https://sanalpos.sekerbank.com.tr',
+  },
+  [ProviderType.QNB]: {
+    sandbox: 'https://vpostest.qnb.com.tr',
+    production: 'https://vpos.qnb.com.tr',
   },
 };
 

@@ -1,0 +1,78 @@
+---
+title: QNB
+description: QNB sanal POS (PayFor) entegrasyon referansı.
+---
+
+QNB sanal POS (PayFor) XML API'sini kullanır. 3D formu `base64(SHA1(MbrId + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))` ile imzalanır; callback'ler sonuç alanlarını kapsayan bir `ResponseHash` taşır.
+
+<Callout type="info">
+  QNB test ortamında, yayınlanan demo üye işyerleriyle doğrulananlar: uçtan uca 3D Model ve 3D Pay ödemeleri, 3D'siz satış, sipariş sorgusu ve iptal. İade önceki günlerin satışları için geçerlidir; aynı gün iade yerine iptal kullanın.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, qnb } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    qnb: qnb({
+      merchantId: process.env.QNB_MERCHANT_ID!,
+      userCode: process.env.QNB_API_USER!,
+      userPass: process.env.QNB_API_PASSWORD!,
+      merchantPass: process.env.QNB_MERCHANT_PASS!, // 3D Secure password
+      // secureType?: '3DModel' | '3DPay' (default '3DModel')
+      // baseUrl: defaults from mode (vpostest.qnb.com.tr / vpos.qnb.com.tr)
+    }),
+  },
+});
+```
+
+`merchantPass` yalnızca hash hesaplamasında kullanılır ve hiçbir zaman gönderilmez; API şifresi de 3D formuna hiçbir zaman konmaz. `secureType`, üye işyerinizin 3D modeliyle aynı olmalıdır.
+
+`paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara (harf, rakam, `-` veya `_`).
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.qnb.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML Auth (NonSecure); success when ProcReturnCode is 00
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.qnb.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/qnb/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the signed form to the 3D gateway
+```
+
+QNB sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.qnb.completeThreeDSPayment(callbackBody);
+```
+
+`ResponseHash`, üye işyeri numaranız, kullanıcı kodunuz ve `merchantPass` ile kontrol edilir. Değerler ayraçsız birleştirildiği için sonuç ayrıca bankayla doğrulanır:
+
+- hash'i geçersiz ya da başka bir üye işyerine ait callback `INVALID_HASH` olarak reddedilir;
+- `3DModel`: `3DStatus` `1` ise ödeme `3DModelPayment` ile tahsil edilir ve sonucu bankanın cevabı belirler;
+- `3DPay`: onaylı bir callback sipariş sorgusuyla kontrol edilir (onaylı, iptal edilmemiş, aynı tutar); bankanın doğrulamadığı bir ödeme `INVALID_HASH` olarak reddedilir.
+
+`paymentId` ve `conversationId` yalnızca bankanın doğruladığı bir ödemede doldurulur.
+
+## İade, iptal ve durum sorgusu [#refund-cancel--status]
+
+```typescript
+await payment.qnb.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.qnb.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Void
+const status = await payment.qnb.getPayment('ORDER123');                                          // OrderInquiry
+// status: 'success', 'cancelled' (voided or refunded), 'failure'
+```
+
+<Callout type="info">
+  QNB için BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır. Ödeme isteğinde `installment` gönderin ve `paidPrice` değerini anlaşmalı oranlarınızdan hesaplayın.
+</Callout>
