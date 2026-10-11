@@ -276,6 +276,57 @@ describe('Denizbank provider', () => {
     });
   });
 
+  describe('completeThreeDSPayment (3DPay)', () => {
+    // In 3DPay the bank charged the card; HASHPARAMS must cover the result
+    const PAY_CALLBACK = {
+      OrderId: 'ORDERPAY',
+      PurchAmount: '1.20',
+      ProcReturnCode: '00',
+      '3DStatus': '1',
+      HASHPARAMS: 'OrderId:PurchAmount:ProcReturnCode:3DStatus',
+      HASHPARAMSVAL: 'ORDERPAY1.20001',
+      HASH: 'd2XPSTYKP1rwyweOp+tpxXu7HE8=',
+    };
+    beforeEach(() => {
+      provider = create({ secureType: '3DPay' });
+    });
+
+    it('sends SecureType 3DPay in the form', async () => {
+      const result = await provider.initThreeDSPayment(mockThreeDSPaymentRequest);
+      expect(result.threeDSHtmlContent).toContain('name="SecureType" value="3DPay"');
+    });
+
+    it("takes the bank's answer from a verified callback, without charging again", async () => {
+      const result = await provider.completeThreeDSPayment(PAY_CALLBACK);
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+      expect(result.paymentId).toBe('ORDERPAY');
+    });
+
+    it('fails without ids on a declined callback', async () => {
+      const result = await provider.completeThreeDSPayment({
+        ...PAY_CALLBACK,
+        ProcReturnCode: '51',
+        HASHPARAMSVAL: 'ORDERPAY1.20511',
+        HASH: 'AvjlCVCcooUtRHqTDlHJG5PHVCY=',
+      });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.code).toBe(PaymentErrorCode.INSUFFICIENT_FUNDS);
+      expectNoIds(result);
+    });
+
+    it('rejects a callback whose hash does not cover the result', async () => {
+      const result = await provider.completeThreeDSPayment({
+        OrderId: 'ORDERPAY',
+        ProcReturnCode: '00',
+        HASHPARAMS: 'OrderId',
+        HASHPARAMSVAL: 'ORDERPAY',
+        HASH: 'VEB83cRSF+yDAPk/+DicLS1WEb4=',
+      });
+      expect(result.errorCode).toBe('INVALID_HASH');
+    });
+  });
+
   it('refunds and cancels by orgOrderId', async () => {
     post.mockResolvedValue({ data: APPROVED });
     const refund = await provider.refund({

@@ -3,12 +3,12 @@ title: Denizbank
 description: Denizbank virtual POS (InterVPos) integration reference.
 ---
 
-Uses the Denizbank InterVPos API with the 3D Model: the bank verifies the card, and the payment
-is then charged with the 3D Secure data. The 3D form is signed with
+Uses the Denizbank InterVPos API. In the 3D Model (default) the bank verifies the card and the
+payment is then charged with the 3D Secure data; in 3D Pay the bank also charges the card. The 3D form is signed with
 `base64(SHA1(ShopCode + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))`.
 
 <Callout type="warn">
-  The Denizbank provider has not been verified with a test store yet: the test host was not reachable, and only the answer format was checked against the production endpoint (without card data). 3D Pay and order status are not supported yet. Test with a small amount before going live.
+  The Denizbank provider has not been verified with a test store yet: the test host was not reachable, and only the answer format was checked against the production endpoint (without card data). Order status is not supported yet. Test with a small amount before going live.
 </Callout>
 
 ## Configuration
@@ -23,6 +23,7 @@ const payment = betterPayment({
       userCode: process.env.DENIZBANK_API_USER!,
       userPass: process.env.DENIZBANK_API_PASSWORD!,
       merchantPass: process.env.DENIZBANK_STORE_KEY!, // 3D Secure store key
+      // secureType?: '3DModel' | '3DPay' (default '3DModel')
       // baseUrl: defaults from mode (test.inter-vpos.com.tr / inter-vpos.com.tr)
     }),
   },
@@ -61,6 +62,10 @@ cover `OrderId`; a callback that fails it, or names another shop, is rejected as
 The values are joined without a separator, so the card is then charged with `Auth` carrying the
 callback's 3D Secure data (`MD`, `PayerTxnId`, `Eci`, `PayerAuthenticationCode`), and the bank's
 answer decides. `paymentId` and `conversationId` are set only for a payment the bank approved.
+
+With `secureType: '3DPay'` the callback is the bank's final answer: `HASHPARAMS` must also cover
+`ProcReturnCode` and `PurchAmount`, and the result is taken from the verified callback without a
+second charge (InterVPos has no order inquiry to confirm it with).
 
 ## Refund & Cancel
 

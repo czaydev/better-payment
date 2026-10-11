@@ -13,6 +13,11 @@ export interface DenizbankConfig extends PaymentProviderConfig {
   userCode: string;
   userPass: string;
   merchantPass: string;
+  /**
+   * 3D model of the shop. Default: '3DModel' (the bank authenticates, you charge
+   * with Auth). With '3DPay' the bank also charges the card.
+   */
+  secureType?: '3DModel' | '3DPay';
 }
 
 /**
