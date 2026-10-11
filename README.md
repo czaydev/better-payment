@@ -146,7 +146,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Albaraka ²  | ✓                         | ✓ 3D                        |   ✓    | ✓ (same day)    |  ✓ ²   |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
-² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id and reports found orders as `pending` until the bank's answer format is confirmed.
+² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
 
 ### 3D Secure completion
 

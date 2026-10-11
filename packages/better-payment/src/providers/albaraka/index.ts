@@ -555,7 +555,7 @@ export class Albaraka extends PaymentProvider<AlbarakaConfig> {
       });
       const found = isAlbarakaApproved(response);
       return this.withErrorCode({
-        status: found ? PaymentStatus.PENDING : PaymentStatus.FAILURE,
+        status: found ? albarakaOrderStatus(response.TransactionData) : PaymentStatus.FAILURE,
         paymentId: found ? response.ReferenceCode || undefined : undefined,
         conversationId: paymentId,
         ...(found ? {} : Albaraka.errorOf(response)),
@@ -567,6 +567,36 @@ export class Albaraka extends PaymentProvider<AlbarakaConfig> {
       });
     }
   }
+}
+
+/**
+ * Maps TransactionInquiry's TransactionData the way Yapı Kredi's `agreement`
+ * answer is read on the same Posnet platform: a successful (TxnStatus 1) sale
+ * is success, a successful reverse or return makes it cancelled. Keys are
+ * matched case-insensitively. When the transactions do not carry those fields,
+ * the status stays pending: the answer format is not confirmed yet.
+ */
+export function albarakaOrderStatus(data: unknown): PaymentStatus {
+  const list = (Array.isArray(data) ? data : data ? [data] : []).filter(
+    (item): item is Record<string, unknown> => !!item && typeof item === 'object'
+  );
+  const field = (item: Record<string, unknown>, name: string) => {
+    const key = Object.keys(item).find((k) => k.toLowerCase() === name);
+    return key === undefined ? undefined : String(item[key] ?? '');
+  };
+  const known = list.filter(
+    (item) => field(item, 'txnstatus') !== undefined && field(item, 'state') !== undefined
+  );
+  if (known.length === 0) return PaymentStatus.PENDING;
+
+  const succeeded = known.filter((item) => field(item, 'txnstatus') === '1');
+  const state = (item: Record<string, unknown>) => (field(item, 'state') ?? '').toLowerCase();
+  const sale = succeeded.some((item) =>
+    ['sale', 'vft_sale', 'capture', 'authorization'].includes(state(item))
+  );
+  const reversed = succeeded.some((item) => /(_reverse|^return$|^vft_return$)/.test(state(item)));
+  if (reversed) return PaymentStatus.CANCELLED;
+  return sale ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE;
 }
 
 /**

@@ -82,9 +82,11 @@ await payment.albaraka.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.
 ```
 
 `getPayment()` takes your **order id**, since the bank's inquiry works by order id (`refund()` and
-`cancel()` take the `ReferenceCode`). An unknown order fails with `E219`. A found order comes back
-as `pending` with the bank's `TransactionData` in `rawResponse`: its format has not been confirmed
-with a real merchant yet, so it is not mapped to a status.
+`cancel()` take the `ReferenceCode`). An unknown order fails with `E219`. A found order's `TransactionData` is read like Yapı Kredi's
+documented `agreement` answer on the same Posnet platform: a successful (`TxnStatus` 1) sale is
+`success`, and a successful reverse or return makes it `cancelled`. If the transactions don't carry
+`State` / `TxnStatus` (the format is not confirmed with a real merchant yet), the status is
+`pending` and the answer is in `rawResponse`.
 
 For a 3D pre-authorization, start with `initThreeDSAuthorize()` and pass `transactionType: 'Auth'`
 to `completeThreeDSPayment()`.

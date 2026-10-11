@@ -74,7 +74,7 @@ await payment.albaraka.capture({ paymentId: auth.paymentId!, amount: '60.00', ip
 await payment.albaraka.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.4' });          // Reverse
 ```
 
-`getPayment()` sizin **sipariş numaranızı** alır, çünkü bankanın sorgusu sipariş numarasıyla çalışır (`refund()` ve `cancel()` ise `ReferenceCode` alır). Bilinmeyen bir sipariş `E219` ile başarısız olur. Bulunan bir sipariş `pending` olarak döner ve bankanın `TransactionData` alanı `rawResponse` içinde gelir: biçimi henüz gerçek bir üye işyeriyle doğrulanmadığı için bir duruma eşlenmez.
+`getPayment()` sizin **sipariş numaranızı** alır, çünkü bankanın sorgusu sipariş numarasıyla çalışır (`refund()` ve `cancel()` ise `ReferenceCode` alır). Bilinmeyen bir sipariş `E219` ile başarısız olur. Bulunan bir siparişin `TransactionData` alanı, aynı Posnet altyapısındaki Yapı Kredi'nin dokümanlı `agreement` cevabı gibi okunur: başarılı (`TxnStatus` 1) bir satış `success`, başarılı bir iptal veya iade `cancelled` döner. İşlemlerde `State` / `TxnStatus` yoksa (biçim henüz gerçek bir üye işyeriyle doğrulanmadı) durum `pending` olur ve cevap `rawResponse` içinde gelir.
 
 3D ön provizyon için `initThreeDSAuthorize()` ile başlayın ve `completeThreeDSPayment()` çağrısına `transactionType: 'Auth'` verin.
 

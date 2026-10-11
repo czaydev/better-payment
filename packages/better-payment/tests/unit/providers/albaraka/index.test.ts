@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
-import { Albaraka, albaraka } from '../../../../src/providers/albaraka';
+import { Albaraka, albaraka, albarakaOrderStatus } from '../../../../src/providers/albaraka';
 import {
   formatAlbarakaAmount,
   getAlbarakaCurrencyCode,
@@ -305,6 +305,20 @@ describe('Albaraka provider', () => {
       expect(result.errorCode).toBe('E219');
       expect(result.code).toBe(PaymentErrorCode.INVALID_REQUEST);
     });
+  });
+
+  it('albarakaOrderStatus reads Posnet agreement-style transactions', () => {
+    expect(albarakaOrderStatus([{ State: 'Sale', TxnStatus: '1' }])).toBe(PaymentStatus.SUCCESS);
+    expect(
+      albarakaOrderStatus([
+        { state: 'Sale', txnStatus: 1 },
+        { state: 'Sale_Reverse', txnStatus: 1 },
+      ])
+    ).toBe(PaymentStatus.CANCELLED);
+    expect(albarakaOrderStatus([{ State: 'Sale', TxnStatus: '0' }])).toBe(PaymentStatus.FAILURE);
+    // Unknown shapes stay pending until the format is confirmed
+    expect(albarakaOrderStatus([{}])).toBe(PaymentStatus.PENDING);
+    expect(albarakaOrderStatus(null)).toBe(PaymentStatus.PENDING);
   });
 
   describe('pre-authorization', () => {
