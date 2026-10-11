@@ -1,6 +1,7 @@
 ---
 title: Yapı Kredi
 description: Yapı Kredi sanal POS (Posnet XML) entegrasyon referansı.
+since: 0.12.0
 ---
 
 Yapı Kredi Posnet XML API'sini kullanır. 3D Secure, Posnet OOS üzerinden çalışır: kart `oosRequestData` servisine gönderilir, bankanın şifreli verisi 3D servisine POST edilir, sonuç `oosResolveMerchantData` ile çözülür ve `oosTranData` ile tahsil edilir. İkisi de bir MAC ile imzalanır: `base64(SHA256(XID;tutar;para birimi;üye işyeri no;base64(SHA256(encKey;terminal no))))`.
