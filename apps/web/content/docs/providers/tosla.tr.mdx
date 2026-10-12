@@ -1,0 +1,79 @@
+---
+title: Tosla
+description: Tosla İşim (AKÖde) sanal POS entegrasyon referansı.
+since: 0.12.0
+---
+
+Tosla İşim, Akbank'ın ödeme kuruluşu AKÖde'nin sanal POS'udur. Her istek `base64(SHA-512(apiPass + clientId + apiUser + Rnd + timeSpan))` ile imzalanır; `timeSpan` Türkiye saatidir (`yyyyMMddHHmmss`).
+
+<Callout type="warn">
+  Henüz bir test üye işyeriyle doğrulanmadı: Tosla test üye işyerini talep üzerine veriyor ve herkese açık bir test üye işyeri yok. Test sunucusu (`prepentegrasyon.tosla.com`) uydurma bir üye işyeriyle tüm servislere bu sağlayıcının okuduğu biçimde cevap verdi: sağlayıcının imzaladığı istekler üye işyeri kontrolüne kadar ulaşıyor (`202`, üye işyeri kullanıcısı bulunamadı); Türkiye saati yerine UTC ile gönderilen bir `timeSpan` ise `998` (doğrulama hatası) ile reddediliyor. Canlıya geçmeden önce küçük bir tutarla deneyin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, tosla } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    tosla: tosla({
+      clientId: process.env.TOSLA_CLIENT_ID!,
+      apiUser: process.env.TOSLA_API_USER!,
+      apiPass: process.env.TOSLA_API_PASS!,
+      // baseUrl: defaults from mode (prepentegrasyon.tosla.com / entegrasyon.tosla.com)
+    }),
+  },
+});
+```
+
+`clientId`, `apiUser` ve `apiPass`, Tosla İşim panelindeki API kullanıcı bilgilerinden alınır.
+
+`paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+## 3D Secure [#3d-secure]
+
+Tosla kartlı ödemeleri 3D Secure ile işler; `createPayment()` `NOT_SUPPORTED` hatası verir.
+
+```typescript
+const init = await payment.tosla.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/tosla/payment/complete-3ds',
+});
+// init.threeDSHtmlContent posts the card to Tosla's card form, which runs 3D Secure
+```
+
+`initThreeDSPayment()` sipariş için bir oturum açar (`threeDPayment`, tutar kuruş cinsinden); dönen sayfa kartı müşterinin tarayıcısından `ProcessCardForm` adresine gönderir. Tosla sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.tosla.completeThreeDSPayment(callbackBody);
+// or, when the callback carries no order id: { ...callbackBody, orderId, amount }
+```
+
+Callback imzalı değildir, bu yüzden yalnızca sipariş numarası kullanılır. Sonuç bir `inquiry` sorgusundan gelir:
+
+- reddedildiğini bildiren bir callback, bankanın koduyla ve numara taşımadan başarısız olur;
+- aksi halde sipariş Tosla'da sorgulanır. Ödeme ancak Tosla'da o sipariş numarası için onaylı (`BankResponseCode` `00`) ve iade edilmemiş bir ödeme varsa, `amount` verdiyseniz o tutarda ise `success` olur;
+- Tosla'nın doğrulamadığı bir ödemeyi bildiren callback `INVALID_HASH` olarak reddedilir.
+
+## İade, iptal ve durum [#refund-cancel--status]
+
+```typescript
+await payment.tosla.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // refund
+await payment.tosla.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // void
+const status = await payment.tosla.getPayment('ORDER123');                                          // inquiry
+// status: 'success', 'cancelled' (refunded), 'failure' (declined or unknown order)
+```
+
+`cancel()` ödemeyi aynı gün iptal eder; sonrasında `refund()` kullanın (tam veya kısmi). Kısmen de olsa iade edilmiş bir ödeme `cancelled` olur.
+
+## BIN ve taksit [#bin--installments]
+
+```typescript
+const bin = await payment.tosla.binCheck('540667');
+const options = await payment.tosla.installmentInfo({ binNumber: '540667', price: '100.00' });
+// options.installmentDetails[0].installmentPrices: counts your account allows, with their rates
+```
+
+İkisi de `GetCommissionAndInstallmentInfo` kullanır: kartın bankasını ve tipini, hesabınızın izin verdiği her taksit sayısının komisyon oranını (`T1`, `T2`, ...) döndürür. Her toplam kendi oranını ekler (`commissionRate`); seçilen toplamı `paidPrice`, taksit sayısını `installment` olarak gönderin.

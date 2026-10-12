@@ -16,6 +16,7 @@ export enum ProviderType {
   PARAMPOS = 'parampos',
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
+  TOSLA = 'tosla',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -135,6 +136,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SIPAY]: {
     sandbox: 'https://provisioning.sipay.com.tr',
     production: 'https://app.sipay.com.tr',
+  },
+  [ProviderType.TOSLA]: {
+    sandbox: 'https://prepentegrasyon.tosla.com',
+    production: 'https://entegrasyon.tosla.com',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {
