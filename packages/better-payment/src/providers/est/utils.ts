@@ -8,13 +8,7 @@ import { buildXmlFields, unescapeXml, type XmlValue } from '../parampos/utils';
  * default URLs are in `PROVIDER_DEFAULT_URLS`.
  */
 export type EstBank =
-  | 'isbank'
-  | 'ziraat'
-  | 'halkbank'
-  | 'teb'
-  | 'sekerbank'
-  | 'akbankest'
-  | 'halkbankmkd';
+  'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd';
 
 export const EST_ENDPOINTS = {
   /** 3D Secure form target (customer's browser) */
