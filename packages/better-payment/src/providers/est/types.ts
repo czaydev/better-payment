@@ -1,5 +1,5 @@
 import type { PaymentProviderConfig } from '../../core/PaymentProvider';
-import type { EstBank, EstStoreType } from './utils';
+import type { EstBank, EstGirogateMethod, EstStoreType } from './utils';
 
 /**
  * EST (Asseco) virtual POS configuration: İş Bankası, Ziraat Bankası,
@@ -28,6 +28,23 @@ export interface EstConfig extends PaymentProviderConfig {
    * liability with the merchant.
    */
   acceptedMdStatuses?: string[];
+}
+
+/**
+ * A Girogate payment (alternative payment method) instead of a card, for
+ * `initThreeDSPayment()` with the 3d_pay or 3d_pay_hosting store type
+ */
+export interface EstGirogateRequest {
+  /** Payment method, e.g. 'IDEAL', 'SOFORT', 'P24' (`EST_GIROGATE_METHODS`) */
+  method: EstGirogateMethod;
+  /** Customer's country, ISO 3166 alpha-2 (e.g. 'NL') */
+  country: string;
+  /** Default: `buyer.email` (P24, Zimpler and the Asian methods) */
+  email?: string;
+  /** Default: `buyer.gsmNumber` (giropay, Dragonpay, eNETS, SingPost, Thai banks) */
+  phone?: string;
+  /** Default: `buyer.id` (Entercash, Trustly, AstroPay) */
+  consumerId?: string;
 }
 
 /**

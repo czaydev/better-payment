@@ -113,6 +113,8 @@ describe('EST utils', () => {
       expect(getEstCurrencyCode('usd')).toBe('840');
       expect(getEstCurrencyCode('EUR')).toBe('978');
       expect(getEstCurrencyCode('GBP')).toBe('826');
+      expect(getEstCurrencyCode('pln')).toBe('985');
+      expect(getEstCurrencyCode('SEK')).toBe('752');
     });
 
     it('rejects unsupported currencies instead of falling back to TRY', () => {

@@ -29,6 +29,7 @@ import {
   EST_STORE_TYPES,
   type EstBank,
   type EstStoreType,
+  buildEstGirogateFields,
   type EstXmlResponse,
   isEstHostedStoreType,
   isEstMerchantChargedStoreType,
@@ -44,7 +45,7 @@ import {
   parseEstXmlResponse,
   isEstApproved,
 } from './utils';
-import type { EstConfig, Est3DCallbackData } from './types';
+import type { EstConfig, Est3DCallbackData, EstGirogateRequest } from './types';
 
 function escapeHtml(value: string): string {
   return value
@@ -198,15 +199,21 @@ export class Est extends PaymentProvider<EstConfig> {
   /**
    * 3D Secure payment: an auto-submitting form to the bank's 3D gate, signed
    * with hash ver3. With storetype 3d_pay_hosting / 3d_host the bank collects
-   * the card on its own page, so no card data is sent.
+   * the card on its own page, so no card data is sent. With `girogate` the
+   * customer pays with an alternative payment method (iDEAL, Sofort, ...)
+   * instead of a card.
    */
   async initThreeDSPayment(
-    request: ThreeDSPaymentRequest & { failUrl?: string }
+    request: ThreeDSPaymentRequest & { failUrl?: string; girogate?: EstGirogateRequest }
   ): Promise<ThreeDSInitResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
+      const { girogate } = request;
+      if (girogate && isEstMerchantChargedStoreType(this.storeType)) {
+        throw new ValidationError('Girogate needs the 3d_pay or 3d_pay_hosting store type');
+      }
       const hosted = isEstHostedStoreType(this.storeType);
-      const rules: PaymentValidationRules = hosted ? {} : { card: true };
+      const rules: PaymentValidationRules = hosted || girogate ? {} : { card: true };
       this.validatePayment(request, rules);
       if (!request.callbackUrl) {
         throw new ValidationError('callbackUrl is required for 3D Secure payments');
@@ -228,7 +235,18 @@ export class Est extends PaymentProvider<EstConfig> {
         refreshTime: '0',
       };
       if (request.buyer?.email) fields.Email = request.buyer.email;
-      if (!hosted) {
+      if (girogate) {
+        Object.assign(
+          fields,
+          buildEstGirogateFields({
+            method: girogate.method,
+            country: girogate.country,
+            email: girogate.email ?? request.buyer?.email,
+            phone: girogate.phone ?? request.buyer?.gsmNumber,
+            consumerId: girogate.consumerId ?? request.buyer?.id,
+          })
+        );
+      } else if (!hosted) {
         const card = this.cardOf(request);
         const cardNumber = card.cardNumber.replace(/\s/g, '');
         const expiry = formatEstExpiry(card.expireMonth, card.expireYear);
@@ -344,6 +362,18 @@ export class Est extends PaymentProvider<EstConfig> {
           paymentId: orderId,
           conversationId: orderId,
           rawResponse: { callback: callbackData, payment: fields },
+        });
+      }
+
+      // A Girogate method that settles later (bank transfer, voucher): the hash is
+      // valid but nothing is paid yet; check the order later with getPayment()
+      if ((callbackData.Response || '').toUpperCase() === 'PENDING') {
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          paymentId: orderId,
+          conversationId: orderId,
+          errorMessage: callbackData.ErrMsg || 'Waiting for the payment method to confirm',
+          rawResponse: callbackData,
         });
       }
 

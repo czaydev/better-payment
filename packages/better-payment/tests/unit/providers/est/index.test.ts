@@ -395,6 +395,134 @@ describe('EST provider', () => {
     });
   });
 
+  describe('Girogate', () => {
+    beforeEach(() => {
+      provider = create({ storeType: '3d_pay' });
+    });
+
+    const { paymentCard: _card, ...withoutCard } = mockThreeDSPaymentRequest;
+
+    it('sends the method and country instead of card data, covered by the hash', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        currency: 'EUR',
+        conversationId: 'ORDERGG',
+        girogate: { method: 'IDEAL', country: 'nl' },
+      });
+
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      const fields = formFields(result.threeDSHtmlContent!);
+      expect(fields).toMatchObject({
+        storetype: '3d_pay',
+        paymentType: 'GIROGATE_IDEAL',
+        ccode: 'NL',
+        currency: '978',
+        oid: 'ORDERGG',
+      });
+      expect(fields).not.toHaveProperty('pan');
+      expect(fields).not.toHaveProperty('cv2');
+      expect(fields).not.toHaveProperty('girogateemail');
+      const { hash, ...signedFields } = fields;
+      expect(hash).toBe(await createEstHash(signedFields, EST_TEST.storeKey));
+    });
+
+    it.each([
+      ['P24', { girogateemail: 'john@example.com' }],
+      ['TRUSTLY', { girogateconsumerid: 'BY789' }],
+      ['GIROPAY', { girogatemobile: '+905350000000' }],
+      ['DRAGONPAY', { girogateemail: 'john@example.com', girogatephone: '+905350000000' }],
+    ] as const)('adds the customer fields %s needs, from the buyer', async (method, expected) => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        buyer: { ...withoutCard.buyer, email: 'john@example.com' },
+        girogate: { method, country: 'PL' },
+      });
+      const fields = formFields(result.threeDSHtmlContent!);
+      expect(fields).toMatchObject(expected);
+      const { hash, ...signedFields } = fields;
+      expect(hash).toBe(await createEstHash(signedFields, EST_TEST.storeKey));
+    });
+
+    it('prefers the customer fields given in the request', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        girogate: { method: 'P24', country: 'PL', email: 'other@example.com' },
+      });
+      expect(formFields(result.threeDSHtmlContent!).girogateemail).toBe('other@example.com');
+    });
+
+    it.each([
+      [{ method: 'NOPE' as any, country: 'NL' }, /Unknown Girogate method/],
+      [{ method: 'IDEAL', country: 'Netherlands' }, /two-letter/],
+    ] as const)('rejects an invalid request', async (girogate, message) => {
+      const result = await provider.initThreeDSPayment({ ...withoutCard, girogate });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.code).toBe(PaymentErrorCode.INVALID_REQUEST);
+      expect(result.errorMessage).toMatch(message);
+    });
+
+    it('requires the customer field a method needs', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        buyer: { ...withoutCard.buyer, email: '' },
+        girogate: { method: 'ZIMPLER', country: 'SE' },
+      });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorMessage).toMatch(/email/);
+    });
+
+    it('needs a store type where the bank charges', async () => {
+      const result = await create({ storeType: '3d' }).initThreeDSPayment({
+        ...withoutCard,
+        girogate: { method: 'IDEAL', country: 'NL' },
+      });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorMessage).toMatch(/3d_pay/);
+    });
+
+    it('returns pending with the order id for a signed Pending callback', async () => {
+      const result = await provider.completeThreeDSPayment(
+        await signed({
+          ...EST_3DPAY_CALLBACK,
+          Response: 'Pending',
+          ProcReturnCode: '',
+          paymentType: 'GIROGATE_SEPA',
+          ccode: 'DE',
+        })
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.paymentId).toBe('ORDERPAY');
+    });
+
+    it('rejects an unsigned Pending callback', async () => {
+      const result = await provider.completeThreeDSPayment({
+        ...EST_3DPAY_CALLBACK,
+        Response: 'Pending',
+      });
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expectNoIds(result);
+    });
+
+    // Shaped like the test environment's answer for a store without Girogate
+    it('fails without ids when the store has no Girogate', async () => {
+      const result = await provider.completeThreeDSPayment(
+        await signed({
+          ...EST_3DPAY_CALLBACK,
+          Response: 'Declined',
+          ProcReturnCode: '99',
+          ErrMsg: 'Not a girogate merchant: ',
+          paymentType: 'GIROGATE_IDEAL',
+          ccode: 'NL',
+        })
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('99');
+      expectNoIds(result);
+    });
+  });
+
   describe('refund, cancel, getPayment', () => {
     it('refunds with Credit', async () => {
       post.mockResolvedValue({ data: EST_APPROVED_XML });
