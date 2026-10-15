@@ -34,8 +34,8 @@ import {
 } from './validation';
 
 /**
- * Tüm provider'larda ortak olan yapılandırma alanları.
- * Kimlik bilgileri her provider'ın kendi config tipinde tanımlanır.
+ * Configuration fields shared by all providers.
+ * Credentials are defined in each provider's own configuration type.
  */
 export interface PaymentProviderConfig {
   baseUrl?: string;
@@ -52,7 +52,7 @@ export interface PaymentProviderConfig {
 }
 
 /**
- * Tüm ödeme sağlayıcıları için temel abstract sınıf
+ * Abstract base class for all payment providers
  */
 export abstract class PaymentProvider<
   TConfig extends PaymentProviderConfig = PaymentProviderConfig,
@@ -68,7 +68,7 @@ export abstract class PaymentProvider<
   }
 
   /**
-   * Yapılandırmayı doğrula. Provider'lar kendi zorunlu alanlarını kontrol eder.
+   * Validate the configuration. Each provider checks its own required fields.
    */
   protected validateConfig(): void {}
 
@@ -111,32 +111,32 @@ export abstract class PaymentProvider<
   }
 
   /**
-   * Direkt ödeme (3D Secure olmadan)
+   * Direct payment (without 3D Secure)
    */
   abstract createPayment(request: PaymentRequest): Promise<PaymentResponse>;
 
   /**
-   * 3D Secure ödeme başlat
+   * Initialize a 3D Secure payment
    */
   abstract initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse>;
 
   /**
-   * 3D Secure ödeme tamamla (callback'ten sonra)
+   * Complete a 3D Secure payment (after the callback)
    */
   abstract completeThreeDSPayment(callbackData: unknown): Promise<PaymentResponse>;
 
   /**
-   * İade işlemi
+   * Refund a payment
    */
   abstract refund(request: RefundRequest): Promise<RefundResponse>;
 
   /**
-   * İptal işlemi
+   * Cancel a payment
    */
   abstract cancel(request: CancelRequest): Promise<CancelResponse>;
 
   /**
-   * Ödeme sorgulama
+   * Query a payment
    */
   abstract getPayment(paymentId: string): Promise<PaymentResponse>;
 
@@ -228,14 +228,14 @@ export abstract class PaymentProvider<
   }
 
   /**
-   * BIN sorgulama
+   * Look up a BIN
    */
   async binCheck(_binNumber: string): Promise<BinCheckResponse> {
     throw new BetterPaymentError('BIN check is not supported by this provider', 'NOT_SUPPORTED');
   }
 
   /**
-   * Taksit sorgulama
+   * Query installment options
    */
   async installmentInfo(_request: InstallmentInfoRequest): Promise<InstallmentInfoResponse> {
     throw new BetterPaymentError(

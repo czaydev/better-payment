@@ -7,6 +7,12 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
   Sürüm geçmişi sıfırlandı. `0.0.1`, yeniden yazılan paketin ilk sürümüdür. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bunları kullanmayın. Gerekçe ve adım adım geçiş rehberi için [0.0.1'deki yenilikler](/docs/whats-new) sayfasına bakın.
 </Callout>
 
+## 0.11.1
+
+### Düzeltilenler [#fixed]
+
+- **[Parampos hata kodları](/docs/reference/error-codes#what-is-mapped):** başarısız Parampos ödemeleri artık `UNKNOWN` yerine belirli bir `code` döndürüyor (önce bankanın `Banka_Sonuc_Kod` alanı, sonra Param'ın `Sonuc` kodu). Tablo `PARAMPOS_ERROR_CODES` olarak dışa açılır.
+
 ## 0.11.0
 
 ### Eklenenler [#added]
@@ -28,13 +34,13 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
 
 - Handler yanıtları `exposeRawResponse: true` verilmedikçe sağlayıcının `rawResponse` alanını içermez; `idempotency.scope` farklı çağıranların Idempotency-Key yanıtlarını birbirinden ayırır.
 
-### Düzeltilenler [#fixed]
+### Düzeltilenler [#fixed-1]
 
 - `buyer.email` doğrulaması boş alan adı bölümlerini reddeder ve artık geri izleme yapan bir düzenli ifade kullanmaz.
 
 ## 0.8.1
 
-### Düzeltilenler [#fixed-1]
+### Düzeltilenler [#fixed-2]
 
 - Framework adapter'ları 1 MiB'tan büyük istek gövdelerini belleğe okumak yerine 413 ile yanıtlar; sınırı `maxBodySize` ile değiştirebilirsiniz.
 - Akbank: 3D Secure callback'leri sipariş geçmişi sorgusuyla doğrulanır; Akbank'taki sipariş kaydıyla eşleşmeyen callback reddedilir.

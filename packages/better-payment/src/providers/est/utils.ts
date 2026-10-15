@@ -7,7 +7,8 @@ import { buildXmlFields, unescapeXml, type XmlValue } from '../parampos/utils';
  * Banks on the EST platform. Each is also a provider id (`ProviderType`) whose
  * default URLs are in `PROVIDER_DEFAULT_URLS`.
  */
-export type EstBank = 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank';
+export type EstBank =
+  'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd';
 
 export const EST_ENDPOINTS = {
   /** 3D Secure form target (customer's browser) */
@@ -123,12 +124,131 @@ export function getEstCurrencyCode(currency: string | undefined): string {
     USD: '840',
     EUR: '978',
     GBP: '826',
+    // Currencies of the Girogate payment methods
+    AUD: '036',
+    BRL: '986',
+    CAD: '124',
+    CHF: '756',
+    CNY: '156',
+    CZK: '203',
+    DKK: '208',
+    NOK: '578',
+    NZD: '554',
+    PHP: '608',
+    PLN: '985',
+    SEK: '752',
+    SGD: '702',
+    THB: '764',
+    // Macedonian denar, for Halkbank Macedonia
+    MKD: '807',
   };
   const code = map[(currency || 'TRY').toUpperCase()];
   if (!code) {
     throw new ValidationError(`Currency ${currency} is not supported by EST`);
   }
   return code;
+}
+
+/**
+ * Girogate payment methods (alternative payments through the EST gate, enabled per
+ * store by the bank). Sent as `paymentType` GIROGATE_<method>.
+ */
+export const EST_GIROGATE_METHODS = [
+  'EPS',
+  'GIROPAY',
+  'IDEAL',
+  'ALIPAY',
+  'MYBANK',
+  'ENTERCASH',
+  'BANCONTACT',
+  'SOFORT',
+  'MULTIBANCO',
+  'SAFETYPAY',
+  'P24',
+  'BOLETO',
+  'FINNISHONLINEBANKING',
+  'SEPA',
+  'WECHATPAY',
+  'SINGPOST',
+  'DRAGONPAY',
+  'ENETS',
+  'PAYU',
+  'POLI',
+  'TRUSTLY',
+  'ASTROPAYCARD',
+  'ZIMPLER',
+  'ASTROPAYDIRECT',
+  'KRUNGTHAIBANK',
+  'KRUNGSIBANK',
+  'SIAMCOMMERCIALBANK',
+  'BANGKOKBANK',
+] as const;
+
+export type EstGirogateMethod = (typeof EST_GIROGATE_METHODS)[number];
+
+/** Customer fields each Girogate method needs, besides the country */
+const GIROGATE_CUSTOMER_FIELDS: Partial<
+  Record<EstGirogateMethod, ('email' | 'phone' | 'mobile' | 'consumerId')[]>
+> = {
+  P24: ['email'],
+  ZIMPLER: ['email'],
+  ENTERCASH: ['consumerId'],
+  TRUSTLY: ['consumerId'],
+  ASTROPAYCARD: ['consumerId'],
+  ASTROPAYDIRECT: ['consumerId'],
+  GIROPAY: ['mobile'],
+  DRAGONPAY: ['email', 'phone'],
+  ENETS: ['email', 'phone'],
+  SINGPOST: ['email', 'phone'],
+  KRUNGTHAIBANK: ['email', 'phone'],
+  KRUNGSIBANK: ['email', 'phone'],
+  SIAMCOMMERCIALBANK: ['email', 'phone'],
+  BANGKOKBANK: ['email', 'phone'],
+};
+
+/**
+ * Form fields of a Girogate payment: `paymentType`, `ccode` and the customer fields
+ * the method needs (`girogateemail`, `girogatephone`, `girogatemobile`,
+ * `girogateconsumerid`). They are covered by the hash like every other field.
+ */
+export function buildEstGirogateFields(options: {
+  method: string;
+  country: string;
+  email?: string;
+  phone?: string;
+  consumerId?: string;
+}): Record<string, string> {
+  const method = options.method.toUpperCase().replace(/^GIROGATE_/, '') as EstGirogateMethod;
+  if (!EST_GIROGATE_METHODS.includes(method)) {
+    throw new ValidationError(`Unknown Girogate method: ${options.method}`);
+  }
+  const country = (options.country || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(country)) {
+    throw new ValidationError('Girogate country must be a two-letter ISO 3166 code');
+  }
+  const fields: Record<string, string> = { paymentType: `GIROGATE_${method}`, ccode: country };
+  const values = {
+    email: options.email,
+    phone: options.phone,
+    mobile: options.phone,
+    consumerId: options.consumerId,
+  };
+  const names = {
+    email: 'girogateemail',
+    phone: 'girogatephone',
+    mobile: 'girogatemobile',
+    consumerId: 'girogateconsumerid',
+  };
+  for (const key of GIROGATE_CUSTOMER_FIELDS[method] ?? []) {
+    const value = values[key];
+    if (!value) {
+      throw new ValidationError(
+        `Girogate ${method} needs the customer's ${key === 'mobile' ? 'phone' : key}`
+      );
+    }
+    fields[names[key]] = value;
+  }
+  return fields;
 }
 
 /** `taksit`: empty for a single payment */

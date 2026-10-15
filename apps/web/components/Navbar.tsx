@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, type Locale } from "@/lib/i18n/config";
 import { switchLocale, switchLocalePath } from "@/lib/i18n/switch";
+import { withBasePath } from "@/lib/base-path";
 
 // Homepage sections are reached by scrolling, without a #hash in the address bar
 export const SCROLL_TARGET_KEY = "bp-scroll-to";
@@ -98,7 +99,7 @@ export default function Navbar({
         {/* Logo */}
         <Link href={localePath(lang, "/")} className="flex items-center gap-2.5 group">
           <Image
-            src="/brand/better-payment-horizontal-color.svg"
+            src={withBasePath("/brand/better-payment-horizontal-color.svg")}
             width={1226}
             height={155}
             alt="Better Payment"
@@ -106,7 +107,7 @@ export default function Navbar({
             className="h-6 w-auto dark:hidden"
           />
           <Image
-            src="/brand/better-payment-horizontal-dark.svg"
+            src={withBasePath("/brand/better-payment-horizontal-dark.svg")}
             width={1226}
             height={155}
             alt="Better Payment"

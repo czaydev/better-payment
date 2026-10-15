@@ -16,6 +16,7 @@ export enum ProviderType {
   PARAMPOS = 'parampos',
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
+  ALBARAKA = 'albaraka',
   STRIPE = 'stripe',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
@@ -23,6 +24,14 @@ export enum ProviderType {
   HALKBANK = 'halkbank',
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
+  /** Akbank's older EST virtual POS (the `akbank` provider is its JSON API) */
+  AKBANKEST = 'akbankest',
+  /** Halkbank Macedonia (Halk Banka AD Skopje) */
+  HALKBANKMKD = 'halkbankmkd',
+  DENIZBANK = 'denizbank',
+  VAKIFBANK = 'vakifbank',
+  YAPIKREDI = 'yapikredi',
+  QNB = 'qnb',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -137,6 +146,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
     sandbox: 'https://provisioning.sipay.com.tr',
     production: 'https://app.sipay.com.tr',
   },
+  [ProviderType.ALBARAKA]: {
+    sandbox: 'https://epostest.albarakaturk.com.tr',
+    production: 'https://epos.albarakaturk.com.tr',
+  },
   [ProviderType.STRIPE]: {
     // One host; the API key selects test or live mode
     sandbox: 'https://api.stripe.com',
@@ -162,6 +175,30 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SEKERBANK]: {
     sandbox: 'https://entegrasyon.asseco-see.com.tr',
     production: 'https://sanalpos.sekerbank.com.tr',
+  },
+  [ProviderType.AKBANKEST]: {
+    sandbox: 'https://entegrasyon.asseco-see.com.tr',
+    production: 'https://www.sanalakpos.com',
+  },
+  [ProviderType.HALKBANKMKD]: {
+    sandbox: 'https://entegrasyon.asseco-see.com.tr',
+    production: 'https://epay.halkbank.mk',
+  },
+  [ProviderType.DENIZBANK]: {
+    sandbox: 'https://test.inter-vpos.com.tr',
+    production: 'https://inter-vpos.com.tr',
+  },
+  [ProviderType.VAKIFBANK]: {
+    sandbox: 'https://onlineodemetest.vakifbank.com.tr:4443',
+    production: 'https://onlineodeme.vakifbank.com.tr:4443',
+  },
+  [ProviderType.YAPIKREDI]: {
+    sandbox: 'https://setmpos.ykb.com',
+    production: 'https://posnet.yapikredi.com.tr',
+  },
+  [ProviderType.QNB]: {
+    sandbox: 'https://vpostest.qnb.com.tr',
+    production: 'https://vpos.qnb.com.tr',
   },
 };
 

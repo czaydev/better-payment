@@ -1,0 +1,85 @@
+---
+title: VakıfBank
+description: VakıfBank sanal POS (VPOS 7/24) entegrasyon referansı.
+since: 0.12.0
+---
+
+VakıfBank VPOS 7/24'ü kullanır. 3D Secure iki adımda çalışır: kart VakıfBank MPI'ına kaydedilir, müşteri kartı veren bankanın ACS sayfasında doğrulama yapar ve ödeme VPOS'ta `MpiTransactionId` ile onaylanır. VPOS kartı, tutarı ve 3D Secure sonucunu kendi MPI kaydından okur.
+
+<Callout type="warn">
+  VakıfBank sağlayıcısı henüz bir test mağazasıyla doğrulanmadı: test MPI, VPOS ve sorgu servislerinde yalnızca istek formatları kontrol edildi. 3D Secure, VakıfBank'ın 3DS ürünüyle çalışır; üye işyeriniz için 3DS'in aktifleştirilmesini VakıfBank'tan isteyin. Canlıya geçmeden önce küçük bir tutarla test edin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, vakifbank } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    vakifbank: vakifbank({
+      merchantId: process.env.VAKIFBANK_MERCHANT_ID!, // 15 digits
+      password: process.env.VAKIFBANK_API_PASSWORD!,
+      terminalNo: process.env.VAKIFBANK_TERMINAL_NO!,
+      // testMode: defaults to mode === 'sandbox' (test MPI)
+      // baseUrl: defaults from mode (onlineodemetest / onlineodeme.vakifbank.com.tr:4443)
+    }),
+  },
+});
+```
+
+`paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara. En fazla 40 harf, rakam, `-` veya `_` içerebilir ve MPI kayıt numarası olarak da kullanıldığı için her ödeme denemesinde yeni olmalıdır.
+
+<Callout type="info">
+  VPOS test sunucusu ara sertifikasını göndermiyor. DigiCert EV RSA CA G2 sertifikası `NODE_EXTRA_CA_CERTS` ile eklenmedikçe Node.js bu sunucuyu reddeder. Canlı ortam sunucusu bundan etkilenmez.
+</Callout>
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.vakifbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// VPOS Sale; success when ResultCode is 0000
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.vakifbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/vakifbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent sends the customer to the card issuer's ACS
+```
+
+Yalnızca 3D Secure'a kayıtlı kartlarla devam edilir. VakıfBank MPI'ı ardından sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.vakifbank.completeThreeDSPayment(callbackBody);
+```
+
+Callback imzalı değildir, bu yüzden değerleri tahsilatta hiç kullanılmaz:
+
+- yalnızca `Status` `Y` (tam doğrulanmış) olan ödeme tahsil edilir; diğer durumlar başarısız olur;
+- ödeme `MpiTransactionId` ile, kart ve tutar alanları olmadan onaylanır; VPOS bunları MPI kaydından alır ve 3D Secure sonucunu kendisi kontrol eder;
+- başka bir üye işyerine ait callback `INVALID_HASH` olarak reddedilir.
+
+`paymentId` ve `conversationId` yalnızca VPOS'un onayladığı bir ödemede doldurulur.
+
+## İade, iptal ve durum sorgusu [#refund-cancel--status]
+
+```typescript
+await payment.vakifbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.vakifbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+// getPayment() throws NOT_SUPPORTED, see below
+```
+
+Satış tutarından düşük bir iade kısmi iadedir; birden fazla kısmi iade toplamda satış tutarına ulaşabilir. `cancel()` gün sonundan önce çalışır.
+
+<Callout type="warn">
+  VakıfBank için `getPayment()` desteklenmez ve `NOT_SUPPORTED` fırlatır. VakıfBank'ın sipariş numarasıyla kayıt araması siparişin onaylı satışını döndürür, ancak sipariş numarası taşımayan iptal ve iade kayıtlarını döndürmez; bu yüzden ödenmiş bir siparişin sonradan iptal veya iade edilip edilmediğini söyleyemez. Ödemenin durumunu `cancel()` ve `refund()` sonuçlarına göre kendi kayıtlarınızda tutun; zaman aşımından sonra siparişi VakıfBank üye işyeri panelinden kontrol edin.
+</Callout>
+
+<Callout type="info">
+  VakıfBank için BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır. Ödeme isteğinde `installment` gönderin ve `paidPrice` değerini anlaşmalı oranlarınızdan hesaplayın.
+</Callout>
