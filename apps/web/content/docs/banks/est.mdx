@@ -126,8 +126,12 @@ AstroPay. Override them in `girogate` (`email`, `phone`, `consumerId`). They are
 Use the currency the method works in (EUR for iDEAL, PLN for Przelewy24, SEK for Trustly in Sweden and so on).
 
 The callback is completed like `3d_pay`: an approved payment is confirmed with an order status query.
-A method that settles later (a bank transfer or voucher) can come back as `Response: Pending`; it is
-returned as `pending` with the order id, so check it later with `getPayment()`.
+A method that settles later (a bank transfer or voucher) can come back as `Response: Pending`. The
+ver3 hash covers the values but not their field names, so the callback alone cannot tell which order
+is pending. Pass the order from your records, `completeThreeDSPayment({ ...callbackBody, orderId })`:
+when it matches, the result is `pending` with the order id, and you check it later with
+`getPayment()`. Without `orderId` the result is `pending` without ids, and a callback for another
+order is rejected as `INVALID_HASH`.
 
 <Callout type="warn">
   Checked on the shared EST test environment, whose test store has no Girogate: the gate accepted the form and its hash (including the customer fields) and answered `Not a girogate merchant`, which comes back as a failure. A Girogate payment has not been run end to end.

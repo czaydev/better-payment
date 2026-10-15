@@ -304,7 +304,9 @@ export class Est extends PaymentProvider<EstConfig> {
    * confirmed, and on a timeout after the bank was reached for this order;
    * a failure never carries ids taken from the callback.
    */
-  async completeThreeDSPayment(callbackData: Est3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackBody: Est3DCallbackData & { orderId?: string }
+  ): Promise<PaymentResponse> {
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -313,7 +315,9 @@ export class Est extends PaymentProvider<EstConfig> {
         rawResponse,
       });
 
-    if (!(await verifyEstCallback(callbackData ?? {}, this.config.storeKey))) {
+    // `orderId` is the order from your records, not part of the bank's POST
+    const { orderId: expectedOrderId, ...callbackData } = callbackBody ?? {};
+    if (!(await verifyEstCallback(callbackData, this.config.storeKey))) {
       return untrusted('Invalid 3D Secure callback hash', callbackData);
     }
     const orderId = callbackData.oid;
@@ -365,13 +369,17 @@ export class Est extends PaymentProvider<EstConfig> {
         });
       }
 
-      // A Girogate method that settles later (bank transfer, voucher): the hash is
-      // valid but nothing is paid yet; check the order later with getPayment()
+      // A Girogate method that settles later (bank transfer, voucher): nothing is
+      // paid yet. The ver3 hash covers the values but not their field names, so
+      // the callback alone cannot tell which order is pending: the order id is
+      // returned only when it matches the order from your records (`orderId`).
       if ((callbackData.Response || '').toUpperCase() === 'PENDING') {
+        if (expectedOrderId !== undefined && expectedOrderId !== orderId) {
+          return untrusted('Callback belongs to a different order', callbackData);
+        }
         return this.withErrorCode({
           status: PaymentStatus.PENDING,
-          paymentId: orderId,
-          conversationId: orderId,
+          ...(expectedOrderId !== undefined ? { paymentId: orderId, conversationId: orderId } : {}),
           errorMessage: callbackData.ErrMsg || 'Waiting for the payment method to confirm',
           rawResponse: callbackData,
         });

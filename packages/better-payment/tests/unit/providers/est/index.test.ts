@@ -3,7 +3,11 @@ import { HttpError } from '../../../../src/core/http';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { Est, est, estOrderStatus, isEstCapturedSale } from '../../../../src/providers/est';
-import { createEstHash, parseEstXmlResponse } from '../../../../src/providers/est/utils';
+import {
+  createEstHash,
+  parseEstXmlResponse,
+  verifyEstCallback,
+} from '../../../../src/providers/est/utils';
 import { PaymentStatus } from '../../../../src/types';
 import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../../fixtures/payment-data';
 import {
@@ -480,19 +484,64 @@ describe('EST provider', () => {
       expect(result.errorMessage).toMatch(/3d_pay/);
     });
 
-    it('returns pending with the order id for a signed Pending callback', async () => {
-      const result = await provider.completeThreeDSPayment(
-        await signed({
-          ...EST_3DPAY_CALLBACK,
-          Response: 'Pending',
-          ProcReturnCode: '',
-          paymentType: 'GIROGATE_SEPA',
-          ccode: 'DE',
-        })
-      );
+    // A Pending callback as the bank signs it, with one more echoed field (`oie`) that
+    // holds another order's id
+    const pendingCallback = () =>
+      signed({
+        ...EST_3DPAY_CALLBACK,
+        Response: 'Pending',
+        ProcReturnCode: '',
+        paymentType: 'GIROGATE_SEPA',
+        ccode: 'DE',
+        oie: 'ORDEROTHER',
+      });
+
+    it('returns pending with the order id when it matches your records', async () => {
+      const result = await provider.completeThreeDSPayment({
+        ...(await pendingCallback()),
+        orderId: 'ORDERPAY',
+      });
       expect(post).not.toHaveBeenCalled();
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.paymentId).toBe('ORDERPAY');
+      expect(result.conversationId).toBe('ORDERPAY');
+    });
+
+    it('returns pending without ids when the order is not given', async () => {
+      const result = await provider.completeThreeDSPayment(await pendingCallback());
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expectNoIds(result);
+    });
+
+    // The ver3 hash covers the sorted values, not their names: renaming the fields
+    // keeps the signed sequence (ORDERPAY, ORDEROTHER) and the HASH, but makes `oid`
+    // another order. Such a callback must not attach a pending result to that order.
+    it('does not attach a relabelled Pending callback to another order', async () => {
+      const { oid: _oid, oie, ...rest } = await pendingCallback();
+      const relabelled = { ...rest, oic: 'ORDERPAY', oid: oie };
+      expect(await verifyEstCallback(relabelled, EST_TEST.storeKey)).toBe(true);
+
+      const unbound = await provider.completeThreeDSPayment(relabelled);
+      expect(unbound.status).toBe(PaymentStatus.PENDING);
+      expectNoIds(unbound);
+
+      const mismatched = await provider.completeThreeDSPayment({
+        ...relabelled,
+        orderId: 'ORDERPAY',
+      });
+      expect(mismatched.status).toBe(PaymentStatus.FAILURE);
+      expect(mismatched.errorCode).toBe('INVALID_HASH');
+      expectNoIds(mismatched);
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    it('does not let orderId change the signed fields', async () => {
+      post.mockResolvedValue({ data: estOrderStatusXml() });
+      const result = await provider.completeThreeDSPayment({
+        ...EST_3DPAY_CALLBACK,
+        orderId: 'ORDERPAY',
+      });
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
     });
 
     it('rejects an unsigned Pending callback', async () => {
