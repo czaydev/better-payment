@@ -4,8 +4,8 @@ import type { PaymentProviderConfig } from '../../core/PaymentProvider';
  * Kuveyt Türk Sanal POS (KT Pay Gate) configuration
  *
  * Values come from the Kuveyt Türk corporate panel (kurumsal.kuveytturk.com.tr):
- * - merchantId: Sanal POS mağaza numarası
- * - customerId: Müşteri (hesap) numarası
+ * - merchantId: Virtual POS merchant ID
+ * - customerId: Customer (account) ID
  * - username / password: the API role user (Yönetim - Kullanıcı İşlemleri)
  */
 export interface KuveytTurkConfig extends PaymentProviderConfig {

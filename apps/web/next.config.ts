@@ -17,17 +17,42 @@ const movedDocs: Record<string, string> = {
   "guides/changelog": "reference/changelog",
 };
 
+/**
+ * Beta docs: the `beta` branch is a second Vercel project, built with NEXT_PUBLIC_BASE_PATH=/beta.
+ * This site serves it under /beta when BETA_ORIGIN (that project's URL) is set, so both versions
+ * live on one domain and the docs version picker switches between them.
+ */
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || undefined;
+// "better-payment-beta.vercel.app" works too: rewrites need the scheme, so https:// is added
+const betaOriginEnv = process.env.BETA_ORIGIN?.trim().replace(/\/+$/, "");
+const betaOrigin = betaOriginEnv ? betaOriginEnv.replace(/^(?!https?:\/\/)/, "https://") : undefined;
+
 const nextConfig: NextConfig = {
+  basePath,
+  env: { NEXT_PUBLIC_BETA_DOCS: betaOrigin ? "1" : "" },
   // 90 keeps the soft gradients in the hero artwork free of banding
   images: { qualities: [75, 90] },
+  async rewrites() {
+    if (basePath || !betaOrigin) return [];
+    return {
+      beforeFiles: [
+        { source: "/beta", destination: `${betaOrigin}/beta` },
+        { source: "/beta/:path*", destination: `${betaOrigin}/beta/:path*` },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async redirects() {
-    return Object.entries(movedDocs).flatMap(([from, to]) =>
+    // The proxy does not run for the bare base path ("/beta"), and the beta deployment is for docs
+    const betaRoot = basePath ? [{ source: "/", destination: "/docs", permanent: false }] : [];
+    return [...betaRoot, ...Object.entries(movedDocs).flatMap(([from, to]) =>
       ["", "/tr"].map((prefix) => ({
         source: `${prefix}/docs/${from}`,
         destination: `${prefix}/docs/${to}`,
         permanent: true,
       }))
-    );
+    )];
   },
 };
 

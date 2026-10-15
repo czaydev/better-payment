@@ -7,6 +7,7 @@ import ProviderNetwork from "@/components/ProviderNetwork";
 import { GitHubIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { withBasePath } from "@/lib/base-path";
 
 // Entrance order from the approved motion spec (vault: Branding/06)
 const at = (ms: number) => ({ "--at": `${ms}ms` }) as React.CSSProperties;
@@ -16,7 +17,7 @@ export default function Hero({ lang, t }: { lang: Locale; t: Dictionary["hero"] 
     <section className="relative isolate overflow-hidden md:min-h-[min(880px,100svh)]">
       <div aria-hidden className="bp-parallax absolute inset-0 -z-10 origin-bottom">
         <Image
-          src="/brand/hero/hero-a3.webp"
+          src={withBasePath("/brand/hero/hero-a3.webp")}
           alt=""
           fill
           priority
@@ -26,7 +27,7 @@ export default function Hero({ lang, t }: { lang: Locale; t: Dictionary["hero"] 
         />
         {/* Same render with its lightness inverted onto the dark background */}
         <Image
-          src="/brand/hero/hero-a3-dark.webp"
+          src={withBasePath("/brand/hero/hero-a3-dark.webp")}
           alt=""
           fill
           quality={90}

@@ -11,6 +11,14 @@ export interface PayTRConfig extends PaymentProviderConfig {
   testMode?: boolean;
   /** iFrame timeout in minutes (default 30) */
   timeoutLimit?: number;
+  /**
+   * How initThreeDSPayment() takes a new card:
+   * - 'iframe' (default): PayTR's payment page in an iFrame (iFrame API)
+   * - 'direct': the card comes in the request, and the customer's browser posts it
+   *   to PayTR with your own checkout design (Direct API, 3D Secure). Needs the
+   *   Direct API on your PayTR account.
+   */
+  threeDSMode?: 'iframe' | 'direct';
 }
 
 export interface PayTRIframeResponse {

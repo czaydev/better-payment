@@ -97,6 +97,11 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           # A prerelease (0.12.0-beta.0) never becomes "latest"
           case "$VERSION" in *-*) DEFAULT_TAG=beta ;; *) DEFAULT_TAG=latest ;; esac
+          # beta publishes prereleases only: a stable version there means pre mode is off
+          if [ "$GITHUB_REF_NAME" = "beta" ] && [ "$DEFAULT_TAG" = "latest" ] && [ -z "$NPM_TAG_INPUT" ]; then
+            echo "::error::beta has the stable version $VERSION; run 'pnpm changeset pre enter beta' on beta (CONTRIBUTING.md → Beta releases)"
+            exit 1
+          fi
           echo "NPM_TAG=${NPM_TAG_INPUT:-$DEFAULT_TAG}" >> "$GITHUB_ENV"
           # The "## <version>" section of CHANGELOG.md becomes the release notes
           awk -v v="## $VERSION" '$0 == v {found=1; next} found && /^## / {exit} found {print}' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
