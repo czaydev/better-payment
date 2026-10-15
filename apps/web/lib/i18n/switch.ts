@@ -1,4 +1,5 @@
 import { LOCALE_COOKIE, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * URL of the current page in another language: ("en", "/tr/docs/x") → "/en/docs/x".
@@ -18,5 +19,5 @@ export function switchLocalePath(lang: Locale, pathname: string): string {
  */
 export function switchLocale(lang: Locale, pathname: string) {
   document.cookie = `${LOCALE_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
-  window.location.assign(switchLocalePath(lang, pathname) + window.location.search);
+  window.location.assign(withBasePath(switchLocalePath(lang, pathname)) + window.location.search);
 }

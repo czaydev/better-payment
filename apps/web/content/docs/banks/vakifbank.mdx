@@ -1,0 +1,90 @@
+---
+title: VakıfBank
+description: VakıfBank virtual POS (VPOS 7/24) integration reference.
+since: 0.12.0
+---
+
+Uses VakıfBank VPOS 7/24. 3D Secure runs in two steps: the card is enrolled with VakıfBank's MPI,
+the customer authenticates at the card issuer's ACS, and the payment is authorized on VPOS with
+`MpiTransactionId`. VPOS reads the card, amount and 3D Secure result from its own MPI record.
+
+<Callout type="warn">
+  The VakıfBank provider has not been verified with a test store yet: only the request formats were checked against the test MPI, VPOS and search services. 3D Secure uses VakıfBank's 3DS product, so ask VakıfBank to enable 3DS for your merchant. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, vakifbank } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    vakifbank: vakifbank({
+      merchantId: process.env.VAKIFBANK_MERCHANT_ID!, // 15 digits
+      password: process.env.VAKIFBANK_API_PASSWORD!,
+      terminalNo: process.env.VAKIFBANK_TERMINAL_NO!,
+      // testMode: defaults to mode === 'sandbox' (test MPI)
+      // baseUrl: defaults from mode (onlineodemetest / onlineodeme.vakifbank.com.tr:4443)
+    }),
+  },
+});
+```
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id. It has at most
+40 letters, digits, `-` or `_`, and must be new for every payment attempt, because it is also the
+MPI enrollment id.
+
+<Callout type="info">
+  The VPOS test host does not send its intermediate certificate. Node.js rejects it unless the DigiCert EV RSA CA G2 certificate is added with `NODE_EXTRA_CA_CERTS`. The production host is not affected.
+</Callout>
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.vakifbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// VPOS Sale; success when ResultCode is 0000
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.vakifbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/vakifbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent sends the customer to the card issuer's ACS
+```
+
+Only cards enrolled in 3D Secure continue. VakıfBank's MPI then POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.vakifbank.completeThreeDSPayment(callbackBody);
+```
+
+The callback is not signed, so its values are never used for the charge:
+
+- only `Status` `Y` (fully authenticated) is charged; other statuses fail;
+- the payment is authorized with `MpiTransactionId` and without card or amount fields, so VPOS takes them from its MPI record and checks the 3D Secure result itself;
+- a callback for another merchant is rejected as `INVALID_HASH`.
+
+`paymentId` and `conversationId` are set only for a payment VPOS approved.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.vakifbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.vakifbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+// getPayment() throws NOT_SUPPORTED, see below
+```
+
+A refund lower than the sale is a partial refund; several partial refunds may add up to the sale
+amount. `cancel()` works before end of day.
+
+<Callout type="warn">
+  `getPayment()` is not supported for VakıfBank and throws `NOT_SUPPORTED`. VakıfBank's record search by order id returns the order's approved sale but not its cancel and refund records, which carry no order id, so it cannot tell whether a paid order was later cancelled or refunded. Keep the payment's state in your own records from the results of `cancel()` and `refund()`; after a timeout, check the order in the VakıfBank merchant panel.
+</Callout>
+
+<Callout type="info">
+  BIN and installment queries are not supported for VakıfBank: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates.
+</Callout>

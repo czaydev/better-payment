@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import { releaseStatus } from "@/lib/release";
+import { withBasePath } from "@/lib/base-path";
 
 const highlightIcons = [Lock, CreditCard, Shield, Zap];
 
@@ -39,10 +40,10 @@ const banks: RouteItem[] = [
   { name: "Şekerbank", live: true },
   { name: "Albaraka Türk", since: "0.12.0" },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
-  { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
-  { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },
+  { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, since: "0.12.0" },
+  { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, since: "0.12.0" },
   { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, issue: 39 },
-  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, issue: 133 },
+  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, since: "0.12.0" },
 ];
 
 const institutions: RouteItem[] = [
@@ -62,7 +63,7 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
       <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_rgb(19_19_43/0.04)] dark:bg-logo transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]">
         {item.logo ? (
           <Image
-            src={item.logo}
+            src={withBasePath(item.logo)}
             alt={item.name}
             width={item.w}
             height={item.h}
@@ -166,7 +167,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
           <div className="grid gap-x-10 gap-y-4 rounded-2xl border border-border bg-card p-6 sm:p-7 lg:grid-cols-[1fr_1.2fr] lg:items-center">
             <div className="flex items-center gap-3">
               <span className="grid size-12 place-items-center rounded-xl border border-border bg-background dark:bg-logo">
-                <Image src="/akbank.svg" alt="" width={75} height={38} className="h-6 w-10 object-contain" />
+                <Image src={withBasePath("/akbank.svg")} alt="" width={75} height={38} className="h-6 w-10 object-contain" />
               </span>
               <div className="min-w-0">
                 <h3 className="flex items-center gap-2 text-lg leading-tight font-bold text-foreground">

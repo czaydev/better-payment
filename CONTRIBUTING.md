@@ -160,6 +160,7 @@ The website and docs are published in English (`/docs/...`) and Turkish (`/tr/do
 - Keep the headings. Every Turkish heading keeps the English heading's id: `## Taksit [#installments]`.
 - Update both languages in the same pull request.
 - Mark new user-facing features with `<Since version="x.y.z" />` in both languages. A page for a new provider or plugin also gets `since: x.y.z` in its frontmatter, which puts the same badge under the title and a "Beta" badge in the sidebar. The badge follows `packages/better-payment/package.json`: "Not released yet" while the version is lower, "Beta" while it is a prerelease of that version (`x.y.z-beta.N`, on the `beta` branch), and "Added in x.y.z" once it is released. Nothing has to be removed by hand after a beta becomes stable. On the homepage roadmap (`apps/web/components/Banks.tsx`), give a new provider `since: "x.y.z"` instead of `live: true`.
+- The beta docs are a second deployment of the website, built from `beta` with `NEXT_PUBLIC_BASE_PATH=/beta` and served under `/beta` on the same domain when the main deployment has `BETA_ORIGIN` set (`apps/web/next.config.ts`). A Stable / Beta picker in the docs sidebar switches between them. `next/link` adds the base path itself; wrap paths of files in `public/` (images, videos) with `withBasePath()` from `apps/web/lib/base-path.ts`.
 
 Rules and glossary: [apps/web/TRANSLATIONS.md](apps/web/TRANSLATIONS.md). CI runs:
 
@@ -168,6 +169,16 @@ cd apps/web
 node scripts/check-translations.mjs        # missing pages, different code blocks, heading ids
 node scripts/check-translations.mjs --fix  # adds heading ids
 ```
+
+**Generated documentation:** the web `dev` and `build` commands generate the TypeDoc API reference and the `llms.txt` / `llms-full.txt` files. Edit source comments or MDX, never the generated files in `apps/web/public/api-reference` and `apps/web/public/llms`. TypeDoc covers the public package entries, not every internal source file. Its HTML is shared by both locales. CI checks the stable and `/beta` outputs.
+
+```bash
+pnpm --filter web docs:test       # MDX conversion and route tests
+pnpm --filter web docs:generate   # TypeDoc + Markdown, without a Next.js build
+pnpm --filter web docs:check      # generated pages and public API destinations
+```
+
+Generation rejects unknown MDX components or executable expressions instead of dropping content. Add an explicit conversion and a test in `apps/web/scripts/docs-content.mjs` when introducing a docs component. Code blocks are kept as code, never evaluated.
 
 **Error message languages** (`localizedErrors`) are one file per language in `packages/better-payment/src/plugins/localized-errors/`. Write messages that read naturally for customers. Never shorten them to fit the bundle size check (`pnpm --filter better-payment size`): if a new language goes over the budget, say so in the pull request and a maintainer raises it.
 

@@ -172,6 +172,17 @@ export type {
 export { Est, est } from './providers/est';
 export type { EstConfig, Est3DCallbackData } from './providers/est/types';
 export type { EstBank, EstStoreType } from './providers/est/utils';
+export { VakifBank, vakifbank } from './providers/vakifbank';
+export type { VakifBankConfig, VakifBank3DCallbackData } from './providers/vakifbank/types';
+export { YapiKredi, yapikredi } from './providers/yapikredi';
+export type {
+  YapiKrediConfig,
+  YapiKrediCallbackFields,
+  YapiKrediCompleteRequest,
+} from './providers/yapikredi/types';
+export { Qnb, qnb } from './providers/qnb';
+export type { QnbConfig, Qnb3DCallbackData } from './providers/qnb/types';
+export type { QnbSecureType } from './providers/qnb/utils';
 
 export { BetterPaymentClient, createBetterPaymentClient } from './client';
 export type { BetterPaymentClientConfig } from './client';
