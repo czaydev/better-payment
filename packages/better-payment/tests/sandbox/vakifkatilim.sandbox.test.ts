@@ -28,13 +28,18 @@ describe.skipIf(!env || !card)('Vakıf Katılım sandbox', () => {
       }).vakifkatilim;
 
   it('charges and cancels a non-3D payment', async () => {
-    const payment = await vakifkatilim.createPayment(
-      paymentRequest(card!, { conversationId: orderId('VK') })
-    );
+    const request = paymentRequest(card!, { conversationId: orderId('VK') });
+    const payment = await vakifkatilim.createPayment(request);
     record('vakifkatilim', 'create-payment', payment.rawResponse);
     expect(payment.status, describeResult(payment)).toBe(PaymentStatus.SUCCESS);
 
-    const cancel = await vakifkatilim.cancel({ paymentId: payment.paymentId!, ip: '85.34.78.112' });
+    // SaleReversal needs the original amount and currency, kept from the payment
+    const cancel = await vakifkatilim.cancel({
+      paymentId: payment.paymentId!,
+      price: request.paidPrice ?? request.price,
+      currency: request.currency,
+      ip: '85.34.78.112',
+    });
     record('vakifkatilim', 'cancel', cancel.rawResponse);
     expect(cancel.status, describeResult(cancel)).toBe(PaymentStatus.SUCCESS);
   });
