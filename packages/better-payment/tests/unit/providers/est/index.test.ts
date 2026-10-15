@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { Est, est, estOrderStatus, isEstCapturedSale } from '../../../../src/providers/est';
@@ -497,8 +498,7 @@ describe('EST provider', () => {
       });
 
     it('returns pending with the order id when it matches your records', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...(await pendingCallback()),
+      const result = await provider.completeThreeDSPayment(await pendingCallback(), {
         orderId: 'ORDERPAY',
       });
       expect(post).not.toHaveBeenCalled();
@@ -525,23 +525,73 @@ describe('EST provider', () => {
       expect(unbound.status).toBe(PaymentStatus.PENDING);
       expectNoIds(unbound);
 
-      const mismatched = await provider.completeThreeDSPayment({
-        ...relabelled,
-        orderId: 'ORDERPAY',
-      });
+      const mismatched = await provider.completeThreeDSPayment(relabelled, { orderId: 'ORDERPAY' });
       expect(mismatched.status).toBe(PaymentStatus.FAILURE);
       expect(mismatched.errorCode).toBe('INVALID_HASH');
       expectNoIds(mismatched);
       expect(post).not.toHaveBeenCalled();
     });
 
-    it('does not let orderId change the signed fields', async () => {
-      post.mockResolvedValue({ data: estOrderStatusXml() });
+    // The order from your records is a separate argument: an orderId added to the
+    // body is part of what the HASH must cover, so it breaks the HASH
+    it('rejects an orderId added to the callback body', async () => {
       const result = await provider.completeThreeDSPayment({
-        ...EST_3DPAY_CALLBACK,
+        ...(await pendingCallback()),
+        orderId: 'ORDEROTHER',
+      } as never);
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expectNoIds(result);
+    });
+
+    it('does not let the context change the signed fields', async () => {
+      post.mockResolvedValue({ data: estOrderStatusXml() });
+      const result = await provider.completeThreeDSPayment(EST_3DPAY_CALLBACK, {
         orderId: 'ORDERPAY',
       });
       expect(result.status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    // Through the default handler: it passes only the HTTP body, so a client cannot
+    // supply the trusted order
+    describe('through the default handler', () => {
+      const handlerFor = (onCallback: ReturnType<typeof vi.fn>) => {
+        const payment = betterPayment({
+          mode: 'sandbox',
+          providers: { isbank: est({ ...EST_TEST, bank: 'isbank', storeType: '3d_pay' }) },
+        });
+        (payment.use('isbank') as any).client.post = post;
+        return new BetterPaymentHandler(payment, { onCallback });
+      };
+      const callbackRequest = (body: Record<string, unknown>) => ({
+        method: 'POST',
+        url: '/api/pay/isbank/callback',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+
+      it('returns a Pending callback without ids', async () => {
+        const onCallback = vi.fn();
+        await handlerFor(onCallback).handle(callbackRequest(await pendingCallback()));
+        expect(onCallback).toHaveBeenCalledTimes(1);
+        const [result] = onCallback.mock.calls[0];
+        expect(result.status).toBe(PaymentStatus.PENDING);
+        expectNoIds(result);
+        expect(post).not.toHaveBeenCalled();
+      });
+
+      it('does not let a client attach a Pending callback to an order with orderId', async () => {
+        const { oid: _oid, oie, ...rest } = await pendingCallback();
+        const onCallback = vi.fn();
+        const res = await handlerFor(onCallback).handle(
+          callbackRequest({ ...rest, oic: 'ORDERPAY', oid: oie, orderId: 'ORDEROTHER' })
+        );
+        expect(post).not.toHaveBeenCalled();
+        expect(onCallback).not.toHaveBeenCalledWith(
+          expect.objectContaining({ paymentId: 'ORDEROTHER' }),
+          expect.anything()
+        );
+        expect(JSON.stringify(res.body ?? '')).not.toContain('"paymentId":"ORDEROTHER"');
+      });
     });
 
     it('rejects an unsigned Pending callback', async () => {

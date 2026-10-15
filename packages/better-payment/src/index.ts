@@ -164,7 +164,12 @@ export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuv
 export { Sipay, sipay } from './providers/sipay';
 export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
 export { Est, est } from './providers/est';
-export type { EstConfig, Est3DCallbackData, EstGirogateRequest } from './providers/est/types';
+export type {
+  EstConfig,
+  Est3DCallbackData,
+  EstCompleteContext,
+  EstGirogateRequest,
+} from './providers/est/types';
 export type { EstBank, EstStoreType, EstGirogateMethod } from './providers/est/utils';
 export { EST_GIROGATE_METHODS } from './providers/est/utils';
 

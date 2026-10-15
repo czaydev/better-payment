@@ -45,7 +45,7 @@ import {
   parseEstXmlResponse,
   isEstApproved,
 } from './utils';
-import type { EstConfig, Est3DCallbackData, EstGirogateRequest } from './types';
+import type { EstConfig, Est3DCallbackData, EstCompleteContext, EstGirogateRequest } from './types';
 
 function escapeHtml(value: string): string {
   return value
@@ -305,7 +305,8 @@ export class Est extends PaymentProvider<EstConfig> {
    * a failure never carries ids taken from the callback.
    */
   async completeThreeDSPayment(
-    callbackBody: Est3DCallbackData & { orderId?: string }
+    callbackData: Est3DCallbackData,
+    context: EstCompleteContext = {}
   ): Promise<PaymentResponse> {
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
@@ -315,9 +316,10 @@ export class Est extends PaymentProvider<EstConfig> {
         rawResponse,
       });
 
-    // `orderId` is the order from your records, not part of the bank's POST
-    const { orderId: expectedOrderId, ...callbackData } = callbackBody ?? {};
-    if (!(await verifyEstCallback(callbackData, this.config.storeKey))) {
+    // The order from your records comes separately from the bank's POST, so an HTTP
+    // client cannot supply it: the default handler passes only the body
+    const expectedOrderId = context.orderId;
+    if (!(await verifyEstCallback(callbackData ?? {}, this.config.storeKey))) {
       return untrusted('Invalid 3D Secure callback hash', callbackData);
     }
     const orderId = callbackData.oid;
@@ -372,7 +374,7 @@ export class Est extends PaymentProvider<EstConfig> {
       // A Girogate method that settles later (bank transfer, voucher): nothing is
       // paid yet. The ver3 hash covers the values but not their field names, so
       // the callback alone cannot tell which order is pending: the order id is
-      // returned only when it matches the order from your records (`orderId`).
+      // returned only when it matches the order from your records (`context.orderId`).
       if ((callbackData.Response || '').toUpperCase() === 'PENDING') {
         if (expectedOrderId !== undefined && expectedOrderId !== orderId) {
           return untrusted('Callback belongs to a different order', callbackData);

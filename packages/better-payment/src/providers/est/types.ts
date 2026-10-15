@@ -31,6 +31,15 @@ export interface EstConfig extends PaymentProviderConfig {
 }
 
 /**
+ * Context of completeThreeDSPayment() from your application, never from the callback:
+ * the default handler passes only the bank's POST, so these fields are absent there
+ */
+export interface EstCompleteContext {
+  /** The order from your records; a Girogate Pending result carries ids only with it */
+  orderId?: string;
+}
+
+/**
  * A Girogate payment (alternative payment method) instead of a card, for
  * `initThreeDSPayment()` with the 3d_pay or 3d_pay_hosting store type
  */
