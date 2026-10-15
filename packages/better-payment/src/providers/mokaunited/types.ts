@@ -121,11 +121,18 @@ export interface MokaUnited3DCallbackData {
   trxCode?: string;
   /** Your order id, as sent */
   OtherTrxCode?: string;
-  /** `codeForHash` from initThreeDSPayment(), from your records (required) */
+  [key: string]: unknown;
+}
+
+/**
+ * Context of completeThreeDSPayment() from your application, never from the callback:
+ * the default handler passes only Moka United's POST, so it has none of these
+ */
+export interface MokaUnitedCompleteContext {
+  /** `codeForHash` initThreeDSPayment() returned for this order (required) */
   codeForHash?: string;
-  /** The order id from your records; takes precedence over OtherTrxCode */
+  /** The order id from your records; preferred over the callback's OtherTrxCode */
   orderId?: string;
   /** The amount you expect, checked against Moka United's record when given */
   amount?: string | number;
-  [key: string]: unknown;
 }

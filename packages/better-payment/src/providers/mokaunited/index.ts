@@ -41,6 +41,7 @@ import type {
   MokaUnitedBankCard,
   MokaUnitedConfig,
   MokaUnited3DCallbackData,
+  MokaUnitedCompleteContext,
   MokaUnitedOperationData,
   MokaUnitedPaymentDetailData,
   MokaUnitedResponse,
@@ -355,13 +356,18 @@ export class MokaUnited extends PaymentProvider<MokaUnitedConfig> {
   /**
    * Completes a 3D Secure payment from the RedirectUrl POST. `hashValue` must be
    * SHA-256(CodeForHash + "T"), with the CodeForHash you kept from
-   * initThreeDSPayment() (`codeForHash`); "F" is a failure reported by Moka United.
-   * The order id comes from your records (`orderId`) or the callback, and the
+   * initThreeDSPayment(), passed as `context.codeForHash` (never from the body: the
+   * default handler passes only the POST, so it cannot complete these payments);
+   * "F" is a failure reported by Moka United. The order id comes from your records
+   * (`context.orderId`) or the callback, and the
    * payment is confirmed with GetDealerPaymentTrxDetailList: an approved payment of
    * that order, with the callback's trxCode, and `amount` when given. Anything else
    * is INVALID_HASH. Failures carry no ids.
    */
-  async completeThreeDSPayment(callbackData: MokaUnited3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackData: MokaUnited3DCallbackData,
+    context: MokaUnitedCompleteContext = {}
+  ): Promise<PaymentResponse> {
     const data = callbackData ?? {};
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
@@ -371,13 +377,13 @@ export class MokaUnited extends PaymentProvider<MokaUnitedConfig> {
         rawResponse,
       });
 
-    const codeForHash = nonEmpty(data.codeForHash);
+    const codeForHash = nonEmpty(context.codeForHash);
     if (!codeForHash) {
       return this.withErrorCode({
         status: PaymentStatus.FAILURE,
         errorCode: 'VALIDATION_ERROR',
         errorMessage:
-          'codeForHash is required: pass the codeForHash initThreeDSPayment() returned for this order',
+          'codeForHash is required: complete in your own route with completeThreeDSPayment(body, { codeForHash }), using the codeForHash initThreeDSPayment() returned for this order',
         rawResponse: data,
       });
     }
@@ -394,7 +400,7 @@ export class MokaUnited extends PaymentProvider<MokaUnitedConfig> {
       return untrusted('Invalid 3D Secure callback hash', data);
     }
 
-    const orderId = nonEmpty(data.orderId) ?? nonEmpty(data.OtherTrxCode);
+    const orderId = nonEmpty(context.orderId) ?? nonEmpty(data.OtherTrxCode);
     if (!orderId) {
       return untrusted('The callback carries no order id: pass orderId from your records', data);
     }
@@ -410,8 +416,8 @@ export class MokaUnited extends PaymentProvider<MokaUnitedConfig> {
           (detail.Data?.PaymentTrxDetailList ?? []).some(
             (trx) => nonEmpty(trx.VirtualPosOrderId) === trxCode && trx.TrxStatus === 1
           )) &&
-        (data.amount === undefined ||
-          toMinorUnits(payment?.Amount ?? NaN) === toMinorUnits(data.amount));
+        (context.amount === undefined ||
+          toMinorUnits(payment?.Amount ?? NaN) === toMinorUnits(context.amount));
       if (!confirmed) {
         return untrusted('3D Secure callback does not match the order at Moka United', {
           callback: data,
@@ -428,7 +434,7 @@ export class MokaUnited extends PaymentProvider<MokaUnitedConfig> {
       // A timeout while confirming: the outcome is unknown. The ids are kept only when
       // the order came from your records (`orderId`), to check it with getPayment()
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
-      return result.status === PaymentStatus.PENDING && nonEmpty(data.orderId) !== undefined
+      return result.status === PaymentStatus.PENDING && nonEmpty(context.orderId) !== undefined
         ? { ...result, paymentId: orderId, conversationId: orderId }
         : result;
     }

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import crypto from 'node:crypto';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment } from '../../../../src';
 import {
@@ -202,13 +203,13 @@ describe('Moka United provider', () => {
       resultMessage: successful ? '' : '3D Onay Alma Hatası',
       trxCode: 'ORDER-17131QQFG04026575',
       OtherTrxCode: 'ORDERMU',
-      codeForHash: CODE_FOR_HASH,
       ...overrides,
     });
+    const trusted = { codeForHash: CODE_FOR_HASH };
 
     it('confirms a "T" hash with the payment detail', async () => {
       post.mockResolvedValue({ data: mokaDetail() });
-      const result = await provider.completeThreeDSPayment(await callback());
+      const result = await provider.completeThreeDSPayment(await callback(), trusted);
       expect(post.mock.calls[0][0]).toBe('/PaymentDealer/GetDealerPaymentTrxDetailList');
       expect(sent().PaymentDealerRequest).toEqual({ PaymentId: '', OtherTrxCode: 'ORDERMU' });
       expect(post.mock.calls[0][2]).toMatchObject({ retryable: true });
@@ -217,7 +218,7 @@ describe('Moka United provider', () => {
     });
 
     it('fails an "F" hash with the callback error, without a request or ids', async () => {
-      const result = await provider.completeThreeDSPayment(await callback(false));
+      const result = await provider.completeThreeDSPayment(await callback(false), trusted);
       expect(post).not.toHaveBeenCalled();
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.errorCode).toBe('025');
@@ -226,19 +227,16 @@ describe('Moka United provider', () => {
     });
 
     it('requires the codeForHash from your records', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...(await callback()),
-        codeForHash: undefined,
-      });
+      const result = await provider.completeThreeDSPayment(await callback());
       expect(result.errorCode).toBe('VALIDATION_ERROR');
       expect(post).not.toHaveBeenCalled();
     });
 
     it('rejects a hash made for another payment', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...(await callback()),
-        hashValue: sha256('OTHER-CODE-FOR-HASHT'),
-      });
+      const result = await provider.completeThreeDSPayment(
+        { ...(await callback()), hashValue: sha256('OTHER-CODE-FOR-HASHT') },
+        trusted
+      );
       expect(result.errorCode).toBe('INVALID_HASH');
       expect(post).not.toHaveBeenCalled();
       expectNoIds(result);
@@ -255,38 +253,75 @@ describe('Moka United provider', () => {
       ['no record', mokaError('PaymentDealer.GetDealerPaymentTrxDetailList.PaymentNotFound')],
     ])('rejects a valid hash when Moka United shows %s', async (_case, detail) => {
       post.mockResolvedValue({ data: detail });
-      const result = await provider.completeThreeDSPayment(await callback());
+      const result = await provider.completeThreeDSPayment(await callback(), trusted);
       expect(result.errorCode).toBe('INVALID_HASH');
       expectNoIds(result);
     });
 
     it('checks the amount when given, and prefers the order id from your records', async () => {
       post.mockResolvedValue({ data: mokaDetail() });
-      const ok = await provider.completeThreeDSPayment({
-        ...(await callback({} as never, { OtherTrxCode: 'FORGED' })),
-        orderId: 'ORDERMU',
-        amount: '1.20',
-      } as never);
+      const ok = await provider.completeThreeDSPayment(
+        await callback(true, { OtherTrxCode: 'FORGED' }),
+        { ...trusted, orderId: 'ORDERMU', amount: '1.20' }
+      );
       expect(sent().PaymentDealerRequest.OtherTrxCode).toBe('ORDERMU');
       expect(ok.status).toBe(PaymentStatus.SUCCESS);
 
-      const wrong = await provider.completeThreeDSPayment({
-        ...(await callback()),
+      const wrong = await provider.completeThreeDSPayment(await callback(), {
+        ...trusted,
         amount: '99.00',
       });
       expect(wrong.errorCode).toBe('INVALID_HASH');
     });
 
+    // The default handler passes only the HTTP body: a client must not be able to supply
+    // the secret or the order
+    it('ignores codeForHash, orderId and amount sent in the callback body', async () => {
+      const forgedCode = 'ATTACKER-CODE';
+      const body = {
+        ...(await callback()),
+        hashValue: sha256(`${forgedCode}T`),
+        codeForHash: forgedCode,
+        orderId: 'SOMEONE-ELSES-ORDER',
+        amount: '1.20',
+      };
+      const direct = await provider.completeThreeDSPayment(body);
+      expect(direct.errorCode).toBe('VALIDATION_ERROR');
+      expect(post).not.toHaveBeenCalled();
+
+      const payment = betterPayment({
+        mode: 'sandbox',
+        providers: { mokaunited: mokaUnited(MOKAUNITED_TEST) },
+      });
+      (payment.use('mokaunited') as any).client.post = post;
+      const onCallback = vi.fn();
+      await new BetterPaymentHandler(payment, { onCallback }).handle({
+        method: 'POST',
+        url: '/api/pay/mokaunited/callback',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: PaymentStatus.SUCCESS }),
+        expect.anything()
+      );
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'SOMEONE-ELSES-ORDER' }),
+        expect.anything()
+      );
+    });
+
     it('keeps the ids on a timeout only for an order from your records', async () => {
       post.mockRejectedValue(timeout());
-      const unsigned = await provider.completeThreeDSPayment(await callback());
+      const unsigned = await provider.completeThreeDSPayment(await callback(), trusted);
       expect(unsigned.status).toBe(PaymentStatus.PENDING);
       expectNoIds(unsigned);
-      const trusted = await provider.completeThreeDSPayment({
-        ...(await callback()),
+      const withOrder = await provider.completeThreeDSPayment(await callback(), {
+        ...trusted,
         orderId: 'ORDERMU',
       });
-      expect(trusted.paymentId).toBe('ORDERMU');
+      expect(withOrder.paymentId).toBe('ORDERMU');
     });
   });
 

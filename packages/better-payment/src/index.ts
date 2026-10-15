@@ -167,6 +167,7 @@ export { MokaUnited, mokaUnited, mokaUnitedPaymentStatus } from './providers/mok
 export type {
   MokaUnitedConfig,
   MokaUnited3DCallbackData,
+  MokaUnitedCompleteContext,
   MokaUnitedThreeDSInitResponse,
 } from './providers/mokaunited/types';
 export { Est, est } from './providers/est';

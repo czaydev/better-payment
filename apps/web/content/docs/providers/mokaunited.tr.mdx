@@ -49,13 +49,15 @@ const init = await payment.mokaunited.initThreeDSPayment({
 `DoDirectPaymentThreeD`, Moka United'ın 3D sayfasını ve bu ödemeye ait bir `CodeForHash` döndürür. `codeForHash` değerini siparişle birlikte saklayın: Moka United sonucu `callbackUrl` adresine, başarılıysa `hashValue = SHA-256(CodeForHash + "T")`, başarısızsa `+ "F"` ile POST eder.
 
 ```typescript
-const result = await payment.mokaunited.completeThreeDSPayment({
-  ...callbackBody,
-  codeForHash: order.codeForHash, // from your records
+// in your own route: the trusted values are a separate argument, never the POST body
+const result = await payment.mokaunited.completeThreeDSPayment(callbackBody, {
+  codeForHash: order.codeForHash, // from your records (required)
   orderId: order.id,              // optional, preferred over the callback's OtherTrxCode
   amount: order.total,            // optional, checked against Moka United's record
 });
 ```
+
+Bu ödemeleri kendi route'unuzda tamamlayın: varsayılan handler'ın callback route'u yalnızca POST gövdesini iletir; bu yüzden `codeForHash` olmadan `VALIDATION_ERROR` ile başarısız olur. Gövdedeki değerler hiçbir zaman `codeForHash`, `orderId` veya `amount` olarak kullanılmaz.
 
 - `codeForHash` verilmeden çağrı başarısız olur; ne "T" ne de "F" ile eşleşen bir `hashValue` `INVALID_HASH` ile reddedilir;
 - "F", callback'teki `resultCode` ile numara taşımayan bir başarısızlıktır;

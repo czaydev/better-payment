@@ -55,13 +55,17 @@ const init = await payment.mokaunited.initThreeDSPayment({
 `hashValue = SHA-256(CodeForHash + "T")` on success and `+ "F"` on failure.
 
 ```typescript
-const result = await payment.mokaunited.completeThreeDSPayment({
-  ...callbackBody,
-  codeForHash: order.codeForHash, // from your records
+// in your own route: the trusted values are a separate argument, never the POST body
+const result = await payment.mokaunited.completeThreeDSPayment(callbackBody, {
+  codeForHash: order.codeForHash, // from your records (required)
   orderId: order.id,              // optional, preferred over the callback's OtherTrxCode
   amount: order.total,            // optional, checked against Moka United's record
 });
 ```
+
+Complete these payments in your own route: the default handler's callback route passes only the
+POST body, so it has no `codeForHash` and fails with `VALIDATION_ERROR`. Values in the body are
+never used as `codeForHash`, `orderId` or `amount`.
 
 - the call fails without `codeForHash`, and a `hashValue` that matches neither "T" nor "F" is rejected as `INVALID_HASH`;
 - "F" is a failure with the callback's `resultCode`, without ids;
