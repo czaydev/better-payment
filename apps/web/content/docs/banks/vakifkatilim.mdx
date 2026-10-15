@@ -56,8 +56,7 @@ const init = await payment.vakifkatilim.initThreeDSPayment({
 // init.threeDSHtmlContent is the bank's page that takes the customer to 3D Secure
 
 // In your callback route, with the order from your own records
-const result = await payment.vakifkatilim.completeThreeDSPayment({
-  ...callbackBody,
+const result = await payment.vakifkatilim.completeThreeDSPayment(callbackBody, {
   orderId: 'ORDER123',
   amount: '100.00',
   currency: 'TRY',
@@ -74,7 +73,9 @@ platform, Kuveyt Türk documents that hash as `base64(SHA1(MerchantOrderId + Res
 it is not checked here until it is seen on a real Vakıf Katılım callback. When `ResponseCode` is `00`, the payment is charged with
 `ThreeDModelProvisionGate` and the callback's `MD`, for the order id, amount and URLs from your
 records, and the bank's answer decides. A callback for another order is rejected, and a failure
-carries no ids. Use your own callback route rather than the handler's `complete-3ds` route.
+carries no ids. The order values go in the second argument and are never read from the callback
+body, so use your own callback route rather than the handler's `complete-3ds` route, which passes
+only the body.
 
 ## Cancel & Refund
 

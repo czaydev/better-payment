@@ -173,7 +173,7 @@ export { VakifKatilim, vakifKatilim } from './providers/vakifkatilim';
 export type {
   VakifKatilimConfig,
   VakifKatilimCallbackFields,
-  VakifKatilimCompleteRequest,
+  VakifKatilimCompleteContext,
 } from './providers/vakifkatilim/types';
 export { Est, est } from './providers/est';
 export type {

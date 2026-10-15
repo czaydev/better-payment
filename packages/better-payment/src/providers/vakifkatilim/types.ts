@@ -30,13 +30,14 @@ export interface VakifKatilimCallbackFields {
 }
 
 /**
- * Input of completeThreeDSPayment(): the callback POST plus the order from your
- * own records. The provision is signed over the amount and the return URLs, and
- * the callback carries neither, so they must come from your side.
+ * The order from your own records for completeThreeDSPayment(), passed as a
+ * separate second argument and never read from the callback body. The
+ * provision is signed over the amount and the return URLs, and the callback
+ * carries neither, so they must come from your side.
  *
- * `completeThreeDSPayment({ ...callbackBody, orderId, amount, currency, callbackUrl })`
+ * `completeThreeDSPayment(callbackBody, { orderId, amount, currency, callbackUrl })`
  */
-export interface VakifKatilimCompleteRequest extends VakifKatilimCallbackFields {
+export interface VakifKatilimCompleteContext {
   /** The order id (conversationId) used to start the payment */
   orderId?: string;
   /** The order amount, as in the payment request ("1.20") */

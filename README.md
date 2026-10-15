@@ -189,9 +189,9 @@ Halkbank Macedonia, with `est({ bank })`.
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
 - **Vakıf Katılım:** the bank POSTs to your `callbackUrl`. Call
-  `completeThreeDSPayment({ ...callbackBody, orderId, amount, currency, callbackUrl })` with
-  the order from your records: the card is charged with the callback's `MD` and the bank's
-  answer decides.
+  `completeThreeDSPayment(callbackBody, { orderId, amount, currency, callbackUrl })` with
+  the order from your records, never read from the body: the card is charged with the
+  callback's `MD` and the bank's answer decides.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

@@ -50,8 +50,7 @@ const init = await payment.vakifkatilim.initThreeDSPayment({
 // init.threeDSHtmlContent is the bank's page that takes the customer to 3D Secure
 
 // In your callback route, with the order from your own records
-const result = await payment.vakifkatilim.completeThreeDSPayment({
-  ...callbackBody,
+const result = await payment.vakifkatilim.completeThreeDSPayment(callbackBody, {
   orderId: 'ORDER123',
   amount: '100.00',
   currency: 'TRY',
@@ -61,7 +60,7 @@ const result = await payment.vakifkatilim.completeThreeDSPayment({
 
 `initThreeDSPayment()` kartı `ThreeDModelPayGate` adresine gönderir; banka müşteriyi 3D Secure'a götüren sayfayla cevap verir. Altyapının reddettiği bir istek (örneğin bilinmeyen üye işyeri) hemen başarısız olur.
 
-Callback `ResponseCode`, `MerchantOrderId`, `MD` ve bir `HashData` taşır. Aynı BOA altyapısında Kuveyt Türk bu hash'i `base64(SHA1(MerchantOrderId + ResponseCode + OrderId + base64(SHA1(şifre))))` olarak belgeliyor; gerçek bir Vakıf Katılım callback'inde görülene kadar burada kontrol edilmez. `ResponseCode` `00` ise ödeme, sizin kayıtlarınızdaki sipariş numarası, tutar ve adreslerle, callback'teki `MD` kullanılarak `ThreeDModelProvisionGate` üzerinden tahsil edilir ve sonucu bankanın cevabı belirler. Başka bir siparişe ait callback reddedilir; başarısız bir sonuç numara taşımaz. Handler'ın `complete-3ds` adresi yerine kendi callback adresinizi kullanın.
+Callback `ResponseCode`, `MerchantOrderId`, `MD` ve bir `HashData` taşır. Aynı BOA altyapısında Kuveyt Türk bu hash'i `base64(SHA1(MerchantOrderId + ResponseCode + OrderId + base64(SHA1(şifre))))` olarak belgeliyor; gerçek bir Vakıf Katılım callback'inde görülene kadar burada kontrol edilmez. `ResponseCode` `00` ise ödeme, sizin kayıtlarınızdaki sipariş numarası, tutar ve adreslerle, callback'teki `MD` kullanılarak `ThreeDModelProvisionGate` üzerinden tahsil edilir ve sonucu bankanın cevabı belirler. Başka bir siparişe ait callback reddedilir; başarısız bir sonuç numara taşımaz. Sipariş değerleri ikinci argümanla verilir ve callback gövdesinden asla okunmaz; bu yüzden yalnızca gövdeyi ileten handler'ın `complete-3ds` adresi yerine kendi callback adresinizi kullanın.
 
 ## İptal ve iade [#cancel--refund]
 

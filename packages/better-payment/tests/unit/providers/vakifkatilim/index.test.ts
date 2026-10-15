@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { VakifKatilim, vakifKatilim } from '../../../../src/providers/vakifkatilim';
@@ -175,8 +176,7 @@ describe('Vakıf Katılım provider', () => {
   });
 
   describe('completeThreeDSPayment', () => {
-    const complete = {
-      ...VAKIFKATILIM_CALLBACK,
+    const context = {
       orderId: 'ORDER1',
       amount: '1.20',
       callbackUrl: 'https://example.com/callback',
@@ -185,7 +185,7 @@ describe('Vakıf Katılım provider', () => {
     it('charges with ThreeDModelProvisionGate and the MD', async () => {
       post.mockResolvedValue({ data: vakifKatilimResponse() });
 
-      const result = await provider.completeThreeDSPayment(complete);
+      const result = await provider.completeThreeDSPayment(VAKIFKATILIM_CALLBACK, context);
 
       expect(post.mock.calls[0][0]).toBe('/Home/ThreeDModelProvisionGate');
       const xml = sentXml();
@@ -199,11 +199,14 @@ describe('Vakıf Katılım provider', () => {
     });
 
     it('fails without ids when the card was not verified', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...complete,
-        ResponseCode: 'CardNotVerified',
-        ResponseMessage: 'Kart doğrulanamadı',
-      });
+      const result = await provider.completeThreeDSPayment(
+        {
+          ...VAKIFKATILIM_CALLBACK,
+          ResponseCode: 'CardNotVerified',
+          ResponseMessage: 'Kart doğrulanamadı',
+        },
+        context
+      );
       expect(post).not.toHaveBeenCalled();
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.errorCode).toBe('CardNotVerified');
@@ -211,10 +214,10 @@ describe('Vakıf Katılım provider', () => {
     });
 
     it('rejects a callback for another order', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...complete,
-        MerchantOrderId: 'OTHER',
-      });
+      const result = await provider.completeThreeDSPayment(
+        { ...VAKIFKATILIM_CALLBACK, MerchantOrderId: 'OTHER' },
+        context
+      );
       expect(post).not.toHaveBeenCalled();
       expect(result.errorCode).toBe('INVALID_CALLBACK');
     });
@@ -225,6 +228,38 @@ describe('Vakıf Katılım provider', () => {
       expect(result.errorMessage).toMatch(/orderId, amount and callbackUrl/);
     });
 
+    // The default handler passes only the HTTP body: order values POSTed with it
+    // must never reach the provision
+    it('ignores order values sent in the callback body, also through the default handler', async () => {
+      const body = { ...VAKIFKATILIM_CALLBACK, ...context, amount: '0.01' };
+      const direct = await provider.completeThreeDSPayment(body);
+      expect(direct.errorMessage).toMatch(/orderId, amount and callbackUrl/);
+
+      const payment = betterPayment({
+        mode: 'sandbox',
+        providers: {
+          vakifkatilim: vakifKatilim({ ...VAKIFKATILIM_TEST, baseUrl: VAKIFKATILIM_BASE_URL }),
+        },
+      });
+      (payment.use('vakifkatilim') as any).client.post = post;
+      const onCallback = vi.fn();
+      await new BetterPaymentHandler(payment, { onCallback }).handle({
+        method: 'POST',
+        url: '/api/pay/vakifkatilim/callback',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: PaymentStatus.SUCCESS }),
+        expect.anything()
+      );
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: 'ORDER1' }),
+        expect.anything()
+      );
+    });
+
     it('fails without ids when the provision is declined', async () => {
       post.mockResolvedValue({
         data: vakifKatilimResponse({
@@ -233,7 +268,7 @@ describe('Vakıf Katılım provider', () => {
           OrderId: '0',
         }),
       });
-      const result = await provider.completeThreeDSPayment(complete);
+      const result = await provider.completeThreeDSPayment(VAKIFKATILIM_CALLBACK, context);
       expect(result.code).toBe(PaymentErrorCode.INSUFFICIENT_FUNDS);
       expect(result.paymentId).toBeUndefined();
       expect(result.conversationId).toBeUndefined();
@@ -241,7 +276,7 @@ describe('Vakıf Katılım provider', () => {
 
     it('returns pending with the order id on a timeout', async () => {
       post.mockRejectedValue(timeout());
-      const result = await provider.completeThreeDSPayment(complete);
+      const result = await provider.completeThreeDSPayment(VAKIFKATILIM_CALLBACK, context);
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.conversationId).toBe('ORDER1');
     });

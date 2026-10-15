@@ -35,7 +35,11 @@ import {
   parseVakifKatilimResponse,
   isVakifKatilimApproved,
 } from './utils';
-import type { VakifKatilimConfig, VakifKatilimCompleteRequest } from './types';
+import type {
+  VakifKatilimCallbackFields,
+  VakifKatilimCompleteContext,
+  VakifKatilimConfig,
+} from './types';
 
 /**
  * Vakıf Katılım virtual POS (BOA VirtualPOS.Gateway, XML)
@@ -273,16 +277,20 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
    * is not checked (its formula is not confirmed): when ResponseCode is 00, the
    * payment is charged with `ThreeDModelProvisionGate` and the callback's MD,
    * for the order values from your records, and the bank's answer decides.
+   * Those values are read only from the second argument, never from the
+   * callback body, which the default handler route passes on its own.
    *
-   * `completeThreeDSPayment({ ...callbackBody, orderId, amount, currency, callbackUrl })`
+   * `completeThreeDSPayment(callbackBody, { orderId, amount, currency, callbackUrl })`
    *
    * `paymentId` and `conversationId` are set only for a payment the bank
    * approved, and on a timeout after the bank was reached; a failure carries no ids.
    */
   async completeThreeDSPayment(
-    callbackData: VakifKatilimCompleteRequest
+    callbackData: VakifKatilimCallbackFields,
+    context: VakifKatilimCompleteContext = {}
   ): Promise<PaymentResponse> {
     const data = callbackData ?? {};
+    const order = context ?? {};
     if (data.ResponseCode !== '00') {
       return this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -293,19 +301,19 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
     }
 
     let reached = false;
-    const orderId = data.orderId ?? '';
+    const orderId = order.orderId ?? '';
     try {
-      if (!data.orderId || !data.amount || !data.callbackUrl) {
+      if (!order.orderId || !order.amount || !order.callbackUrl) {
         throw new ValidationError(
           'completeThreeDSPayment() needs orderId, amount and callbackUrl from your records: ' +
-            'completeThreeDSPayment({ ...callbackBody, orderId, amount, currency, callbackUrl })'
+            'completeThreeDSPayment(callbackBody, { orderId, amount, currency, callbackUrl })'
         );
       }
       if (!data.MD) {
         throw new ValidationError('3D Secure callback is missing: MD');
       }
-      validateVakifKatilimOrderId(data.orderId);
-      if (data.MerchantOrderId && data.MerchantOrderId !== data.orderId) {
+      validateVakifKatilimOrderId(order.orderId);
+      if (data.MerchantOrderId && data.MerchantOrderId !== order.orderId) {
         return this.withErrorCode({
           status: PaymentStatus.FAILURE,
           errorCode: 'INVALID_CALLBACK',
@@ -314,25 +322,25 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
         });
       }
 
-      const okUrl = data.callbackUrl;
-      const failUrl = data.failUrl || data.callbackUrl;
-      const amount = formatVakifKatilimAmount(data.amount);
+      const okUrl = order.callbackUrl;
+      const failUrl = order.failUrl || order.callbackUrl;
+      const amount = formatVakifKatilimAmount(order.amount);
       reached = true;
       const fields = await this.api(VAKIFKATILIM_ENDPOINTS.PROVISION, {
         OkUrl: okUrl,
         FailUrl: failUrl,
         HashData: await createVakifKatilimHash(this.credentials, {
-          merchantOrderId: data.orderId,
+          merchantOrderId: order.orderId,
           amount,
           okUrl,
           failUrl,
         }),
         ...this.account(),
-        MerchantOrderId: data.orderId,
-        InstallmentCount: formatVakifKatilimInstallment(data.installment),
+        MerchantOrderId: order.orderId,
+        InstallmentCount: formatVakifKatilimInstallment(order.installment),
         Amount: amount,
         DisplayAmount: amount,
-        FECCurrencyCode: getVakifKatilimCurrencyCode(data.currency),
+        FECCurrencyCode: getVakifKatilimCurrencyCode(order.currency),
         TransactionSecurity: '3',
         AdditionalData: {
           AdditionalDataList: { VPosAdditionalData: { Key: 'MD', Data: data.MD } },
@@ -349,7 +357,7 @@ export class VakifKatilim extends PaymentProvider<VakifKatilimConfig> {
       }
       return this.withErrorCode({
         status: PaymentStatus.SUCCESS,
-        paymentId: VakifKatilim.paymentIdOf(data.orderId, fields),
+        paymentId: VakifKatilim.paymentIdOf(order.orderId, fields),
         conversationId: orderId,
         rawResponse: { callback: data, payment: fields },
       });
