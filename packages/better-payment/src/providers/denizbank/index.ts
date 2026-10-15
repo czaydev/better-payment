@@ -49,7 +49,7 @@ function escapeHtml(value: string): string {
  * Denizbank virtual POS (InterVPos), 3D Model
  *
  * - createPayment():          `Auth` (NonSecure)
- * - initThreeDSPayment():     auto-submitting form to InterVPos (SecureType 3DModel or 3DPay)
+ * - initThreeDSPayment():     auto-submitting form to InterVPos (SecureType 3DModel)
  * - completeThreeDSPayment(): verifies the callback HASH, then charges with `Auth`
  *                             carrying the 3D Secure data (the bank's answer decides)
  * - refund() `Refund`, cancel() `Void`
@@ -78,14 +78,17 @@ export class Denizbank extends PaymentProvider<DenizbankConfig> {
         'denizbank'
       );
     }
-    if (this.config.secureType && !['3DModel', '3DPay'].includes(this.config.secureType)) {
-      throw new ConfigurationError(
-        `Unknown Denizbank secureType: ${this.config.secureType}`,
-        'denizbank'
-      );
-    }
     if (!this.config.baseUrl) {
       throw new ConfigurationError('Denizbank baseUrl is required', 'denizbank');
+    }
+    // 3D Pay is not supported: its callback would be the only proof of payment, and
+    // the HASH joins the values without separators, so it cannot bind the order
+    const secureType = (this.config as { secureType?: string }).secureType;
+    if (secureType !== undefined && secureType !== '3DModel') {
+      throw new ConfigurationError(
+        `Denizbank secureType ${secureType} is not supported; only the 3D Model is`,
+        'denizbank'
+      );
     }
   }
 
@@ -186,7 +189,7 @@ export class Denizbank extends PaymentProvider<DenizbankConfig> {
         Version3D: '2.0',
         ShopCode: this.config.shopCode,
         TxnType: 'Auth',
-        SecureType: this.config.secureType ?? '3DModel',
+        SecureType: '3DModel',
         PurchAmount: formatDenizbankAmount(request.paidPrice ?? request.price),
         OrderId: orderId,
         OkUrl: request.callbackUrl,
@@ -261,26 +264,12 @@ export class Denizbank extends PaymentProvider<DenizbankConfig> {
         rawResponse: callbackData,
       });
 
-    const threeDPay = (this.config.secureType ?? '3DModel') === '3DPay';
-    // In 3DPay the callback is the bank's final answer, so its hash must cover it
-    const required = threeDPay ? ['OrderId', 'ProcReturnCode', 'PurchAmount'] : ['OrderId'];
-    if (!(await verifyDenizbankCallback(callbackData ?? {}, this.config.merchantPass, required))) {
+    if (!(await verifyDenizbankCallback(callbackData ?? {}, this.config.merchantPass))) {
       return untrusted('Invalid 3D Secure callback hash');
     }
     const orderId = callbackData.OrderId!;
     if (callbackData.ShopCode !== undefined && callbackData.ShopCode !== this.config.shopCode) {
       return untrusted('Callback belongs to a different shop');
-    }
-    if (threeDPay) {
-      // The bank charged the card; there is no order inquiry to confirm it with
-      const approved = isDenizbankApproved(callbackData);
-      return this.withErrorCode({
-        status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
-        ...(approved
-          ? { paymentId: orderId, conversationId: orderId }
-          : Denizbank.errorOf(callbackData)),
-        rawResponse: callbackData,
-      });
     }
     if (
       (callbackData['3DStatus'] !== undefined && callbackData['3DStatus'] !== '1') ||

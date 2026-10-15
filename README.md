@@ -143,7 +143,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
-| Denizbank   | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
+| Denizbank   | ✓                         | ✓ 3D Model                  |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
 
@@ -165,9 +165,8 @@ this id to `refund`, `cancel` and `getPayment`.
   charge it with the XML API, `3d_pay` / `3d_pay_hosting` are checked with an order
   status query.
 - **Denizbank:** the bank POSTs to your `callbackUrl`. The `HASH` is rebuilt from the
-  fields in `HASHPARAMS`. In `3DModel` the card is then charged with the callback's
-  3D Secure data and the bank's answer decides; in `3DPay` the bank has already charged,
-  so `HASHPARAMS` must cover the order id, result code and amount.
+  fields in `HASHPARAMS`, then the card is charged with the callback's 3D Secure data
+  and the bank's answer decides.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

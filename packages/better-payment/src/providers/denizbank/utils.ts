@@ -44,12 +44,11 @@ export function createDenizbank3DHash(fields: {
  */
 export async function verifyDenizbankCallback(
   data: Record<string, string | undefined>,
-  merchantPass: string,
-  required: string[] = ['OrderId']
+  merchantPass: string
 ): Promise<boolean> {
   if (!data || !data.HASH || !data.HASHPARAMS) return false;
   const names = data.HASHPARAMS.split(':').filter(Boolean);
-  if (!required.every((name) => names.includes(name))) return false;
+  if (!names.includes('OrderId')) return false;
   const value = names.map((name) => data[name] ?? '').join('');
   if (data.HASHPARAMSVAL !== undefined && data.HASHPARAMSVAL !== value) return false;
   return safeEqual(await sha1Base64(value + merchantPass), data.HASH);

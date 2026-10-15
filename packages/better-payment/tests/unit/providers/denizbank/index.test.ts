@@ -261,6 +261,35 @@ describe('Denizbank provider', () => {
       expectNoIds(result);
     });
 
+    // The HASH joins the values without separators, so their boundaries can move
+    // while the HASH stays valid. Such a callback must never succeed on its own:
+    // the payment is charged with Auth (carrying the 3D session's MD) and the bank decides.
+    it('never accepts a re-split callback with a valid HASH without the bank', async () => {
+      const resplit = { ...CALLBACK, Currency: '949O', OrderId: 'RDER3D' };
+      expect(
+        ['Version3D', 'PurchAmount', 'TotalAmount', 'InstallmentCount', 'Currency', 'OrderId']
+          .map((name) => (resplit as Record<string, string>)[name])
+          .join('')
+      ).toBe(
+        ['Version3D', 'PurchAmount', 'TotalAmount', 'InstallmentCount', 'Currency', 'OrderId']
+          .map((name) => (CALLBACK as Record<string, string>)[name])
+          .join('')
+      );
+      post.mockResolvedValue({ data: DECLINED });
+
+      const result = await provider.completeThreeDSPayment(resplit);
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(sent()).toMatchObject({ TxnType: 'Auth', OrderId: 'RDER3D', MD: 'MDVALUE123' });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expectNoIds(result);
+    });
+
+    it('rejects the 3D Pay model, which cannot bind the callback to an order', () => {
+      expect(() => create({ secureType: '3DPay' } as any)).toThrow(/3DPay is not supported/);
+      expect(() => create({ secureType: '3DModel' } as any)).not.toThrow();
+    });
+
     it('fails without ids when the bank declines', async () => {
       post.mockResolvedValue({ data: DECLINED });
       const result = await provider.completeThreeDSPayment(CALLBACK);
@@ -273,57 +302,6 @@ describe('Denizbank provider', () => {
       const result = await provider.completeThreeDSPayment(CALLBACK);
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.paymentId).toBe('ORDER3D');
-    });
-  });
-
-  describe('completeThreeDSPayment (3DPay)', () => {
-    // In 3DPay the bank charged the card; HASHPARAMS must cover the result
-    const PAY_CALLBACK = {
-      OrderId: 'ORDERPAY',
-      PurchAmount: '1.20',
-      ProcReturnCode: '00',
-      '3DStatus': '1',
-      HASHPARAMS: 'OrderId:PurchAmount:ProcReturnCode:3DStatus',
-      HASHPARAMSVAL: 'ORDERPAY1.20001',
-      HASH: 'd2XPSTYKP1rwyweOp+tpxXu7HE8=',
-    };
-    beforeEach(() => {
-      provider = create({ secureType: '3DPay' });
-    });
-
-    it('sends SecureType 3DPay in the form', async () => {
-      const result = await provider.initThreeDSPayment(mockThreeDSPaymentRequest);
-      expect(result.threeDSHtmlContent).toContain('name="SecureType" value="3DPay"');
-    });
-
-    it("takes the bank's answer from a verified callback, without charging again", async () => {
-      const result = await provider.completeThreeDSPayment(PAY_CALLBACK);
-      expect(post).not.toHaveBeenCalled();
-      expect(result.status).toBe(PaymentStatus.SUCCESS);
-      expect(result.paymentId).toBe('ORDERPAY');
-    });
-
-    it('fails without ids on a declined callback', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...PAY_CALLBACK,
-        ProcReturnCode: '51',
-        HASHPARAMSVAL: 'ORDERPAY1.20511',
-        HASH: 'AvjlCVCcooUtRHqTDlHJG5PHVCY=',
-      });
-      expect(result.status).toBe(PaymentStatus.FAILURE);
-      expect(result.code).toBe(PaymentErrorCode.INSUFFICIENT_FUNDS);
-      expectNoIds(result);
-    });
-
-    it('rejects a callback whose hash does not cover the result', async () => {
-      const result = await provider.completeThreeDSPayment({
-        OrderId: 'ORDERPAY',
-        ProcReturnCode: '00',
-        HASHPARAMS: 'OrderId',
-        HASHPARAMSVAL: 'ORDERPAY',
-        HASH: 'VEB83cRSF+yDAPk/+DicLS1WEb4=',
-      });
-      expect(result.errorCode).toBe('INVALID_HASH');
     });
   });
 
