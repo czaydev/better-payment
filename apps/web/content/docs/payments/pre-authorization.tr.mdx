@@ -47,9 +47,10 @@ await payment.use('akbank').voidAuthorization({ paymentId: auth.paymentId!, ip: 
 | Parampos | `TP_Islem_Odeme_OnProv_WMD` (NS) | `TP_Islem_Odeme_OnProv_WMD` (3D) | `TP_Islem_Odeme_OnProv_Kapa` | `TP_Islem_Iptal_OnProv` |
 | Akbank | txnCode `1004` | txnCode `3004` (3D_PAY) | txnCode `1005` | txnCode `1003` |
 | Sipay | `paySmart2D` (`PreAuth`) | `paySmart3D` (`PreAuth`) | `confirmPayment` (status 1) | `confirmPayment` (status 2) |
+| Albaraka Türk | JSON `Auth` | 3D form (`TransactionType` Auth) + `Auth` | JSON `Capture` | JSON `Reverse` |
 | PayTR | henüz yok ([#60](https://github.com/czaydev/better-payment/issues/60)) | — | — | — |
 
-- `paymentId`, iyzico'da iyzico'nun ödeme numarası; Parampos, Sipay ve Akbank'ta sizin sipariş numaranızdır.
+- `paymentId`, iyzico'da iyzico'nun ödeme numarası; Albaraka Türk'te ReferenceCode; Parampos, Sipay ve Akbank'ta sizin sipariş numaranızdır.
 - `capture()` için `amount` zorunludur. Kısmi capture için bloke edilen tutardan azını verin.
 - Desteklemeyen sağlayıcılar `NOT_SUPPORTED` fırlatır; HTTP handler `400` döner.
 
@@ -70,4 +71,4 @@ Capture ve void para hareketi yarattığı için, iadeler gibi yalnızca bir `au
 
 ## Doğrulama [#verification]
 
-iyzico akışı (ön provizyon, kısmi capture, void, 3D ön provizyon) her gece gerçek iyzico sandbox'ına karşı çalıştırılır. Sipay akışı (ön provizyon, kısmi capture) her gece Sipay test ortamına karşı çalıştırılır. Parampos ve Akbank sağlayıcıların spesifikasyonlarını ve referans test vektörlerini izler; henüz kendi sandbox'larında çalıştırılmadı.
+iyzico akışı (ön provizyon, kısmi capture, void, 3D ön provizyon) her gece gerçek iyzico sandbox'ına karşı çalıştırılır. Sipay akışı (ön provizyon, kısmi capture) her gece Sipay test ortamına karşı çalıştırılır. Albaraka Türk'ün ön provizyonu test sunucusunda yalnızca istek biçimi açısından kontrol edildi. Parampos ve Akbank sağlayıcıların spesifikasyonlarını ve referans test vektörlerini izler; henüz kendi sandbox'larında çalıştırılmadı.

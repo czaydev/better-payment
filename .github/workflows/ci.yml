@@ -47,6 +47,8 @@ jobs:
       - run: pnpm --filter better-payment build
       - run: pnpm --filter web lint
       - run: pnpm --filter web docs:test
+      - name: Roadmap scroll regression tests
+        run: node --test apps/web/scripts/roadmap-scroll.test.mjs
       - run: pnpm --filter web build
       - run: pnpm --filter web docs:check
       - name: Generate and check beta documentation URLs

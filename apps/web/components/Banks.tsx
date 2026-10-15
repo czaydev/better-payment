@@ -38,11 +38,13 @@ const banks: RouteItem[] = [
   { name: "Halkbank", logo: "/brand/banks/halkbank.svg", w: 512, h: 99, live: true },
   { name: "TEB", logo: "/brand/banks/teb.png", w: 971, h: 421, live: true },
   { name: "Şekerbank", live: true },
+  { name: "Halkbank Makedonya", since: "0.12.0" },
+  { name: "Albaraka Türk", since: "0.12.0" },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
-  { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, issue: 38 },
-  { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, issue: 39 },
-  { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, issue: 39 },
-  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, issue: 133 },
+  { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, since: "0.12.0" },
+  { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, since: "0.12.0" },
+  { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, since: "0.12.0" },
+  { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, since: "0.12.0" },
 ];
 
 const institutions: RouteItem[] = [

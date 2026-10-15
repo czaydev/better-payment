@@ -48,6 +48,7 @@ import {
   generatePayTRInstallmentRatesToken,
   verifyPayTRCallback,
   formatPayTRBasket,
+  formatPayTRDirectBasket,
   convertToKurus,
   formatPayTRAmount,
   mapPayTRCurrency,
@@ -81,9 +82,10 @@ const PAYTR_ORDER_RULES: PaymentValidationRules = {
 /**
  * PayTR payment provider
  *
- * - initThreeDSPayment(): iFrame API. The payment result is delivered to the
- *   notification (Bildirim) URL configured in the PayTR panel; pass that POST
- *   body to completeThreeDSPayment() and respond with plain text "OK".
+ * - initThreeDSPayment(): iFrame API, or the Direct API with `threeDSMode: 'direct'`.
+ *   The payment result is delivered to the notification (Bildirim) URL configured
+ *   in the PayTR panel; pass that POST body to completeThreeDSPayment() and
+ *   respond with plain text "OK".
  * - createPayment(): Direct API, non-3D, synchronous (requires the "Non-3D"
  *   permission on the PayTR account).
  */
@@ -112,6 +114,12 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
     if (!this.config.baseUrl) {
       this.config.baseUrl = 'https://www.paytr.com';
     }
+    if (this.config.threeDSMode && !['iframe', 'direct'].includes(this.config.threeDSMode)) {
+      throw new ConfigurationError(
+        `Unknown PayTR threeDSMode: ${this.config.threeDSMode}`,
+        'paytr'
+      );
+    }
   }
 
   private get testMode(): string {
@@ -139,13 +147,16 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
     return this.client.post<T>(path, createPayTRFormData(data), config).then((res) => res.data);
   }
 
-  private buildBasket(items: Array<{ name: string; price: string; quantity?: number }>): string {
+  private buildBasket(
+    items: Array<{ name: string; price: string; quantity?: number }>,
+    api: 'iframe' | 'direct'
+  ): string {
     const basket: PayTRBasketItem[] = items.map((item) => ({
       name: item.name,
       price: formatPayTRAmount(item.price),
       quantity: item.quantity && item.quantity > 0 ? item.quantity : 1,
     }));
-    return formatPayTRBasket(basket);
+    return api === 'iframe' ? formatPayTRBasket(basket) : formatPayTRDirectBasket(basket);
   }
 
   private resolveMerchantOid(conversationId?: string): string {
@@ -211,7 +222,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_name: `${request.buyer.name} ${request.buyer.surname}`,
         user_address: request.billingAddress?.address || request.shippingAddress?.address || '',
         user_phone: request.buyer.gsmNumber,
-        user_basket: this.buildBasket(request.basketItems),
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
         ...this.cardFields(request),
       };
 
@@ -254,6 +265,9 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
       // Stored cards are charged through the Direct API (3D form), not the iFrame
       return this.initStoredCardPayment(request);
     }
+    if (this.config.threeDSMode === 'direct') {
+      return this.initDirectPayment(request);
+    }
     let merchantOid: string | undefined;
     try {
       // iFrame flow: the card is entered on PayTR's page
@@ -263,7 +277,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         throw new ValidationError('callbackUrl is required');
       }
 
-      const userBasket = this.buildBasket(request.basketItems);
+      const userBasket = this.buildBasket(request.basketItems, 'iframe');
       const paymentAmount = convertToKurus(request.paidPrice ?? request.price);
       const currency = mapPayTRCurrency(request.currency);
       const noInstallment = request.installment === 1 ? '1' : '0';
@@ -600,6 +614,82 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
     };
   }
 
+  /**
+   * 3D payment with a new card through the Direct API: an auto-submitting form
+   * that the customer's browser posts to PayTR (the card never goes through
+   * PayTR's iFrame page). PayTR then runs 3D Secure, redirects to callbackUrl /
+   * failUrl, and sends the result to the notification URL.
+   */
+  private async initDirectPayment(
+    request: ThreeDSPaymentRequest & { failUrl?: string }
+  ): Promise<ThreeDSInitResponse> {
+    let merchantOid: string | undefined;
+    try {
+      this.validatePayment(request, { ...PAYTR_ORDER_RULES, card: true, saveCard: true });
+      merchantOid = this.resolveMerchantOid(request.conversationId);
+      if (!request.callbackUrl) {
+        throw new ValidationError('callbackUrl is required');
+      }
+      const installmentCount =
+        request.installment && request.installment > 1 ? String(request.installment) : '0';
+      const paymentAmount = formatPayTRAmount(request.paidPrice ?? request.price);
+      const currency = mapPayTRCurrency(request.currency);
+
+      const fields: Record<string, string> = {
+        merchant_id: this.config.merchantId,
+        user_ip: request.buyer.ip,
+        merchant_oid: merchantOid,
+        email: request.buyer.email,
+        payment_amount: paymentAmount,
+        payment_type: 'card',
+        installment_count: installmentCount,
+        currency,
+        test_mode: this.testMode,
+        non_3d: '0',
+      };
+      fields.paytr_token = await generatePayTRDirectToken(
+        {
+          merchantId: fields.merchant_id,
+          userIp: fields.user_ip,
+          merchantOid,
+          email: fields.email,
+          paymentAmount,
+          paymentType: 'card',
+          installmentCount,
+          currency,
+          testMode: fields.test_mode,
+          non3d: '0',
+        },
+        this.config.merchantSalt,
+        this.config.merchantKey
+      );
+      Object.assign(fields, {
+        client_lang: this.lang,
+        debug_on: this.testMode,
+        user_name: `${request.buyer.name} ${request.buyer.surname}`,
+        user_address: request.billingAddress?.address || request.shippingAddress?.address || '',
+        user_phone: request.buyer.gsmNumber,
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
+        merchant_ok_url: request.callbackUrl,
+        merchant_fail_url: request.failUrl || request.callbackUrl,
+        ...this.cardFields(request),
+      });
+
+      const action = `${this.config.baseUrl!.replace(/\/$/, '')}/odeme`;
+      return this.withErrorCode({
+        status: PaymentStatus.PENDING,
+        threeDSHtmlContent: buildAutoSubmitForm(action, fields),
+        paymentId: merchantOid,
+        conversationId: merchantOid,
+      });
+    } catch (error) {
+      return this.failure<ThreeDSInitResponse>(error, '3DS initialization failed', {
+        paymentId: merchantOid,
+        conversationId: merchantOid,
+      });
+    }
+  }
+
   /** 3D payment with a stored card, via the Direct API form (createPaymentWithToken) */
   private async initStoredCardPayment(
     request: ThreeDSPaymentRequest & { failUrl?: string }
@@ -688,7 +778,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_name: `${request.buyer.name} ${request.buyer.surname}`,
         user_address: request.buyer.address || '',
         user_phone: request.buyer.gsmNumber,
-        user_basket: this.buildBasket(request.basketItems),
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
         merchant_ok_url: request.callbackUrl,
         merchant_fail_url: request.failUrl || request.callbackUrl,
       });
