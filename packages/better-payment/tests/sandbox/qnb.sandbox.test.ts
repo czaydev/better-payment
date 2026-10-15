@@ -31,6 +31,8 @@ describe.skipIf(!env)('QNB sandbox', () => {
     const result = await qnb.getPayment(orderId('QNBNONE'));
     record('qnb', 'status-unknown-order', result.rawResponse);
     expect(result.status).toBe(PaymentStatus.FAILURE);
+    // A credential error is also a failure, but does not verify the inquiry contract.
+    expect(result.errorCode).toBe('V013');
     expect(result.errorMessage).toBeTruthy();
   });
 

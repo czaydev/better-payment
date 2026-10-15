@@ -50,6 +50,9 @@ describe.skipIf(!env)('Ziraat Katılım sandbox', () => {
 
       const cancel = await ziraatkatilim.cancel({ paymentId: id, ip: '85.34.78.112' });
       expect(cancel.status, describeResult(cancel)).toBe(PaymentStatus.SUCCESS);
+
+      const afterCancel = await ziraatkatilim.getPayment(id);
+      expect(afterCancel.status, describeResult(afterCancel)).toBe(PaymentStatus.CANCELLED);
     });
   });
 });
