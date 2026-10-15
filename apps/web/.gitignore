@@ -42,3 +42,9 @@ next-env.d.ts
 
 # fumadocs generated
 .source
+
+# Rebuilt from source before dev/build; never edit generated documentation
+/public/api-reference/
+/public/llms/
+/public/llms.txt
+/public/llms-full.txt

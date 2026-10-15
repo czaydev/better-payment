@@ -4,6 +4,7 @@ import { loader, type LoaderPlugin } from "fumadocs-core/source";
 import { toFumadocsSource } from "fumadocs-mdx/runtime/server";
 import { i18n, type Locale } from "@/lib/i18n/config";
 import { releaseStatus } from "@/lib/release";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Sidebar group icons from the brand's frosted-glass set
@@ -15,7 +16,7 @@ function brandIconsPlugin(): LoaderPlugin {
       node.icon = createElement("img", {
         // Fumadocs renders the icon inside a list of children
         key: "icon",
-        src: `/brand/docs-icons/${node.icon}.webp`,
+        src: withBasePath(`/brand/docs-icons/${node.icon}.webp`),
         alt: "",
         width: 20,
         height: 20,

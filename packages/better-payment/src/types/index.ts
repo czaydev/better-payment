@@ -4,7 +4,7 @@ export type { PaymentCard, Address } from './common';
 import { PaymentStatus, PaymentCard, Address } from './common';
 
 /**
- * Para birimi
+ * Currency
  */
 export enum Currency {
   TRY = 'TRY',
@@ -14,7 +14,7 @@ export enum Currency {
 }
 
 /**
- * Alıcı bilgileri
+ * Buyer details
  */
 export interface Buyer {
   id: string;
@@ -31,7 +31,7 @@ export interface Buyer {
 }
 
 /**
- * Sepet item tipi
+ * Basket item type
  */
 export enum BasketItemType {
   PHYSICAL = 'PHYSICAL',
@@ -39,7 +39,7 @@ export enum BasketItemType {
 }
 
 /**
- * Sepet item
+ * Basket item
  */
 export interface BasketItem {
   id: string;
@@ -51,7 +51,7 @@ export interface BasketItem {
 }
 
 /**
- * Ödeme isteği parametreleri
+ * Payment request parameters
  */
 export interface PaymentRequest {
   price: string;
@@ -75,16 +75,16 @@ export interface PaymentRequest {
   basketItems: BasketItem[];
   callbackUrl?: string;
   /**
-   * Sipariş/işlem numarası. Banka ve PayTR entegrasyonlarında sipariş numarası
-   * olarak kullanılır; verilmezse otomatik (alfanümerik) üretilir ve yanıtta döner.
+   * Order/transaction ID. Used as the order ID by bank and PayTR integrations;
+   * if omitted, an alphanumeric ID is generated and returned in the response.
    */
   conversationId?: string;
-  /** Taksit sayısı (1 = tek çekim) */
+  /** Installment count (1 = single payment) */
   installment?: number;
 }
 
 /**
- * Ödeme yanıtı
+ * Payment response
  */
 export interface PaymentResponse {
   status: PaymentStatus;
@@ -189,14 +189,14 @@ export interface DeleteCardResponse {
 }
 
 /**
- * 3D Secure ödeme isteği
+ * 3D Secure payment request
  */
 export interface ThreeDSPaymentRequest extends PaymentRequest {
   callbackUrl: string;
 }
 
 /**
- * 3D Secure ödeme başlatma yanıtı
+ * 3D Secure payment initialization response
  */
 export interface ThreeDSInitResponse {
   status: PaymentStatus;
@@ -217,7 +217,7 @@ export interface ThreeDSInitResponse {
 }
 
 /**
- * İade isteği
+ * Refund request
  */
 export interface RefundRequest {
   /** The paymentId returned by the payment (iyzico); the order id for other providers */
@@ -255,7 +255,7 @@ export interface VoidAuthorizationRequest {
 }
 
 /**
- * İade yanıtı
+ * Refund response
  */
 export interface RefundResponse {
   status: PaymentStatus;
@@ -272,22 +272,22 @@ export interface RefundResponse {
 }
 
 /**
- * İptal isteği
+ * Cancellation request
  */
 export interface CancelRequest {
   paymentId: string;
   ip: string;
   conversationId?: string;
   /**
-   * İşlemin toplam tutarı. İptal için tutar isteyen sağlayıcılarda (Parampos,
-   * Akbank) kullanılır; verilmezse mümkünse sorgulanır.
+   * Total transaction amount. Used by providers that require an amount for
+   * cancellation (Parampos, Akbank); queried when possible if omitted.
    */
   price?: string;
   currency?: Currency | string;
 }
 
 /**
- * İptal yanıtı
+ * Cancellation response
  */
 export interface CancelResponse {
   status: PaymentStatus;
@@ -305,7 +305,7 @@ export interface CancelResponse {
 }
 
 /**
- * BIN sorgulama yanıtı
+ * BIN lookup response
  */
 export interface BinCheckResponse {
   binNumber: string;
@@ -319,7 +319,7 @@ export interface BinCheckResponse {
 }
 
 /**
- * Checkout Form isteği
+ * Checkout Form request
  */
 export interface CheckoutFormRequest {
   price: string;
@@ -336,7 +336,7 @@ export interface CheckoutFormRequest {
 }
 
 /**
- * Checkout Form başlatma yanıtı
+ * Checkout Form initialization response
  */
 export interface CheckoutFormInitResponse {
   status: PaymentStatus;
@@ -356,7 +356,7 @@ export interface CheckoutFormInitResponse {
 }
 
 /**
- * Checkout Form sonuç yanıtı
+ * Checkout Form result response
  */
 export interface CheckoutFormRetrieveResponse {
   status: PaymentStatus;
@@ -392,7 +392,7 @@ export interface CheckoutFormRetrieveResponse {
 }
 
 /**
- * PWI (Payment With IBAN - Korumalı Havale/EFT) İsteği
+ * PWI (Payment With IBAN - protected bank transfer) request
  */
 export interface PWIPaymentRequest {
   price: string;
@@ -408,14 +408,16 @@ export interface PWIPaymentRequest {
 }
 
 /**
- * PWI Ödeme Başlatma Yanıtı
+ * PWI payment initialization response
  */
 export interface PWIPaymentInitResponse {
   status: PaymentStatus;
-  htmlContent?: string; // Müşteriye gösterilecek HTML içeriği
+  /** HTML content to display to the customer */
+  htmlContent?: string;
   token?: string;
   tokenExpireTime?: number;
-  paymentPageUrl?: string; // Ödeme sayfası URL'i
+  /** Payment page URL */
+  paymentPageUrl?: string;
   conversationId?: string;
   /** Normalized error code, set on failures */
   code?: PaymentErrorCode;
@@ -428,16 +430,16 @@ export interface PWIPaymentInitResponse {
 }
 
 /**
- * PWI Ödeme Durumu
+ * PWI payment status
  */
 export enum PWIPaymentStatus {
-  WAITING = 'WAITING', // Havale bekleniyor
-  SUCCESS = 'SUCCESS', // Havale başarılı
-  FAILURE = 'FAILURE', // Havale başarısız/iptal edildi
+  WAITING = 'WAITING', // Awaiting bank transfer
+  SUCCESS = 'SUCCESS', // Bank transfer succeeded
+  FAILURE = 'FAILURE', // Bank transfer failed or was cancelled
 }
 
 /**
- * PWI Ödeme Sorgulama Yanıtı
+ * PWI payment query response
  */
 export interface PWIPaymentRetrieveResponse {
   status: PaymentStatus;
@@ -453,8 +455,10 @@ export interface PWIPaymentRetrieveResponse {
   merchantCommissionRateAmount?: number;
   iyziCommissionRateAmount?: number;
   iyziCommissionFee?: number;
-  iban?: string; // Havale yapılacak IBAN
-  bankName?: string; // Banka adı
+  /** Destination IBAN for the bank transfer */
+  iban?: string;
+  /** Bank name */
+  bankName?: string;
   buyerName?: string;
   buyerSurname?: string;
   buyerEmail?: string;
@@ -470,48 +474,66 @@ export interface PWIPaymentRetrieveResponse {
 }
 
 /**
- * Taksit Detay Bilgisi
+ * Installment details
  */
 export interface InstallmentDetail {
-  installmentNumber: number; // Taksit sayısı (1 = tek çekim)
-  totalPrice: number; // Toplam tutar
-  installmentPrice: number; // Taksit başına tutar
+  /** Installment count (1 = single payment) */
+  installmentNumber: number;
+  /** Total amount */
+  totalPrice: number;
+  /** Amount per installment */
+  installmentPrice: number;
   /** Commission rate in percent that produced totalPrice, when the provider reports it */
   commissionRate?: number;
 }
 
 /**
- * Taksit Bilgisi (Banka Bazında)
+ * Installment options by bank
  */
 export interface InstallmentPrice {
-  binNumber: string; // Kart BIN numarası
-  price: number; // Fiyat
-  cardType: string; // Kart tipi (CREDIT_CARD, DEBIT_CARD)
-  cardAssociation: string; // Kart kuruluşu (VISA, MASTER_CARD, TROY, AMEX)
-  cardFamilyName: string; // Kart ailesi adı (Bonus, Maximum, Axess, World, vb.)
-  force3ds?: number; // 3DS zorunluluğu (0: hayır, 1: evet)
-  bankCode: number; // Banka kodu
-  bankName: string; // Banka adı
-  forceCvc?: number; // CVC zorunluluğu (0: hayır, 1: evet)
-  commercial: number; // Ticari kart mı (0: hayır, 1: evet)
-  installmentPrices: InstallmentDetail[]; // Taksit detayları
+  /** Card BIN */
+  binNumber: string;
+  /** Price */
+  price: number;
+  /** Card type (CREDIT_CARD, DEBIT_CARD) */
+  cardType: string;
+  /** Card association (VISA, MASTER_CARD, TROY, AMEX) */
+  cardAssociation: string;
+  /** Card family name (Bonus, Maximum, Axess, World, etc.) */
+  cardFamilyName: string;
+  /** Whether 3DS is required (0: no, 1: yes) */
+  force3ds?: number;
+  /** Bank code */
+  bankCode: number;
+  /** Bank name */
+  bankName: string;
+  /** Whether CVC is required (0: no, 1: yes) */
+  forceCvc?: number;
+  /** Whether this is a commercial card (0: no, 1: yes) */
+  commercial: number;
+  /** Installment details */
+  installmentPrices: InstallmentDetail[];
 }
 
 /**
- * Taksit Sorgulama İsteği
+ * Installment query request
  */
 export interface InstallmentInfoRequest {
-  binNumber: string; // Kredi kartı BIN numarası (ilk 6-8 hane)
-  price: string; // Ödeme tutarı
-  conversationId?: string; // İsteğe bağlı conversation ID
+  /** Credit card BIN (first 6-8 digits) */
+  binNumber: string;
+  /** Payment amount */
+  price: string;
+  /** Optional conversation ID */
+  conversationId?: string;
 }
 
 /**
- * Taksit Sorgulama Yanıtı
+ * Installment query response
  */
 export interface InstallmentInfoResponse {
   status: PaymentStatus;
-  installmentDetails?: InstallmentPrice[]; // Taksit detayları
+  /** Installment details */
+  installmentDetails?: InstallmentPrice[];
   conversationId?: string;
   /** Normalized error code, set on failures */
   code?: PaymentErrorCode;

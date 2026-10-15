@@ -1,0 +1,68 @@
+---
+title: Denizbank
+description: Denizbank sanal POS (InterVPos) entegrasyon referansı.
+since: 0.12.0
+---
+
+Denizbank InterVPos API'sini 3D Model ile kullanır: banka kartı doğrular, ödeme ardından 3D Secure verileriyle tahsil edilir. 3D formu `base64(SHA1(ShopCode + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))` ile imzalanır.
+
+<Callout type="warn">
+  Denizbank sağlayıcısı henüz bir test mağazasıyla doğrulanmadı: test sunucusuna erişilemedi, canlı ortam adresinde yalnızca cevap formatı (kart bilgisi gönderilmeden) kontrol edildi. 3D Pay ve sipariş durumu sorgusu henüz desteklenmiyor: 3D Pay'de ödemenin tek kanıtı callback olurdu ve `HASH` değerleri ayraçsız birleştirdiği için ödemeyi tek başına bir siparişe bağlayamaz. 3D Model `Auth` ile ödeme alır ve sonucu bankanın cevabı belirler. Canlıya geçmeden önce küçük bir tutarla test edin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, denizbank } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    denizbank: denizbank({
+      shopCode: process.env.DENIZBANK_SHOP_CODE!,
+      userCode: process.env.DENIZBANK_API_USER!,
+      userPass: process.env.DENIZBANK_API_PASSWORD!,
+      merchantPass: process.env.DENIZBANK_STORE_KEY!, // 3D Secure store key
+      // baseUrl: defaults from mode (test.inter-vpos.com.tr / inter-vpos.com.tr)
+    }),
+  },
+});
+```
+
+`merchantPass` yalnızca hash hesaplamasında kullanılır ve hiçbir zaman gönderilmez; API şifresi de 3D formuna hiçbir zaman konmaz. `paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.denizbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// Auth (NonSecure); success when ProcReturnCode is 00
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.denizbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/denizbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits the signed form to InterVPos
+```
+
+Denizbank sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.denizbank.completeThreeDSPayment(callbackBody);
+```
+
+`HASH`, `HASHPARAMS` içinde adı geçen alanlardan yeniden oluşturulur (`HASHPARAMSVAL` hiçbir zaman kullanılmaz) ve `OrderId` alanını kapsamalıdır; bunu geçemeyen ya da başka bir mağazaya ait callback `INVALID_HASH` olarak reddedilir. Değerler ayraçsız birleştirildiği için kart ardından callback'teki 3D Secure verileriyle (`MD`, `PayerTxnId`, `Eci`, `PayerAuthenticationCode`) `Auth` olarak tahsil edilir ve sonucu bankanın cevabı belirler. `paymentId` ve `conversationId` yalnızca bankanın onayladığı bir ödemede doldurulur.
+
+## İade ve iptal [#refund--cancel]
+
+```typescript
+await payment.denizbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+await payment.denizbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Void
+```
+
+<Callout type="info">
+  Denizbank için sipariş durumu, BIN ve taksit sorgusu henüz desteklenmiyor: `getPayment()`, `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
+</Callout>

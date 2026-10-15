@@ -3,6 +3,7 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { withBasePath } from "@/lib/base-path";
 
 function footerLinks(t: Dictionary["footer"]) {
   return [
@@ -59,14 +60,14 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
               className="flex items-center gap-2.5 mb-4 w-fit group"
             >
               <Image
-                src="/brand/better-payment-horizontal-color.svg"
+                src={withBasePath("/brand/better-payment-horizontal-color.svg")}
                 width={1226}
                 height={155}
                 alt="Better Payment"
                 className="h-7 w-auto dark:hidden"
               />
               <Image
-                src="/brand/better-payment-horizontal-dark.svg"
+                src={withBasePath("/brand/better-payment-horizontal-dark.svg")}
                 width={1226}
                 height={155}
                 alt="Better Payment"

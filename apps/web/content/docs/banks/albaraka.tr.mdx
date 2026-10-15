@@ -1,0 +1,84 @@
+---
+title: Albaraka Türk
+description: Albaraka Türk sanal POS (e-POS, Posnet JSON API) entegrasyon referansı.
+since: 0.12.0
+---
+
+Albaraka Türk'ün bir Posnet servisi olan e-POS JSON API'sini kullanır. İstekler bir MAC ile imzalanır: `base64(SHA256(MACParams içinde adı geçen değerler + encKey))`.
+
+<Callout type="warn">
+  Henüz bir test mağazasıyla doğrulanmadı: Albaraka test mağazasını talep üzerine verir. Test sunucusuna sağlayıcı üzerinden ulaşıldı: satış, ön provizyon, provizyon tahsilatı, 3D tahsilatı, iade ve iptal istekleri kabul edildi ve uydurma üye işyeri için `0148 UNAUTHORIZED REQUEST` döndü; sorgu `E219` (kayıt bulunamadı) döndü; 3D sayfası da formu aldı. Canlıya geçmeden önce küçük bir tutarla test edin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, albaraka } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    albaraka: albaraka({
+      merchantId: process.env.ALBARAKA_MERCHANT_ID!,
+      terminalId: process.env.ALBARAKA_TERMINAL_ID!,
+      posnetId: process.env.ALBARAKA_POSNET_ID!,
+      encKey: process.env.ALBARAKA_ENC_KEY!,
+      // acceptedMdStatuses?: string[] (default ['1'])
+      // baseUrl: defaults from mode (epostest.albarakaturk.com.tr / epos.albarakaturk.com.tr)
+    }),
+  },
+});
+```
+
+Tüm değerler Albaraka Türk'ten alınır. `encKey` yalnızca MAC için kullanılır ve hiç gönderilmez.
+
+Sipariş numaraları en fazla 20 harf veya rakamdır; bankaya soldan sıfırla 20 karaktere tamamlanarak gider. `paymentId` bankanın `ReferenceCode` değeridir ve `refund()` ile `cancel()` bunu alır; `conversationId` sizin sipariş numaranızdır.
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.albaraka.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// JSON Sale; success when ResponseCode is 00. result.paymentId is the ReferenceCode
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.albaraka.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/albaraka/callback',
+});
+// init.threeDSHtmlContent auto-submits the signed form to the 3D verification page
+
+// In your callback route, with the order from your own records
+const result = await payment.albaraka.completeThreeDSPayment({
+  ...callbackBody,
+  orderId: 'ORDER123',
+  amount: '100.00',
+  currency: 'TRY',
+});
+```
+
+Callback imzalı değildir ve sipariş tutarını taşımaz; bu yüzden `completeThreeDSPayment()` sipariş numarası, tutar ve para birimini sizin kayıtlarınızdan alır. `MdStatus` kabul edilen bir değerse (varsayılan olarak yalnızca `1`; bkz. `acceptedMdStatuses`), kart 3D verileriyle JSON `Sale` üzerinden tahsil edilir ve sonucu bankanın cevabı belirler. Başarısız bir sonuç numara taşımaz.
+
+Bu nedenle Albaraka için handler'ın yalnızca POST gövdesini bilen `complete-3ds` adresi yerine kendi callback adresinizi kullanın.
+
+## İade, iptal, durum ve ön provizyon [#refund-cancel-status--pre-authorization]
+
+```typescript
+await payment.albaraka.refund({ paymentId: referenceCode, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Return
+await payment.albaraka.cancel({ paymentId: referenceCode, ip: '1.2.3.4' });                               // Reverse
+const status = await payment.albaraka.getPayment('ORDER123'); // TransactionInquiry, by order id
+
+const auth = await payment.albaraka.authorize({ ...paymentRequest, conversationId: 'ORDER124' }); // Auth
+await payment.albaraka.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });   // Capture
+await payment.albaraka.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.4' });          // Reverse
+```
+
+`getPayment()` sizin **sipariş numaranızı** alır, çünkü bankanın sorgusu sipariş numarasıyla çalışır (`refund()` ve `cancel()` ise `ReferenceCode` alır). Bilinmeyen bir sipariş `E219` ile başarısız olur. Bulunan bir siparişin `TransactionData` alanı, aynı Posnet altyapısındaki Yapı Kredi'nin dokümanlı `agreement` cevabı gibi okunur: başarılı (`TxnStatus` 1) bir satış `success`, başarılı bir iptal veya iade `cancelled` döner. İşlemlerde `State` / `TxnStatus` yoksa (biçim henüz gerçek bir üye işyeriyle doğrulanmadı) durum `pending` olur ve cevap `rawResponse` içinde gelir.
+
+3D ön provizyon için `initThreeDSAuthorize()` ile başlayın ve `completeThreeDSPayment()` çağrısına `transactionType: 'Auth'` verin.
+
+<Callout type="info">
+  BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
+</Callout>
