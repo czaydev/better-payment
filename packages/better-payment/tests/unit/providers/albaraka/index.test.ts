@@ -75,6 +75,59 @@ describe('Albaraka provider', () => {
     expect(() => create({ [field]: '' })).toThrow(field);
   });
 
+  describe.each([
+    'createPayment',
+    'authorize',
+    'initThreeDSPayment',
+    'initThreeDSAuthorize',
+  ] as const)('%s order ids', (method) => {
+    const threeDS = method === 'initThreeDSPayment' || method === 'initThreeDSAuthorize';
+
+    it('generates a bank-compatible id when conversationId is omitted', async () => {
+      post.mockResolvedValue({ data: albarakaResponse() });
+      const request = {
+        ...mockThreeDSPaymentRequest,
+        paymentCard: card,
+        conversationId: undefined,
+      };
+      const result = await provider[method](request);
+
+      expect(result.status).toBe(threeDS ? PaymentStatus.PENDING : PaymentStatus.SUCCESS);
+      expect(result.conversationId).toMatch(/^[A-F0-9]{20}$/);
+      const body = 'threeDSHtmlContent' in result ? formFields(result.threeDSHtmlContent!) : sent();
+      expect(body.OrderId).toBe(result.conversationId);
+      const next = await provider[method](request);
+      expect(next.conversationId).not.toBe(result.conversationId);
+    });
+
+    it('preserves a caller id at the 20-character limit', async () => {
+      post.mockResolvedValue({ data: albarakaResponse() });
+      const conversationId = 'A'.repeat(20);
+      const result = await provider[method]({
+        ...mockThreeDSPaymentRequest,
+        paymentCard: card,
+        conversationId,
+      });
+
+      expect(result.status).toBe(threeDS ? PaymentStatus.PENDING : PaymentStatus.SUCCESS);
+      expect(result.conversationId).toBe(conversationId);
+      const body = 'threeDSHtmlContent' in result ? formFields(result.threeDSHtmlContent!) : sent();
+      expect(body.OrderId).toBe(conversationId);
+    });
+
+    it('rejects an overlong caller id instead of truncating it', async () => {
+      const result = await provider[method]({
+        ...mockThreeDSPaymentRequest,
+        paymentCard: card,
+        conversationId: 'A'.repeat(21),
+      });
+
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.code).toBe(PaymentErrorCode.INVALID_REQUEST);
+      expect(post).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createPayment', () => {
     it('sends a JSON Sale with every data member and the MAC (reference vector)', async () => {
       post.mockResolvedValue({ data: albarakaResponse() });

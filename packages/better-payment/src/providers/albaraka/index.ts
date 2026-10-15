@@ -9,7 +9,7 @@ import { PaymentProvider } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId } from '../../core/utils';
+import { randomHex } from '../../core/crypto';
 import {
   PaymentRequest,
   PaymentResponse,
@@ -42,6 +42,11 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/** 80 random bits fit Albaraka's 20-character alphanumeric order id limit. */
+function generateAlbarakaOrderId(): string {
+  return randomHex(10).toUpperCase();
 }
 
 /**
@@ -155,7 +160,7 @@ export class Albaraka extends PaymentProvider<AlbarakaConfig> {
   }
 
   private async pay(request: PaymentRequest, operation: 'Sale' | 'Auth'): Promise<PaymentResponse> {
-    const orderId = request.conversationId || generateOrderId();
+    const orderId = request.conversationId || generateAlbarakaOrderId();
     try {
       const bankOrderId = formatAlbarakaOrderId(orderId);
       this.validatePayment(request, { card: true });
@@ -231,7 +236,7 @@ export class Albaraka extends PaymentProvider<AlbarakaConfig> {
     request: ThreeDSPaymentRequest,
     transactionType: 'Sale' | 'Auth'
   ): Promise<ThreeDSInitResponse> {
-    const orderId = request.conversationId || generateOrderId();
+    const orderId = request.conversationId || generateAlbarakaOrderId();
     try {
       const bankOrderId = formatAlbarakaOrderId(orderId);
       this.validatePayment(request, { card: true });
