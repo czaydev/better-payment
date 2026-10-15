@@ -1,5 +1,5 @@
 /**
- * İyzico API yanıt tipleri
+ * iyzico API response types
  */
 
 export interface IyzicoResponse {
@@ -71,7 +71,7 @@ export interface IyzicoCancelResponse extends IyzicoResponse {
 }
 
 /**
- * İyzico API istek tipleri
+ * iyzico API request types
  */
 
 export interface IyzicoPaymentCard {
@@ -163,7 +163,7 @@ export interface IyzicoPaymentRequest {
 }
 
 /**
- * İyzico Checkout Form İstek Tipi
+ * iyzico Checkout Form request type
  */
 export interface IyzicoCheckoutFormRequest {
   locale: string;
@@ -183,7 +183,7 @@ export interface IyzicoCheckoutFormRequest {
 }
 
 /**
- * İyzico Checkout Form Initialize Response
+ * iyzico Checkout Form initialization response
  */
 export interface IyzicoCheckoutFormInitResponse extends IyzicoResponse {
   checkoutFormContent?: string;
@@ -193,7 +193,7 @@ export interface IyzicoCheckoutFormInitResponse extends IyzicoResponse {
 }
 
 /**
- * İyzico Checkout Form Retrieve Response
+ * iyzico Checkout Form retrieval response
  */
 export interface IyzicoCheckoutFormRetrieveResponse extends IyzicoResponse {
   paymentId?: string;
@@ -235,11 +235,11 @@ export interface IyzicoBinCheckResponse extends IyzicoResponse {
 }
 
 /**
- * İyzico PWI (Payment With IBAN - Korumalı Havale/EFT) Tipleri
+ * iyzico PWI (Payment With IBAN - protected bank transfer) types
  */
 
 /**
- * PWI Ödeme Başlatma İsteği
+ * PWI payment initialization request
  */
 export interface IyzicoPWIPaymentRequest {
   locale: string;
@@ -257,22 +257,26 @@ export interface IyzicoPWIPaymentRequest {
 }
 
 /**
- * PWI Ödeme Başlatma Yanıtı
+ * PWI payment initialization response
  */
 export interface IyzicoPWIPaymentInitResponse extends IyzicoResponse {
-  htmlContent?: string; // Müşteriye gösterilecek HTML içeriği
-  token?: string; // PWI token
+  /** HTML content to display to the customer */
+  htmlContent?: string;
+  /** PWI token */
+  token?: string;
   tokenExpireTime?: number;
-  paymentPageUrl?: string; // Ödeme sayfası URL'i
+  /** Payment page URL */
+  paymentPageUrl?: string;
 }
 
 /**
- * PWI Ödeme Sorgulama Yanıtı
+ * PWI payment query response
  */
 export interface IyzicoPWIPaymentRetrieveResponse extends IyzicoResponse {
   token?: string;
   callbackUrl?: string;
-  paymentStatus?: string; // WAITING, SUCCESS, FAILURE
+  /** WAITING, SUCCESS, FAILURE */
+  paymentStatus?: string;
   paymentId?: string;
   price?: number;
   paidPrice?: number;
@@ -290,7 +294,7 @@ export interface IyzicoPWIPaymentRetrieveResponse extends IyzicoResponse {
 }
 
 /**
- * İyzico Taksit Detay Bilgisi
+ * iyzico installment details
  */
 export interface IyzicoInstallmentDetail {
   installmentNumber: number;
@@ -299,7 +303,7 @@ export interface IyzicoInstallmentDetail {
 }
 
 /**
- * İyzico Taksit Fiyat Bilgisi
+ * iyzico installment pricing
  */
 export interface IyzicoInstallmentPrice {
   binNumber: string;
@@ -316,7 +320,7 @@ export interface IyzicoInstallmentPrice {
 }
 
 /**
- * İyzico Taksit Sorgulama İsteği
+ * iyzico installment query request
  */
 export interface IyzicoInstallmentInfoRequest {
   locale?: string;
@@ -326,7 +330,7 @@ export interface IyzicoInstallmentInfoRequest {
 }
 
 /**
- * İyzico Taksit Sorgulama Yanıtı
+ * iyzico installment query response
  */
 export interface IyzicoInstallmentInfoResponse extends IyzicoResponse {
   installmentDetails?: IyzicoInstallmentPrice[];

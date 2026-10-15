@@ -1,0 +1,97 @@
+---
+title: Albaraka Türk
+description: Albaraka Türk virtual POS (e-POS, Posnet JSON API) integration reference.
+since: 0.12.0
+---
+
+Uses Albaraka Türk's e-POS JSON API, a Posnet service. Requests are signed with a MAC:
+`base64(SHA256(the values named in MACParams + encKey))`.
+
+<Callout type="warn">
+  Not verified with a test merchant yet: Albaraka gives test stores on request. The test host was reached through the provider: sale, pre-authorization, capture, 3D completion, refund and cancel requests were accepted and answered `0148 UNAUTHORIZED REQUEST` for the made-up merchant, the inquiry answered `E219` (not found), and the 3D page took the form. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, albaraka } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    albaraka: albaraka({
+      merchantId: process.env.ALBARAKA_MERCHANT_ID!,
+      terminalId: process.env.ALBARAKA_TERMINAL_ID!,
+      posnetId: process.env.ALBARAKA_POSNET_ID!,
+      encKey: process.env.ALBARAKA_ENC_KEY!,
+      // acceptedMdStatuses?: string[] (default ['1'])
+      // baseUrl: defaults from mode (epostest.albarakaturk.com.tr / epos.albarakaturk.com.tr)
+    }),
+  },
+});
+```
+
+All values come from Albaraka Türk. `encKey` is only used for the MAC and is never sent.
+
+Order ids are up to 20 letters or digits; the bank receives them padded with zeros to 20.
+`paymentId` is the bank's `ReferenceCode`, which `refund()` and `cancel()` take, and
+`conversationId` is your order id.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.albaraka.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// JSON Sale; success when ResponseCode is 00. result.paymentId is the ReferenceCode
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.albaraka.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/albaraka/callback',
+});
+// init.threeDSHtmlContent auto-submits the signed form to the 3D verification page
+
+// In your callback route, with the order from your own records
+const result = await payment.albaraka.completeThreeDSPayment({
+  ...callbackBody,
+  orderId: 'ORDER123',
+  amount: '100.00',
+  currency: 'TRY',
+});
+```
+
+The callback is not signed and does not carry the order amount, so `completeThreeDSPayment()`
+takes the order id, amount and currency from your records. When `MdStatus` is accepted (only `1`
+by default; see `acceptedMdStatuses`), the card is charged with JSON `Sale` and the 3D data, and the
+bank's answer decides. A failure carries no ids.
+
+Because of this, use your own callback route for Albaraka rather than the handler's `complete-3ds`
+route, which only has the POST body.
+
+## Refund, Cancel, Status & Pre-authorization
+
+```typescript
+await payment.albaraka.refund({ paymentId: referenceCode, price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Return
+await payment.albaraka.cancel({ paymentId: referenceCode, ip: '1.2.3.4' });                               // Reverse
+const status = await payment.albaraka.getPayment('ORDER123'); // TransactionInquiry, by order id
+
+const auth = await payment.albaraka.authorize({ ...paymentRequest, conversationId: 'ORDER124' }); // Auth
+await payment.albaraka.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });   // Capture
+await payment.albaraka.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.4' });          // Reverse
+```
+
+`getPayment()` takes your **order id**, since the bank's inquiry works by order id (`refund()` and
+`cancel()` take the `ReferenceCode`). An unknown order fails with `E219`. A found order's `TransactionData` is read like Yapı Kredi's
+documented `agreement` answer on the same Posnet platform: a successful (`TxnStatus` 1) sale is
+`success`, and a successful reverse or return makes it `cancelled`. If the transactions don't carry
+`State` / `TxnStatus` (the format is not confirmed with a real merchant yet), the status is
+`pending` and the answer is in `rawResponse`.
+
+For a 3D pre-authorization, start with `initThreeDSAuthorize()` and pass `transactionType: 'Auth'`
+to `completeThreeDSPayment()`.
+
+<Callout type="info">
+  BIN and installment queries are not supported: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.
+</Callout>

@@ -58,7 +58,8 @@ function escapeHtml(value: string): string {
 
 /**
  * EST (Asseco) virtual POS, shared by İş Bankası, Ziraat Bankası, Halkbank,
- * TEB and Şekerbank. One provider class, configured per bank.
+ * TEB, Şekerbank, Akbank (its older virtual POS) and Halkbank Macedonia. One
+ * provider class, configured per bank.
  *
  * - createPayment():          XML API `Auth` (non-3D)
  * - initThreeDSPayment():     auto-submitting form to `/fim/est3Dgate` (storetype 3d,
@@ -546,6 +547,8 @@ const EST_PROVIDER_TYPES: Record<EstBank, RemoteProviderType> = {
   halkbank: ProviderType.HALKBANK,
   teb: ProviderType.TEB,
   sekerbank: ProviderType.SEKERBANK,
+  akbankest: ProviderType.AKBANKEST,
+  halkbankmkd: ProviderType.HALKBANKMKD,
 };
 
 /**

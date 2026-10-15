@@ -2,8 +2,8 @@ import { digest, hmac, toBase64, toHex } from '../../core/crypto';
 import { VERSION } from '../../version';
 
 /**
- * İyzico V2 authorization header oluşturur
- * Resmi iyzico-node SDK algoritmasına göre
+ * Generates an iyzico V2 authorization header
+ * Following the official iyzico-node SDK algorithm
  */
 export async function generateIyzicoAuthStringV2(
   apiKey: string,
@@ -12,10 +12,10 @@ export async function generateIyzicoAuthStringV2(
   uri: string,
   requestBody: string
 ): Promise<string> {
-  // 1. Signature oluştur: HMAC-SHA256(randomString + uri + requestBody)
+  // 1. Create the signature: HMAC-SHA256(randomString + uri + requestBody)
   const signature = toHex(await hmac('SHA-256', secretKey, randomString + uri + requestBody));
 
-  // 2. Authorization parametrelerini birleştir
+  // 2. Combine the authorization parameters
   const authorizationParams = [
     `apiKey:${apiKey}`,
     `randomKey:${randomString}`,
@@ -29,7 +29,7 @@ export async function generateIyzicoAuthStringV2(
 }
 
 /**
- * İyzico V1 authorization header oluşturur (fallback)
+ * Generates an iyzico V1 authorization header (fallback)
  */
 export async function generateIyzicoAuthStringV1(
   apiKey: string,
@@ -43,15 +43,15 @@ export async function generateIyzicoAuthStringV1(
 }
 
 /**
- * Random string oluşturur
+ * Generates a random string
  */
 export function generateRandomString(): string {
-  // İyzico SDK ile uyumlu format: timestamp + random
+  // Format compatible with the iyzico SDK: timestamp + random
   return Date.now() + Math.random().toString(36).slice(2);
 }
 
 /**
- * İyzico API isteği için header oluşturur
+ * Creates headers for an iyzico API request
  */
 export async function createIyzicoHeaders(
   apiKey: string,

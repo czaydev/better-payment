@@ -422,6 +422,7 @@ IYZICO_SANDBOX_API_KEY=... IYZICO_SANDBOX_SECRET_KEY=... pnpm test:sandbox
 | PayTR     | `PAYTR_SANDBOX_MERCHANT_ID`, `PAYTR_SANDBOX_MERCHANT_KEY`, `PAYTR_SANDBOX_MERCHANT_SALT` | `PAYTR_SANDBOX_CARD_NUMBER` (BIN/taksit sorgusu için) |
 | Parampos  | `PARAMPOS_SANDBOX_CLIENT_CODE`, `PARAMPOS_SANDBOX_CLIENT_USERNAME`, `PARAMPOS_SANDBOX_CLIENT_PASSWORD`, `PARAMPOS_SANDBOX_GUID` | `PARAMPOS_SANDBOX_BASE_URL`, `PARAMPOS_SANDBOX_CARD_*` |
 | Akbank    | `AKBANK_SANDBOX_MERCHANT_SAFE_ID`, `AKBANK_SANDBOX_TERMINAL_SAFE_ID`, `AKBANK_SANDBOX_SECRET_KEY` | `AKBANK_SANDBOX_CARD_*` |
+| Albaraka  | `ALBARAKA_SANDBOX_MERCHANT_ID`, `ALBARAKA_SANDBOX_TERMINAL_ID`, `ALBARAKA_SANDBOX_POSNET_ID`, `ALBARAKA_SANDBOX_ENC_KEY` | `ALBARAKA_SANDBOX_CARD_*` (zorunlu: testler kartsız çalışmaz) |
 | Sipay     | `SIPAY_SANDBOX_APP_ID`, `SIPAY_SANDBOX_APP_SECRET`, `SIPAY_SANDBOX_MERCHANT_KEY` (Sipay dokümanındaki ortak test üye işyeri kullanılabilir) | `SIPAY_SANDBOX_CARD_*` (varsayılan: Sipay test kartı `4508034508034509`) |
 | EST       | `EST_SANDBOX_CLIENT_ID`, `EST_SANDBOX_USERNAME`, `EST_SANDBOX_PASSWORD`, `EST_SANDBOX_STORE_KEY` | `EST_SANDBOX_BANK` (varsayılan `isbank`), `EST_SANDBOX_CARD_*` |
 
@@ -449,6 +450,7 @@ Web sitesi ve dokümantasyon İngilizce (varsayılan, `/docs/...`) ve Türkçe (
 - Başlık yapısı aynı kalır ve her Türkçe başlık İngilizce başlığın id'sini taşır (`## Taksit [#installments]`).
 - Bir İngilizce sayfayı değiştirdiğinizde Türkçesini aynı PR'da güncelleyin.
 - Kullanıcıya yönelik yeni özellikleri iki dilde de `<Since version="x.y.z" />` ile işaretleyin. Yeni bir provider veya plugin sayfasının frontmatter'ına da `since: x.y.z` ekleyin; aynı rozet başlığın altında, "Beta" rozeti de kenar çubuğunda görünür. Rozet `packages/better-payment/package.json`'u izler: sürüm daha düşükken "Henüz yayınlanmadı", o sürümün prerelease'iyken (`x.y.z-beta.N`, `beta` branch'inde) "Beta", yayınlanınca "x.y.z sürümünde eklendi". Beta stabil olunca elle bir şey silmek gerekmez. Ana sayfadaki yol haritasında (`apps/web/components/Banks.tsx`) yeni provider'a `live: true` yerine `since: "x.y.z"` verin.
+- Beta dokümanı, sitenin `beta`'dan `NEXT_PUBLIC_BASE_PATH=/beta` ile build edilen ikinci bir deployment'ıdır. Ana deployment'ta `BETA_ORIGIN` ayarlıysa aynı alan adında `/beta` altında sunulur (`apps/web/next.config.ts`). Doküman kenar çubuğundaki Stabil / Beta seçicisi ikisi arasında geçiş yapar. `next/link` base path'i kendisi ekler; `public/` içindeki dosyaların yollarını (görseller, videolar) `apps/web/lib/base-path.ts`'teki `withBasePath()` ile sarın.
 - Terimler için sözlüğe uyun (ön provizyon, taksit, sanal POS, …).
 
 Kurallar ve terim sözlüğü: [apps/web/TRANSLATIONS.md](apps/web/TRANSLATIONS.md). CI şu kontrolü çalıştırır:
@@ -458,6 +460,16 @@ cd apps/web
 node scripts/check-translations.mjs        # eksik çeviri, farklı kod bloğu, başlık id'leri
 node scripts/check-translations.mjs --fix  # başlık id'lerini ekler
 ```
+
+**Otomatik dokümantasyon:** web `dev` ve `build` komutları TypeDoc API referansını ve `llms.txt` / `llms-full.txt` dosyalarını üretir. `apps/web/public/api-reference` ve `apps/web/public/llms` altındaki çıktıları değil, kaynak yorumlarını veya MDX dosyalarını düzenleyin. TypeDoc tüm iç kaynak dosyalarını değil, paketin public giriş noktalarını kapsar. HTML çıktısı iki dilde ortak kullanılır. CI, stable ve `/beta` çıktılarını kontrol eder.
+
+```bash
+pnpm --filter web docs:test       # MDX dönüşümü ve route testleri
+pnpm --filter web docs:generate   # Next.js build olmadan TypeDoc + Markdown
+pnpm --filter web docs:check      # üretilen sayfalar ve public API hedefleri
+```
+
+Üretim, tanınmayan MDX bileşenlerini veya çalıştırılabilir ifadeleri sessizce atlamak yerine hata verir. Yeni bir doküman bileşeni eklerken `apps/web/scripts/docs-content.mjs` içine açık bir dönüşüm ve test ekleyin. Kod blokları kod olarak korunur, çalıştırılmaz.
 
 **Hata mesajı dilleri** (`localizedErrors`), `packages/better-payment/src/plugins/localized-errors/` altında her dil için bir dosyadır. Mesajları müşteriye doğal gelecek şekilde yazın. Paket boyutu kontrolüne (`pnpm --filter better-payment size`) sığdırmak için asla kısaltmayın: yeni bir dil sınırı aşarsa PR'da belirtin, sınırı bakımcılar yükseltir.
 

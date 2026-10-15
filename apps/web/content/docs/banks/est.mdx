@@ -20,7 +20,7 @@ import { betterPayment, est } from 'better-payment';
 const payment = betterPayment({
   providers: {
     isbank: est({
-      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank'
+      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd'
       clientId: process.env.EST_CLIENT_ID!,
       username: process.env.EST_API_USER!,
       password: process.env.EST_API_PASSWORD!,
@@ -39,6 +39,25 @@ const payment = betterPayment({
 `storeType` must match the 3D model the bank set up for your store.
 
 `paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+### Banks
+
+| Bank | `bank` | Production host |
+| ---- | ------ | --------------- |
+| İş Bankası | `isbank` | `https://sanalpos.isbank.com.tr` |
+| Ziraat Bankası | `ziraat` | `https://sanalpos2.ziraatbank.com.tr` |
+| Halkbank | `halkbank` | `https://sanalpos.halkbank.com.tr` |
+| TEB | `teb` | `https://sanalpos.teb.com.tr` |
+| Şekerbank | `sekerbank` | `https://sanalpos.sekerbank.com.tr` |
+| Akbank (older virtual POS) | `akbankest` | `https://www.sanalakpos.com` |
+| Halkbank Macedonia | `halkbankmkd` | `https://epay.halkbank.mk` |
+
+<Since version="0.12.0" />
+
+`akbankest` is for merchants still on Akbank's older EST virtual POS (sanalakpos.com); Akbank's
+newer JSON API is the separate [`akbank`](/docs/banks/akbank) provider. `halkbankmkd` is Halkbank
+Macedonia (Halk Banka AD Skopje); send `currency: 'MKD'` for Macedonian denars (sent as `807`).
+Both hosts answered the XML API (for a made-up store) but have not been tried with a real store.
 
 ## Direct Payment (non-3D)
 

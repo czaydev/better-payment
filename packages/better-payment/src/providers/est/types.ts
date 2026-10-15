@@ -3,10 +3,10 @@ import type { EstBank, EstGirogateMethod, EstStoreType } from './utils';
 
 /**
  * EST (Asseco) virtual POS configuration: İş Bankası, Ziraat Bankası,
- * Halkbank, TEB and Şekerbank
+ * Halkbank, TEB, Şekerbank, Akbank (older virtual POS) and Halkbank Macedonia
  *
  * Values come from the bank's merchant panel:
- * - clientId: Mağaza (üye işyeri) numarası
+ * - clientId: Merchant ID
  * - username / password: API user, used by the XML API
  * - storeKey: 3D Secure store key, used for the hash
  */

@@ -7,7 +7,8 @@ import { buildXmlFields, unescapeXml, type XmlValue } from '../parampos/utils';
  * Banks on the EST platform. Each is also a provider id (`ProviderType`) whose
  * default URLs are in `PROVIDER_DEFAULT_URLS`.
  */
-export type EstBank = 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank';
+export type EstBank =
+  'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd';
 
 export const EST_ENDPOINTS = {
   /** 3D Secure form target (customer's browser) */
@@ -138,6 +139,8 @@ export function getEstCurrencyCode(currency: string | undefined): string {
     SEK: '752',
     SGD: '702',
     THB: '764',
+    // Macedonian denar, for Halkbank Macedonia
+    MKD: '807',
   };
   const code = map[(currency || 'TRY').toUpperCase()];
   if (!code) {
