@@ -1,0 +1,113 @@
+---
+title: Lidio
+description: Lidio payment integration reference.
+since: 0.12.0
+---
+
+Uses Lidio's REST API (formerly Mobilexpress), documented at
+[developer.lidio.com](https://developer.lidio.com/docs/api-documentation/72b66de24898e-introduction).
+Every request is JSON and carries your API key (`Authorization: MxS2S <apiKey>`) and your
+`MerchantCode` header. Lidio picks the bank POS from the card BIN.
+
+<Callout type="warn">
+  Not verified with a test merchant yet: Lidio gives test merchants to its customers. The test host (`test.lidio.com/api`) rejects a made-up merchant with HTTP 401. Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, lidio } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    lidio: lidio({
+      merchantCode: process.env.LIDIO_MERCHANT_CODE!,
+      apiKey: process.env.LIDIO_API_KEY!,
+      merchantKey: process.env.LIDIO_MERCHANT_KEY!, // signs the 3D Secure return
+      // baseUrl: defaults from mode (test.lidio.com/api / api.lidio.com)
+    }),
+  },
+});
+```
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id. Cancels, refunds,
+captures and status queries use it. `buyer.email`, `buyer.id` and `buyer.ip` are sent as
+`customerInfo` and `clientIp`; the one your account identifies customers by also signs the 3D
+Secure return.
+
+## Non-3D Payment
+
+`createPayment()` uses `ProcessPayment` with a new card (`processType` `sales`). A `SystemError` or a
+timeout means the outcome is unknown: the result is `pending` with the order id, so check it with
+`getPayment()`.
+
+## 3D Secure
+
+```typescript
+const init = await payment.lidio.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/lidio/return',
+});
+// init.threeDSHtmlContent is Lidio's redirect form
+```
+
+After 3D Secure, Lidio sends the customer's browser back to `callbackUrl` with the result in the
+query string: `OrderId`, `SystemTransId`, `Result` (`3DSuccess` / `3DFailed`), `TotalAmount`,
+`MDStatus` and `Hash`. Complete the payment in that route, with the order from your records:
+
+```typescript
+// in your own return route: the order is a separate argument, never read from the query
+const query = Object.fromEntries(new URL(request.url).searchParams);
+const result = await payment.lidio.completeThreeDSPayment(query, {
+  orderId: order.id,
+  amount: order.total,           // "100.00"
+  currency: 'TRY',
+  customer: order.customerEmail, // or the customer id, as your Lidio account identifies customers
+});
+```
+
+- `Hash` must be `Base64(SHA-256(OrderId:MerchantKey:TotalAmount:Result:customer))`, `OrderId` must
+  be your order and `TotalAmount` your amount, as Lidio's documentation requires; anything else is
+  `INVALID_HASH`;
+- `3DFailed` is a failure without ids;
+- `3DSuccess` is charged with `FinishPaymentProcess` for your order and amount, and Lidio's answer
+  decides. A timeout or `SystemError` is `pending` with your order id.
+
+The default handler's callback route takes a POST body only, so it cannot complete these payments.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.lidio.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+await payment.lidio.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+const status = await payment.lidio.getPayment('ORDER123');                                          // PaymentInquiry
+// status: 'success' (also after a partial refund), 'cancelled' (cancelled or fully refunded), 'failure', 'pending'
+```
+
+`cancel()` voids a payment before end of day; after that, use `refund()` (full or partial). Lidio
+answers `DuplicateRequest` for a refund that already succeeded, which counts as success.
+`getPayment()` queries the sale: `isCancelled` and `isFullRefunded` make it `cancelled`, and
+`Waiting`, `Pending` or `SystemError` make it `pending`.
+
+## Pre-Authorization
+
+```typescript
+const auth = await payment.lidio.authorize({ ...paymentRequest, conversationId: 'ORDER123' });
+// or initThreeDSAuthorize() + completeThreeDSPayment() for 3D Secure
+await payment.lidio.capture({ paymentId: 'ORDER123', amount: '80.00', ip: '1.2.3.4' }); // Postauth
+await payment.lidio.voidAuthorization({ paymentId: 'ORDER123', ip: '1.2.3.4' });       // Cancel
+```
+
+## BIN & Installments
+
+```typescript
+const bin = await payment.lidio.binCheck('549604');
+const options = await payment.lidio.installmentInfo({ binNumber: '549604', price: '100.00' });
+```
+
+`binCheck()` uses `GetBankOfBINNumber`, which returns the bank code, the scheme and the card program
+(`Bonus`, `Axess`, ...). `installmentInfo()` uses `GetInstallmentInfo` with the BIN and the amount:
+it lists the counts of the POS Lidio picks for that BIN, with the total your account charges the
+customer (`interestRateToUser`). Options for business cards only, or below their minimum amount,
+are left out.

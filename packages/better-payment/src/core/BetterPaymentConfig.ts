@@ -16,6 +16,7 @@ export enum ProviderType {
   PARAMPOS = 'parampos',
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
+  LIDIO = 'lidio',
   ALBARAKA = 'albaraka',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
@@ -144,6 +145,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.SIPAY]: {
     sandbox: 'https://provisioning.sipay.com.tr',
     production: 'https://app.sipay.com.tr',
+  },
+  [ProviderType.LIDIO]: {
+    sandbox: 'https://test.lidio.com/api',
+    production: 'https://api.lidio.com',
   },
   [ProviderType.ALBARAKA]: {
     sandbox: 'https://epostest.albarakaturk.com.tr',
