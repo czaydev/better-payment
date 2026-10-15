@@ -33,6 +33,10 @@ describe.skipIf(!env)('Ziraat Katılım sandbox', () => {
     const result = await ziraatkatilim.getPayment(orderId('ZKNONE'));
     record('ziraatkatilim', 'status-unknown-order', result.rawResponse);
     expect(result.status).toBe(PaymentStatus.FAILURE);
+    // A credential (V004) or merchant (V001) error is also a failure but does not
+    // verify the order lookup. Pin the authenticated unknown-order code once a test
+    // merchant has recorded it.
+    expect(result.errorCode, describeResult(result)).not.toMatch(/^V00[14]$/);
     expect(result.errorMessage).toBeTruthy();
   });
 

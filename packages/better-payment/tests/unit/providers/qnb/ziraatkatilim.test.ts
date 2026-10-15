@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { ZiraatKatilim, ziraatKatilim } from '../../../../src/providers/qnb';
 import {
@@ -183,10 +185,19 @@ describe('Ziraat Katılım provider', () => {
   });
 
   describe('completeThreeDSPayment', () => {
+    const ORDER = { orderId: 'ORDER3D' };
+    // The same signed bytes, split differently: OrderId takes the first character
+    // of ResponseRnd, and the hash still verifies
+    const RESPLIT = {
+      ...ZIRAAT_KATILIM_3DMODEL_CALLBACK,
+      OrderId: 'ORDER3DP',
+      ResponseRnd: 'F639273396572865868',
+    };
+
     it('charges a verified 3DModel callback with 3DModelPayment', async () => {
       post.mockResolvedValue(approved());
 
-      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK);
+      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK, ORDER);
 
       expect(sentXml()).toContain('<SecureType>3DModelPayment</SecureType>');
       expect(sentXml()).toContain('<RequestGuid>1000000000000001</RequestGuid>');
@@ -195,25 +206,80 @@ describe('Ziraat Katılım provider', () => {
     });
 
     it('rejects a changed OrderId as INVALID_HASH', async () => {
-      const result = await provider.completeThreeDSPayment({
-        ...ZIRAAT_KATILIM_3DMODEL_CALLBACK,
-        OrderId: 'OTHER',
-      });
+      const result = await provider.completeThreeDSPayment(
+        { ...ZIRAAT_KATILIM_3DMODEL_CALLBACK, OrderId: 'OTHER' },
+        { orderId: 'OTHER' }
+      );
       expect(post).not.toHaveBeenCalled();
       expect(result.errorCode).toBe('INVALID_HASH');
       expect(result.paymentId).toBeUndefined();
     });
 
+    it('needs the order id from your records', async () => {
+      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK);
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('VALIDATION_ERROR');
+      expect(result.paymentId).toBeUndefined();
+    });
+
+    it('rejects a re-split callback whose hash still verifies', async () => {
+      expect(await verifyZiraatKatilimCallback(RESPLIT, credentials, '3DModel')).toBe(true);
+      const result = await provider.completeThreeDSPayment(RESPLIT, ORDER);
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expect(result.paymentId).toBeUndefined();
+    });
+
+    // The default handler passes only the HTTP body, so it has no order from your
+    // records: neither a re-split callback nor an orderId POSTed with it may charge
+    it('does not charge through the default handler', async () => {
+      const payment = betterPayment({
+        mode: 'sandbox',
+        providers: {
+          ziraatkatilim: ziraatKatilim({
+            ...ZIRAAT_KATILIM_TEST,
+            baseUrl: ZIRAAT_KATILIM_BASE_URL,
+          }),
+        },
+      });
+      (payment.use('ziraatkatilim') as any).client.post = post;
+      post.mockResolvedValue(approved({ OrderId: 'ORDER3DP' }));
+      const onCallback = vi.fn();
+      await new BetterPaymentHandler(payment, { onCallback }).handle({
+        method: 'POST',
+        url: '/api/pay/ziraatkatilim/callback',
+        headers: { 'content-type': 'application/json' },
+        body: { ...RESPLIT, orderId: 'ORDER3DP' },
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: PaymentStatus.SUCCESS }),
+        expect.anything()
+      );
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'ORDER3DP' }),
+        expect.anything()
+      );
+    });
+
+    it('keeps your order id on a timeout', async () => {
+      post.mockRejectedValue(new HttpError('Request timed out', {}, { code: 'ETIMEDOUT' }));
+      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK, ORDER);
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.paymentId).toBe('ORDER3D');
+    });
+
     it('rejects a callback signed with the QNB formula', async () => {
       const result = await create({ secureType: '3DPay' }).completeThreeDSPayment(
-        QNB_3DPAY_CALLBACK
+        QNB_3DPAY_CALLBACK,
+        { orderId: QNB_3DPAY_CALLBACK.OrderId }
       );
       expect(result.errorCode).toBe('INVALID_HASH');
     });
 
     it('fails without ids when the bank declines 3DModelPayment', async () => {
       post.mockResolvedValue({ data: payforText({ ProcReturnCode: '05', ErrMsg: 'Red' }) });
-      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK);
+      const result = await provider.completeThreeDSPayment(ZIRAAT_KATILIM_3DMODEL_CALLBACK, ORDER);
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.paymentId).toBeUndefined();
     });
@@ -231,7 +297,8 @@ describe('Ziraat Katılım provider', () => {
         }),
       });
       const result = await create({ secureType: '3DPay' }).completeThreeDSPayment(
-        ZIRAAT_KATILIM_3DPAY_CALLBACK
+        ZIRAAT_KATILIM_3DPAY_CALLBACK,
+        { orderId: 'ORDERPAY', amount: '1.00' }
       );
       expect(sentXml()).toContain('<TxnType>OrderInquiry</TxnType>');
       expect(result.status).toBe(PaymentStatus.SUCCESS);

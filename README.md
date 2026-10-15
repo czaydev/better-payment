@@ -187,7 +187,9 @@ Halkbank Macedonia, with `est({ bank })`.
 - **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
-- **Ziraat Katılım:** the same PayFor flow as QNB, with Ziraat Katılım's own callback hash.
+- **Ziraat Katılım:** the same PayFor flow as QNB, with Ziraat Katılım's own callback hash,
+  which cannot tell `OrderId` from `ResponseRnd`. Complete it in your own route with the
+  order from your records: `completeThreeDSPayment(callbackBody, { orderId, amount })`.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

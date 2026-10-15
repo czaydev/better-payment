@@ -9,7 +9,7 @@ import { PaymentProvider } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId } from '../../core/utils';
+import { generateOrderId, toMinorUnits } from '../../core/utils';
 import { randomHex } from '../../core/crypto';
 import type { XmlValue } from '../parampos/utils';
 import {
@@ -41,7 +41,12 @@ import {
   parseQnbXmlResponse,
   isQnbApproved,
 } from './utils';
-import type { QnbConfig, Qnb3DCallbackData, ZiraatKatilimConfig } from './types';
+import type {
+  QnbConfig,
+  Qnb3DCallbackData,
+  QnbCompleteContext,
+  ZiraatKatilimConfig,
+} from './types';
 
 function escapeHtml(value: string): string {
   return value
@@ -302,14 +307,20 @@ export class Qnb extends PaymentProvider<QnbConfig> {
    * The ResponseHash joins its values without a separator, so a valid hash
    * alone does not pin each value; the result is confirmed with the bank:
    * 3DModel charges with `3DModelPayment` (the bank's answer decides), 3DPay
-   * is checked with `OrderInquiry` (status Y, amount equal to the callback).
-   * A callback with an invalid hash, for another merchant, or claiming a
-   * payment the bank does not confirm is rejected as INVALID_HASH.
+   * is checked with `OrderInquiry` (status Y, amount equal to `context.amount`,
+   * or the callback's without it). A callback with an invalid hash, for
+   * another merchant or another order than `context.orderId`, or claiming a
+   * payment the bank does not confirm is rejected as INVALID_HASH. `context`
+   * is read only from the second argument, never from the callback body.
    *
    * `paymentId` and `conversationId` are set only for a payment the bank
-   * confirmed, and on a timeout after the bank was reached for this order.
+   * confirmed, and on a timeout only when `context.orderId` was given.
    */
-  async completeThreeDSPayment(callbackData: Qnb3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackData: Qnb3DCallbackData,
+    context: QnbCompleteContext = {}
+  ): Promise<PaymentResponse> {
+    const expected = context ?? {};
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -327,6 +338,9 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       callbackData.MerchantID !== this.config.merchantId
     ) {
       return untrusted('Callback belongs to a different merchant', callbackData);
+    }
+    if (expected.orderId !== undefined && expected.orderId !== orderId) {
+      return untrusted('Callback belongs to another order than yours', callbackData);
     }
     if (callbackData['3DStatus'] !== '1') {
       return this.withErrorCode({
@@ -376,10 +390,12 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       }
       reached = true;
       const inquiry = await this.orderInquiry(orderId);
-      if (
-        !isQnbCapturedSale(inquiry) ||
-        (callbackData.PurchAmount !== undefined && inquiry.PurchAmount !== callbackData.PurchAmount)
-      ) {
+      const amountMatches =
+        expected.amount !== undefined
+          ? toMinorUnits(inquiry.PurchAmount ?? NaN) === toMinorUnits(expected.amount)
+          : callbackData.PurchAmount === undefined ||
+            inquiry.PurchAmount === callbackData.PurchAmount;
+      if (!isQnbCapturedSale(inquiry) || !amountMatches) {
         return untrusted('3D Secure callback does not match the order at the bank', {
           callback: callbackData,
           inquiry,
@@ -394,9 +410,10 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
       // A timeout after the bank was asked about this order: the outcome is
-      // unknown, keep the ids so the order can be checked with getPayment()
-      return reached && result.status === PaymentStatus.PENDING
-        ? { ...result, paymentId: orderId, conversationId: orderId }
+      // unknown. The ids are kept only for an order from your records, so it can
+      // be checked with getPayment(); the callback's own order is not trusted
+      return reached && result.status === PaymentStatus.PENDING && expected.orderId
+        ? { ...result, paymentId: expected.orderId, conversationId: expected.orderId }
         : result;
     }
   }
@@ -513,6 +530,9 @@ export function isQnbCapturedSale(inquiry: Record<string, string | undefined>): 
  * - 3DModel callbacks are signed over MerchantID, MerchantPass, OrderId and
  *   ResponseRnd only, so the 3D result itself is not covered; the payment is
  *   decided by `3DModelPayment`, as with QNB
+ * - those values are joined without a separator, so OrderId and ResponseRnd
+ *   can be re-split under the same hash: completeThreeDSPayment() needs the
+ *   order id from your records
  * - the XML API answers in `Key=Value;;` text, read like the XML answer
  */
 export class ZiraatKatilim extends Qnb {
@@ -540,6 +560,28 @@ export class ZiraatKatilim extends Qnb {
 
   protected verifyCallback(data: Record<string, string | undefined>): Promise<boolean> {
     return verifyZiraatKatilimCallback(data, this.credentials, this.secureType);
+  }
+
+  /**
+   * As QNB's, but `context.orderId` from your records is required: the
+   * callback hash cannot tell OrderId from ResponseRnd. Complete these payments
+   * in your own route; the default handler passes only the callback body.
+   */
+  async completeThreeDSPayment(
+    callbackData: Qnb3DCallbackData,
+    context: QnbCompleteContext = {}
+  ): Promise<PaymentResponse> {
+    if (!context?.orderId) {
+      return this.withErrorCode({
+        status: PaymentStatus.FAILURE,
+        errorCode: 'VALIDATION_ERROR',
+        errorMessage:
+          'Ziraat Katılım needs the order from your records: ' +
+          'completeThreeDSPayment(callbackBody, { orderId, amount })',
+        rawResponse: callbackData,
+      });
+    }
+    return super.completeThreeDSPayment(callbackData, context);
   }
 
   protected validateConfig(): void {

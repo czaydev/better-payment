@@ -1,6 +1,7 @@
 ---
 title: Ziraat Katılım
 description: Ziraat Katılım virtual POS (PayFor) integration reference.
+since: 0.12.0
 ---
 
 Ziraat Katılım runs the same PayFor platform as [QNB](/docs/banks/qnb), so `ziraatKatilim()` shares
@@ -46,11 +47,11 @@ QNB's XML answer.
 const init = await payment.ziraatkatilim.initThreeDSPayment({
   ...paymentRequest,
   conversationId: 'ORDER123',
-  callbackUrl: 'https://yoursite.com/api/pay/ziraatkatilim/payment/complete-3ds',
+  callbackUrl: 'https://yoursite.com/checkout/ziraatkatilim/callback', // your own route
 });
 
-// In the callback route
-const result = await payment.ziraatkatilim.completeThreeDSPayment(callbackBody);
+// In your callback route: the order from your records, never from the callback body
+const result = await payment.ziraatkatilim.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
 
 ## Callback Hash
@@ -61,8 +62,15 @@ The `ResponseHash` is checked with your merchant id and `merchantPass`:
 - `3DPay`: `base64(SHA1(MerchantID + MerchantPass + OrderId + AuthCode + ProcReturnCode + ResponseRnd))`
 
 The `3DModel` hash does not cover the 3D result, so the payment is decided by the bank's answer to
-`3DModelPayment`. A `3DPay` callback is confirmed with an order inquiry. A callback with an invalid
-hash is rejected as `INVALID_HASH`, and `paymentId` is set only for a payment the bank confirmed.
+`3DModelPayment`. A `3DPay` callback is confirmed with an order inquiry, against your `amount` when
+you pass it. A callback with an invalid hash is rejected as `INVALID_HASH`, and `paymentId` is set
+only for a payment the bank confirmed.
+
+The values are joined without a separator, so `OrderId` and `ResponseRnd` can be re-split under
+the same hash. `orderId` from your records is therefore required, in the second argument that is
+never read from the callback body, and a callback for another order is rejected. The default
+handler route passes only the body, so complete these payments in your own route. On a timeout,
+the result is `pending` with your `orderId`.
 
 <Callout type="info">
   BIN and installment queries are not supported: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`.

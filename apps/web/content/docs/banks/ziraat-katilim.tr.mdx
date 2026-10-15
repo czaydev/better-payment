@@ -1,6 +1,7 @@
 ---
 title: Ziraat Katılım
 description: Ziraat Katılım sanal POS (PayFor) entegrasyon referansı.
+since: 0.12.0
 ---
 
 Ziraat Katılım, [QNB](/docs/banks/qnb) ile aynı PayFor altyapısını kullanır; bu yüzden `ziraatKatilim()` QNB sağlayıcısını paylaşır. Farklar adresler, kurum kodu (`mbrId`) ve callback hash'idir.
@@ -41,11 +42,11 @@ Tüm değerler Ziraat Katılım'dan alınır. `merchantPass` yalnızca hash'lerd
 const init = await payment.ziraatkatilim.initThreeDSPayment({
   ...paymentRequest,
   conversationId: 'ORDER123',
-  callbackUrl: 'https://yoursite.com/api/pay/ziraatkatilim/payment/complete-3ds',
+  callbackUrl: 'https://yoursite.com/checkout/ziraatkatilim/callback', // your own route
 });
 
-// In the callback route
-const result = await payment.ziraatkatilim.completeThreeDSPayment(callbackBody);
+// In your callback route: the order from your records, never from the callback body
+const result = await payment.ziraatkatilim.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
 
 ## Callback hash'i [#callback-hash]
@@ -55,7 +56,9 @@ const result = await payment.ziraatkatilim.completeThreeDSPayment(callbackBody);
 - `3DModel`: `base64(SHA1(MerchantID + MerchantPass + OrderId + ResponseRnd))`
 - `3DPay`: `base64(SHA1(MerchantID + MerchantPass + OrderId + AuthCode + ProcReturnCode + ResponseRnd))`
 
-`3DModel` hash'i 3D sonucunu kapsamaz; bu yüzden ödemeyi bankanın `3DModelPayment` cevabı belirler. `3DPay` callback'i sipariş sorgusuyla doğrulanır. Hash'i geçersiz bir callback `INVALID_HASH` olarak reddedilir; `paymentId` yalnızca bankanın doğruladığı bir ödemede doldurulur.
+`3DModel` hash'i 3D sonucunu kapsamaz; bu yüzden ödemeyi bankanın `3DModelPayment` cevabı belirler. `3DPay` callback'i sipariş sorgusuyla, verdiyseniz sizin `amount` değerinize göre doğrulanır. Hash'i geçersiz bir callback `INVALID_HASH` olarak reddedilir; `paymentId` yalnızca bankanın doğruladığı bir ödemede doldurulur.
+
+Değerler ayraçsız birleştirildiği için `OrderId` ile `ResponseRnd` aynı hash altında farklı bölünebilir. Bu yüzden kendi kayıtlarınızdaki `orderId` zorunludur; callback gövdesinden asla okunmayan ikinci argümanla verilir ve başka bir siparişe ait callback reddedilir. Varsayılan handler rotası yalnızca gövdeyi iletir; bu ödemeleri kendi rotanızda tamamlayın. Zaman aşımında sonuç sizin `orderId` değerinizle `pending` olur.
 
 <Callout type="info">
   BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
