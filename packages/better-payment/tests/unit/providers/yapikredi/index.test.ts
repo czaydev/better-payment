@@ -146,6 +146,57 @@ describe('Yapı Kredi provider', () => {
     expect(() => create({ [field]: '' })).toThrow(field);
   });
 
+  describe('order ids', () => {
+    it.each(['createPayment', 'initThreeDSPayment'] as const)(
+      '%s generates a bank-compatible id when conversationId is omitted',
+      async (method) => {
+        const threeDS = method === 'initThreeDSPayment';
+        post.mockResolvedValue({ data: threeDS ? YKB_OOS_REQUEST_XML : YKB_APPROVED_XML });
+        const request = { ...mockThreeDSPaymentRequest, conversationId: undefined };
+        const result = await provider[method](request);
+
+        expect(result.status).toBe(threeDS ? PaymentStatus.PENDING : PaymentStatus.SUCCESS);
+        expect(result.conversationId).toMatch(/^[A-F0-9]{20}$/);
+        expect(leaf(sentXml(), threeDS ? 'XID' : 'orderID')).toBe(
+          threeDS ? result.conversationId : result.conversationId!.padStart(24, '0')
+        );
+        const next = await provider[method](request);
+        expect(next.conversationId).not.toBe(result.conversationId);
+      }
+    );
+
+    it.each([
+      ['createPayment', 24],
+      ['initThreeDSPayment', 20],
+    ] as const)('%s preserves a caller id at its %i-character limit', async (method, length) => {
+      const threeDS = method === 'initThreeDSPayment';
+      post.mockResolvedValue({ data: threeDS ? YKB_OOS_REQUEST_XML : YKB_APPROVED_XML });
+      const conversationId = 'A'.repeat(length);
+      const result = await provider[method]({ ...mockThreeDSPaymentRequest, conversationId });
+
+      expect(result.status).toBe(threeDS ? PaymentStatus.PENDING : PaymentStatus.SUCCESS);
+      expect(result.conversationId).toBe(conversationId);
+      expect(leaf(sentXml(), threeDS ? 'XID' : 'orderID')).toBe(conversationId);
+    });
+
+    it.each([
+      ['createPayment', 25],
+      ['initThreeDSPayment', 21],
+    ] as const)(
+      '%s rejects an overlong caller id instead of truncating it',
+      async (method, length) => {
+        const result = await provider[method]({
+          ...mockThreeDSPaymentRequest,
+          conversationId: 'A'.repeat(length),
+        });
+
+        expect(result.status).toBe(PaymentStatus.FAILURE);
+        expect(result.code).toBe(PaymentErrorCode.INVALID_REQUEST);
+        expect(post).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   describe('createPayment', () => {
     it('sends a non-3D sale and returns the host log key', async () => {
       post.mockResolvedValue({ data: YKB_APPROVED_XML });

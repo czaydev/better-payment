@@ -9,7 +9,7 @@ import { PaymentProvider } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId } from '../../core/utils';
+import { randomHex } from '../../core/crypto';
 import type { XmlValue } from '../parampos/utils';
 import {
   PaymentRequest,
@@ -47,6 +47,11 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/** 80 random bits fit both Posnet's 20-character XID and 24-character order id. */
+function generateYapiKrediOrderId(): string {
+  return randomHex(10).toUpperCase();
 }
 
 /**
@@ -130,7 +135,7 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
    * Non-3D sale (XML `sale`)
    */
   async createPayment(request: PaymentRequest): Promise<PaymentResponse> {
-    const orderId = request.conversationId || generateOrderId();
+    const orderId = request.conversationId || generateYapiKrediOrderId();
     try {
       this.validatePayment(request, { card: true });
       const card = this.cardOf(request);
@@ -165,7 +170,7 @@ export class YapiKredi extends PaymentProvider<YapiKrediConfig> {
    * encrypted answer is posted from the customer's browser to the 3D service.
    */
   async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
-    const orderId = request.conversationId || generateOrderId();
+    const orderId = request.conversationId || generateYapiKrediOrderId();
     try {
       this.validatePayment(request, { card: true });
       const card = this.cardOf(request);
