@@ -54,8 +54,11 @@ through your server again. Paratika runs 3D Secure and POSTs the result to `call
 
 `completeThreeDSPayment()` checks `sdSha512` (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`)
 when `secretKey` is set, and always confirms the payment with `QUERYTRANSACTION`: an approved (`AP`)
-sale of the same order must exist. The amount was fixed by the session your server created. A
-failure carries no ids.
+sale with the callback's `pgTranId` must exist, and Paratika must link it to the callback's order:
+either the sale carries the same `merchantPaymentId`, or a second query by that order id lists the
+sale. Without that link the payment is rejected as `INVALID_HASH`, so an unsigned callback (no
+`secretKey`) cannot claim another order. The amount was fixed by the session your server created.
+A failure carries no ids.
 
 ## Payments, Refunds & Queries
 

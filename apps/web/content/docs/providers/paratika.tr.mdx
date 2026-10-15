@@ -47,7 +47,7 @@ const result = await payment.vakifpay.completeThreeDSPayment(callbackBody);
 
 `initThreeDSPayment()` siparişle bir ödeme oturumu (`SESSIONTOKEN`) açar, ardından müşterinin tarayıcısının kartı doğrudan Paratika'ya gönderdiği bir form döndürür (Direct POST 3D); kart bir daha sunucunuzdan geçmez. Paratika 3D Secure'u çalıştırır ve sonucu `callbackUrl` adresine POST eder.
 
-`completeThreeDSPayment()`, `secretKey` verilmişse `sdSha512` değerini (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`) kontrol eder ve ödemeyi her zaman `QUERYTRANSACTION` ile doğrular: aynı siparişe ait onaylı (`AP`) bir satış bulunmalıdır. Tutar, sunucunuzun açtığı oturumla belirlenmiştir. Başarısız bir sonuç numara taşımaz.
+`completeThreeDSPayment()`, `secretKey` verilmişse `sdSha512` değerini (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`) kontrol eder ve ödemeyi her zaman `QUERYTRANSACTION` ile doğrular: callback'teki `pgTranId` ile onaylı (`AP`) bir satış bulunmalı ve Paratika bu satışı callback'teki siparişe bağlamalıdır; ya satışta aynı `merchantPaymentId` yer alır ya da o sipariş numarasıyla yapılan ikinci bir sorgu bu satışı listeler. Bu bağ yoksa ödeme `INVALID_HASH` ile reddedilir; böylece imzasız bir callback (`secretKey` yokken) başka bir siparişi sahiplenemez. Tutar, sunucunuzun açtığı oturumla belirlenmiştir. Başarısız bir sonuç numara taşımaz.
 
 ## Ödemeler, iadeler ve sorgular [#payments-refunds--queries]
 

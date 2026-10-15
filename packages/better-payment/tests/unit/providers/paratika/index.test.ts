@@ -208,6 +208,79 @@ describe('Paratika provider', () => {
       );
     });
 
+    describe('without secretKey (unsigned callback): the order must be bound by Paratika', () => {
+      const unsigned = { ...PARATIKA_3D_CALLBACK, sdSha512: undefined };
+      const { merchantPaymentId: _omit, ...saleWithoutOrder } = paratikaSale();
+      let unsignedProvider: Paratika;
+
+      beforeEach(() => {
+        unsignedProvider = create({ secretKey: undefined });
+      });
+
+      it('accepts a sale whose merchantPaymentId matches, with one query', async () => {
+        post.mockResolvedValue({ data: paratikaTransactions([paratikaSale()]) });
+        const result = await unsignedProvider.completeThreeDSPayment(unsigned);
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe(PaymentStatus.SUCCESS);
+        expect(result.conversationId).toBe('ORDER1');
+      });
+
+      it('rejects a sale whose merchantPaymentId differs, without ids', async () => {
+        post.mockResolvedValue({
+          data: paratikaTransactions([paratikaSale({ merchantPaymentId: 'OTHER' })]),
+        });
+        const result = await unsignedProvider.completeThreeDSPayment(unsigned);
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(result.errorCode).toBe('INVALID_HASH');
+        expect(result.paymentId).toBeUndefined();
+        expect(result.conversationId).toBeUndefined();
+      });
+
+      it.each([
+        ['missing', saleWithoutOrder],
+        ['empty', paratikaSale({ merchantPaymentId: '' })],
+      ])(
+        'binds a sale with a %s merchantPaymentId through a query by order id',
+        async (_case, sale) => {
+          post
+            .mockResolvedValueOnce({ data: paratikaTransactions([sale]) })
+            .mockResolvedValueOnce({ data: paratikaTransactions([saleWithoutOrder]) });
+          const result = await unsignedProvider.completeThreeDSPayment(unsigned);
+          expect(sent(1)).toMatchObject({
+            ACTION: 'QUERYTRANSACTION',
+            MERCHANTPAYMENTID: 'ORDER1',
+          });
+          expect(result.status).toBe(PaymentStatus.SUCCESS);
+          expect(result.conversationId).toBe('ORDER1');
+        }
+      );
+
+      it.each([
+        ['finds nothing for the order', paratikaTransactions([])],
+        [
+          'lists another payment only',
+          paratikaTransactions([{ ...saleWithoutOrder, pgTranId: 'X1' }]),
+        ],
+        [
+          'also lists another order (filter not applied)',
+          paratikaTransactions([
+            saleWithoutOrder,
+            paratikaSale({ merchantPaymentId: 'OTHER', pgTranId: 'X2' }),
+          ]),
+        ],
+        ['is declined', paratikaDeclined('ERR10020', 'Geçersiz kullanıcı bilgileri')],
+      ])('fails closed when the order query %s', async (_case, orderAnswer) => {
+        post
+          .mockResolvedValueOnce({ data: paratikaTransactions([saleWithoutOrder]) })
+          .mockResolvedValueOnce({ data: orderAnswer });
+        const result = await unsignedProvider.completeThreeDSPayment(unsigned);
+        expect(result.status).toBe(PaymentStatus.FAILURE);
+        expect(result.errorCode).toBe('INVALID_HASH');
+        expect(result.paymentId).toBeUndefined();
+        expect(result.conversationId).toBeUndefined();
+      });
+    });
+
     it('fails without ids on a declined callback, without querying', async () => {
       const result = await create({ secretKey: undefined }).completeThreeDSPayment({
         ...PARATIKA_3D_CALLBACK,

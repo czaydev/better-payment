@@ -359,26 +359,52 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
         throw new ValidationError('3D Secure callback is missing pgTranId or merchantPaymentId');
       }
       reached = true;
-      const inquiry = await this.queryTransactions({ PGTRANID: data.pgTranId });
-      const sale = (inquiry.transactionList ?? []).find(
-        (transaction) =>
-          transaction.pgTranId === data.pgTranId &&
-          String(transaction.transactionStatus).toUpperCase() === 'AP' &&
-          String(transaction.transactionType ?? 'SALE').toUpperCase() === 'SALE' &&
-          (transaction.merchantPaymentId === undefined ||
-            transaction.merchantPaymentId === data.merchantPaymentId)
-      );
-      if (!isParatikaApproved(inquiry) || !sale) {
+      const pgTranId = data.pgTranId;
+      const orderId = data.merchantPaymentId;
+      const isApprovedSale = (transaction: ParatikaTransaction) =>
+        transaction.pgTranId === pgTranId &&
+        String(transaction.transactionStatus).toUpperCase() === 'AP' &&
+        String(transaction.transactionType ?? 'SALE').toUpperCase() === 'SALE';
+      const orderOf = (transaction: ParatikaTransaction) =>
+        typeof transaction.merchantPaymentId === 'string' && transaction.merchantPaymentId !== ''
+          ? transaction.merchantPaymentId
+          : undefined;
+
+      const inquiry = await this.queryTransactions({ PGTRANID: pgTranId });
+      const sale = isParatikaApproved(inquiry)
+        ? (inquiry.transactionList ?? []).find(isApprovedSale)
+        : undefined;
+      if (!sale || (orderOf(sale) !== undefined && orderOf(sale) !== orderId)) {
         return untrusted('3D Secure callback does not match an approved payment', {
           callback: data,
           inquiry,
         });
       }
+
+      // The callback is unsigned without secretKey, so its order id must come from
+      // Paratika: from the sale itself, or else from a query by that order id that
+      // lists this sale. Anything that does not bind the two fails closed.
+      let orderInquiry:
+        (ParatikaResponse & { transactionList?: ParatikaTransaction[] }) | undefined;
+      if (orderOf(sale) === undefined) {
+        orderInquiry = await this.queryTransactions({ MERCHANTPAYMENTID: orderId });
+        const list = isParatikaApproved(orderInquiry) ? (orderInquiry.transactionList ?? []) : [];
+        const bound =
+          list.some(isApprovedSale) &&
+          list.every((transaction) => [undefined, orderId].includes(orderOf(transaction)));
+        if (!bound) {
+          return untrusted('Paratika does not link this payment to the callback order', {
+            callback: data,
+            inquiry,
+            orderInquiry,
+          });
+        }
+      }
       return this.withErrorCode({
         status: PaymentStatus.SUCCESS,
-        paymentId: data.pgTranId,
-        conversationId: data.merchantPaymentId,
-        rawResponse: { callback: data, inquiry },
+        paymentId: pgTranId,
+        conversationId: orderId,
+        rawResponse: { callback: data, inquiry, ...(orderInquiry ? { orderInquiry } : {}) },
       });
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
