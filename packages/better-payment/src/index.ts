@@ -172,6 +172,9 @@ export type {
   YapiKrediCallbackFields,
   YapiKrediCompleteRequest,
 } from './providers/yapikredi/types';
+export { Qnb, qnb } from './providers/qnb';
+export type { QnbConfig, Qnb3DCallbackData } from './providers/qnb/types';
+export type { QnbSecureType } from './providers/qnb/utils';
 
 export { BetterPaymentClient, createBetterPaymentClient } from './client';
 export type { BetterPaymentClientConfig } from './client';

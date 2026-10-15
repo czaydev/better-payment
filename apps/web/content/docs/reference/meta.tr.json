@@ -3,6 +3,7 @@
   "icon": "reference",
   "defaultOpen": true,
   "pages": [
+    "api",
     "types",
     "error-codes",
     "changelog",

@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
 import { PayTR } from '../../../../src/providers/paytr';
 import { PaymentStatus } from '../../../../src/types';
-import { generatePayTRRefundToken, generatePayTRStatusToken } from '../../../../src/providers/paytr/utils';
+import {
+  generatePayTRDirectToken,
+  generatePayTRRefundToken,
+  generatePayTRStatusToken,
+} from '../../../../src/providers/paytr/utils';
 import { mockThreeDSPaymentRequest, mockPaymentRequest } from '../../../fixtures/payment-data';
 
 const SALT = 'YEUaNcdHXqyt7hjt';
@@ -247,6 +251,94 @@ describe('PayTR provider', () => {
       const result = await paytr.createPayment(mockPaymentRequest);
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.errorCode).toBe('NETWORK_ERROR');
+    });
+  });
+
+  describe('initThreeDSPayment (Direct API)', () => {
+    const formFields = (html: string): Record<string, string> =>
+      Object.fromEntries(
+        [...html.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)"/g)].map((m) => [
+          m[1],
+          m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+        ])
+      );
+
+    beforeEach(() => {
+      paytr = new PayTR({ ...baseConfig, testMode: true, threeDSMode: 'direct' });
+      (paytr as any).client.post = post;
+    });
+
+    it('returns a signed card form for the browser to post to /odeme', async () => {
+      const result = await paytr.initThreeDSPayment({
+        ...mockThreeDSPaymentRequest,
+        conversationId: 'ORDER1',
+        installment: 3,
+      });
+
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.paymentId).toBe('ORDER1');
+      const html = result.threeDSHtmlContent!;
+      expect(html).toContain('action="https://www.paytr.com/odeme"');
+      const fields = formFields(html);
+      expect(fields).toMatchObject({
+        merchant_id: '123456',
+        merchant_oid: 'ORDER1',
+        payment_amount: '1.20',
+        payment_type: 'card',
+        installment_count: '3',
+        currency: 'TL',
+        test_mode: '1',
+        non_3d: '0',
+        cc_owner: 'John Doe',
+        card_number: '5528790000000008',
+        expiry_month: '12',
+        expiry_year: '30',
+        cvv: '123',
+        merchant_ok_url: mockThreeDSPaymentRequest.callbackUrl,
+        merchant_fail_url: mockThreeDSPaymentRequest.callbackUrl,
+      });
+      expect(fields).not.toHaveProperty('sync_mode');
+      expect(fields).not.toHaveProperty('merchant_key');
+      expect(fields).not.toHaveProperty('merchant_salt');
+      expect(fields.paytr_token).toBe(
+        await generatePayTRDirectToken(
+          {
+            merchantId: '123456',
+            userIp: fields.user_ip,
+            merchantOid: 'ORDER1',
+            email: fields.email,
+            paymentAmount: '1.20',
+            paymentType: 'card',
+            installmentCount: '3',
+            currency: 'TL',
+            testMode: '1',
+            non3d: '0',
+          },
+          SALT,
+          KEY
+        )
+      );
+    });
+
+    it('asks PayTR to store the card with saveCard', async () => {
+      const result = await paytr.initThreeDSPayment({
+        ...mockThreeDSPaymentRequest,
+        saveCard: { customerToken: 'U1' },
+      });
+      const fields = formFields(result.threeDSHtmlContent!);
+      expect(fields.store_card).toBe('1');
+      expect(fields.utoken).toBe('U1');
+    });
+
+    it('needs the card in the request', async () => {
+      const { paymentCard: _card, ...withoutCard } = mockThreeDSPaymentRequest;
+      const result = await paytr.initThreeDSPayment(withoutCard as any);
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+    });
+
+    it('rejects an unknown threeDSMode', () => {
+      expect(() => new PayTR({ ...baseConfig, threeDSMode: 'x' as any })).toThrow(/threeDSMode/);
     });
   });
 

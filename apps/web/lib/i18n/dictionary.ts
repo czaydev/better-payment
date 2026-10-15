@@ -1,6 +1,12 @@
 import type { Locale } from "./config";
 
 const en = {
+  notFound: {
+    title: "This page is out of reach.",
+    description: "The link may have changed, or the page may no longer exist. Let's get you back on track.",
+    home: "Back to home",
+    docs: "Explore the docs",
+  },
   meta: {
     title: "Better Payment — Unified Payment Gateway for Node.js",
     description:
@@ -211,10 +217,9 @@ const en = {
     fallbackNotice:
       "This page has not been translated into English yet, so it is shown in Turkish.",
     betaNotice: {
-      before: "You are reading the docs of the beta release (",
-      middle: "). Install it with ",
-      after: ". ",
-      link: "Docs of the stable release",
+      title: "You are viewing the beta docs",
+      install: "Install the beta with",
+      link: "Go to the stable docs",
     },
   },
   fumadocs: {
@@ -225,6 +230,12 @@ const en = {
 export type Dictionary = typeof en;
 
 const tr: Dictionary = {
+  notFound: {
+    title: "Bu sayfaya ulaşamadık.",
+    description: "Bağlantı değişmiş veya sayfa kaldırılmış olabilir. Aradığınız yere başka bir yoldan ulaşalım.",
+    home: "Ana sayfaya dön",
+    docs: "Dokümantasyona göz at",
+  },
   meta: {
     title: "Better Payment — Node.js için birleşik ödeme altyapısı",
     description:
@@ -434,10 +445,9 @@ const tr: Dictionary = {
   docs: {
     fallbackNotice: "Bu sayfa henüz Türkçeye çevrilmedi; İngilizce hâli gösteriliyor.",
     betaNotice: {
-      before: "Beta sürümün dokümanını okuyorsunuz (",
-      middle: "). Kurmak için: ",
-      after: ". ",
-      link: "Stabil sürümün dokümanı",
+      title: "Beta sürümün dokümanını görüntülüyorsunuz",
+      install: "Beta sürümü kurmak için",
+      link: "Stabil dokümana geç",
     },
   },
   fumadocs: {

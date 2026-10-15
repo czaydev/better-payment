@@ -23,6 +23,7 @@ export enum ProviderType {
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
   YAPIKREDI = 'yapikredi',
+  QNB = 'qnb',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -161,6 +162,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.YAPIKREDI]: {
     sandbox: 'https://setmpos.ykb.com',
     production: 'https://posnet.yapikredi.com.tr',
+  },
+  [ProviderType.QNB]: {
+    sandbox: 'https://vpostest.qnb.com.tr',
+    production: 'https://vpos.qnb.com.tr',
   },
 };
 

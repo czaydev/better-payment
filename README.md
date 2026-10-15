@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Yapı Kredi and the EST banks
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Yapı Kredi, QNB and the EST banks
 (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
@@ -128,7 +128,7 @@ list and suggested customer messages.
 if (result.code === PaymentErrorCode.INSUFFICIENT_FUNDS) askForAnotherCard();
 ```
 
-For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk and EST, `paymentId` is your **order id**: the
+For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, EST and QNB, `paymentId` is your **order id**: the
 `conversationId` you pass in, or an alphanumeric id generated for you. Pass
 this id to `refund`, `cancel` and `getPayment`.
 
@@ -137,13 +137,14 @@ this id to `refund`, `cancel` and `getPayment`.
 | Provider    | Non-3D                    | 3D Secure                   | Refund | Cancel          | Status | BIN | Installments      |
 | ----------- | ------------------------- | --------------------------- | :----: | --------------- | :----: | :-: | ----------------- |
 | iyzico      | ✓                         | ✓                           |   ✓    | ✓               |   ✓    |  ✓  | ✓                 |
-| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame                    |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
+| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame / Direct API       |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
 | Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
+| QNB         | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB and Şekerbank, with `est({ bank })`.
 
@@ -168,6 +169,9 @@ this id to `refund`, `cancel` and `getPayment`.
   your own route with the order from your records:
   `completeThreeDSPayment({ ...body, orderId, amount, currency })`. The bank resolves the
   packets, and the resolved order must match yours before the card is charged.
+- **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
+  result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
+  checked with an order inquiry.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

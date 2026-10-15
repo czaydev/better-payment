@@ -6,7 +6,7 @@ import type { EstBank, EstStoreType } from './utils';
  * Halkbank, TEB and Şekerbank
  *
  * Values come from the bank's merchant panel:
- * - clientId: Mağaza (üye işyeri) numarası
+ * - clientId: Merchant ID
  * - username / password: API user, used by the XML API
  * - storeKey: 3D Secure store key, used for the hash
  */
