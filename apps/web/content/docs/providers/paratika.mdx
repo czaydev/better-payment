@@ -60,6 +60,12 @@ sale. Without that link the payment is rejected as `INVALID_HASH`, so an unsigne
 `secretKey`) cannot claim another order. The amount was fixed by the session your server created.
 A failure carries no ids.
 
+Pass the order id from your own records as the second argument,
+`completeThreeDSPayment(callbackBody, { orderId })`; a callback for another order is then rejected.
+It is never read from the callback body, and the default handler route passes only the body. If a
+query times out, the result is `pending` without `paymentId`, and with `conversationId` only when the
+order is trusted: the `orderId` you passed, or a callback whose `sdSha512` verified.
+
 ## Payments, Refunds & Queries
 
 ```typescript

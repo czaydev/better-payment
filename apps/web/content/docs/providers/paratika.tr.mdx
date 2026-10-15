@@ -49,6 +49,8 @@ const result = await payment.vakifpay.completeThreeDSPayment(callbackBody);
 
 `completeThreeDSPayment()`, `secretKey` verilmişse `sdSha512` değerini (`SHA512(merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey)`) kontrol eder ve ödemeyi her zaman `QUERYTRANSACTION` ile doğrular: callback'teki `pgTranId` ile onaylı (`AP`) bir satış bulunmalı ve Paratika bu satışı callback'teki siparişe bağlamalıdır; ya satışta aynı `merchantPaymentId` yer alır ya da o sipariş numarasıyla yapılan ikinci bir sorgu bu satışı listeler. Bu bağ yoksa ödeme `INVALID_HASH` ile reddedilir; böylece imzasız bir callback (`secretKey` yokken) başka bir siparişi sahiplenemez. Tutar, sunucunuzun açtığı oturumla belirlenmiştir. Başarısız bir sonuç numara taşımaz.
 
+Kendi kayıtlarınızdaki sipariş numarasını ikinci argüman olarak verin: `completeThreeDSPayment(callbackBody, { orderId })`; başka bir siparişe ait callback bu durumda reddedilir. Bu değer callback gövdesinden asla okunmaz ve varsayılan handler rotası yalnızca gövdeyi iletir. Bir sorgu zaman aşımına uğrarsa sonuç `paymentId` olmadan `pending` olur; `conversationId` yalnızca sipariş güvenilirse döner: verdiğiniz `orderId` ya da `sdSha512` doğrulanmış bir callback.
+
 ## Ödemeler, iadeler ve sorgular [#payments-refunds--queries]
 
 ```typescript

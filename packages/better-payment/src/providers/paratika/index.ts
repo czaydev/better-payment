@@ -39,6 +39,7 @@ import {
 import type {
   ParatikaConfig,
   Paratika3DCallbackData,
+  ParatikaCompleteContext,
   ParatikaResponse,
   ParatikaTransaction,
 } from './types';
@@ -325,13 +326,20 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
    * merchantPaymentId must exist. The amount was fixed by the payment session
    * your server created.
    *
-   * `paymentId` and `conversationId` are set only for a confirmed payment, and
-   * on a timeout after Paratika was reached; a failure carries no ids.
+   * `paymentId` and `conversationId` are set only for a confirmed payment. On a
+   * timeout the result is pending with only `conversationId`, and only when the
+   * order is trusted: `context.orderId` from your records, or a callback whose
+   * `sdSha512` verified. `context` is read only from the second argument, never
+   * from the callback body. A failure carries no ids.
    */
-  async completeThreeDSPayment(callbackData: Paratika3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackData: Paratika3DCallbackData,
+    context: ParatikaCompleteContext = {}
+  ): Promise<PaymentResponse> {
     const data = callbackData ?? {};
+    const expectedOrderId = context.orderId || undefined;
     if (data.auth3DToken !== undefined) {
-      return this.completeThreeDSAuthorize(data);
+      return this.completeThreeDSAuthorize(data, expectedOrderId);
     }
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
@@ -344,6 +352,12 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
     if (this.config.secretKey && !(await verifyParatikaCallback(data, this.config.secretKey))) {
       return untrusted('Invalid 3D Secure callback hash', data);
     }
+    if (expectedOrderId !== undefined && data.merchantPaymentId !== expectedOrderId) {
+      return untrusted('3D Secure callback is for another order', data);
+    }
+    // The order a pending result may carry: never an unsigned callback's own
+    const trustedOrderId =
+      expectedOrderId ?? (this.config.secretKey ? data.merchantPaymentId : undefined);
     if (data.responseCode !== '00') {
       return this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -407,9 +421,11 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
         rawResponse: { callback: data, inquiry, ...(orderInquiry ? { orderInquiry } : {}) },
       });
     } catch (error) {
+      // The outcome is unknown, and the order may not be bound yet: the callback's
+      // pgTranId is not trusted, its order only when signed or from your records
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
-      return reached && result.status === PaymentStatus.PENDING
-        ? { ...result, paymentId: data.pgTranId, conversationId: data.merchantPaymentId }
+      return reached && result.status === PaymentStatus.PENDING && trustedOrderId
+        ? { ...result, conversationId: trustedOrderId }
         : result;
     }
   }
@@ -418,9 +434,13 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
    * After `/post/auth3d`: when the authentication succeeded and `mdStatus` is
    * accepted, the amount is blocked with `PREAUTH` on the same session; the
    * session your server created fixed the order and amount, and the bank's
-   * answer decides. A failure carries no ids.
+   * answer decides. A failure carries no ids, and a timeout only the order id
+   * from your records.
    */
-  private async completeThreeDSAuthorize(data: Paratika3DCallbackData): Promise<PaymentResponse> {
+  private async completeThreeDSAuthorize(
+    data: Paratika3DCallbackData,
+    expectedOrderId: string | undefined
+  ): Promise<PaymentResponse> {
     const accepted = this.config.acceptedMdStatuses ?? ['1'];
     if (data.responseCode !== '00' || !data.mdStatus || !accepted.includes(data.mdStatus)) {
       return this.withErrorCode({
@@ -457,13 +477,13 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
       return this.withErrorCode({
         status: PaymentStatus.SUCCESS,
         paymentId: response.pgTranId,
-        conversationId: response.merchantPaymentId || data.merchantPaymentId,
+        conversationId: response.merchantPaymentId || expectedOrderId,
         rawResponse: { callback: data, payment: response },
       });
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
-      return reached && result.status === PaymentStatus.PENDING
-        ? { ...result, conversationId: data.merchantPaymentId }
+      return reached && result.status === PaymentStatus.PENDING && expectedOrderId
+        ? { ...result, conversationId: expectedOrderId }
         : result;
     }
   }

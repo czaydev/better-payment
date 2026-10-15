@@ -164,7 +164,11 @@ export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuv
 export { Sipay, sipay } from './providers/sipay';
 export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
 export { Paratika, paratika } from './providers/paratika';
-export type { ParatikaConfig, Paratika3DCallbackData } from './providers/paratika/types';
+export type {
+  ParatikaConfig,
+  Paratika3DCallbackData,
+  ParatikaCompleteContext,
+} from './providers/paratika/types';
 export type { ParatikaBrand } from './providers/paratika/utils';
 export { Est, est } from './providers/est';
 export type { EstConfig, Est3DCallbackData } from './providers/est/types';

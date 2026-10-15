@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { Paratika, paratika } from '../../../../src/providers/paratika';
@@ -279,6 +280,79 @@ describe('Paratika provider', () => {
         expect(result.paymentId).toBeUndefined();
         expect(result.conversationId).toBeUndefined();
       });
+
+      describe('on a timeout, the callback ids are not attached', () => {
+        const forged = { ...unsigned, merchantPaymentId: 'UNVERIFIED_ORDER' };
+
+        it('when the first query times out', async () => {
+          post.mockRejectedValue(timeout());
+          const result = await unsignedProvider.completeThreeDSPayment(forged);
+          expect(result.status).toBe(PaymentStatus.PENDING);
+          expect(result.paymentId).toBeUndefined();
+          expect(result.conversationId).toBeUndefined();
+        });
+
+        it('when the sale has no order and the order query times out', async () => {
+          post
+            .mockResolvedValueOnce({ data: paratikaTransactions([saleWithoutOrder]) })
+            .mockRejectedValueOnce(timeout());
+          const result = await unsignedProvider.completeThreeDSPayment(forged);
+          expect(sent(1)).toMatchObject({ MERCHANTPAYMENTID: 'UNVERIFIED_ORDER' });
+          expect(result.status).toBe(PaymentStatus.PENDING);
+          expect(result.paymentId).toBeUndefined();
+          expect(result.conversationId).toBeUndefined();
+        });
+
+        it('keeps only the order id when it came from your records', async () => {
+          post.mockRejectedValue(timeout());
+          const result = await unsignedProvider.completeThreeDSPayment(unsigned, {
+            orderId: 'ORDER1',
+          });
+          expect(result.status).toBe(PaymentStatus.PENDING);
+          expect(result.paymentId).toBeUndefined();
+          expect(result.conversationId).toBe('ORDER1');
+        });
+
+        // The default handler passes only the HTTP body: an orderId POSTed with it
+        // is not the trusted context
+        it('through the default handler, even with an orderId in the body', async () => {
+          post.mockRejectedValue(timeout());
+          const payment = betterPayment({
+            mode: 'sandbox',
+            providers: {
+              paratika: paratika({
+                ...PARATIKA_TEST,
+                secretKey: undefined,
+                baseUrl: PARATIKA_BASE_URL,
+              }),
+            },
+          });
+          (payment.use('paratika') as any).client.post = post;
+          const onCallback = vi.fn();
+          await new BetterPaymentHandler(payment, { onCallback }).handle({
+            method: 'POST',
+            url: '/api/pay/paratika/callback',
+            headers: { 'content-type': 'application/json' },
+            body: { ...forged, orderId: 'UNVERIFIED_ORDER' },
+          });
+          expect(onCallback).toHaveBeenCalledWith(
+            expect.objectContaining({ status: PaymentStatus.PENDING }),
+            expect.anything()
+          );
+          const [result] = onCallback.mock.calls[0];
+          expect(result.paymentId).toBeUndefined();
+          expect(result.conversationId).toBeUndefined();
+        });
+      });
+    });
+
+    it('rejects a callback for another order than the one from your records', async () => {
+      const result = await provider.completeThreeDSPayment(PARATIKA_3D_CALLBACK, {
+        orderId: 'ORDER2',
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expect(result.conversationId).toBeUndefined();
     });
 
     it('fails without ids on a declined callback, without querying', async () => {
@@ -293,11 +367,12 @@ describe('Paratika provider', () => {
       expect(result.conversationId).toBeUndefined();
     });
 
-    it('returns pending with the ids on a timeout', async () => {
+    it('returns pending with only the signed order id on a timeout', async () => {
       post.mockRejectedValue(timeout());
       const result = await provider.completeThreeDSPayment(PARATIKA_3D_CALLBACK);
       expect(result.status).toBe(PaymentStatus.PENDING);
-      expect(result.paymentId).toBe('18285OQZD14766');
+      expect(result.paymentId).toBeUndefined();
+      expect(result.conversationId).toBe('ORDER1');
     });
   });
 
@@ -362,6 +437,15 @@ describe('Paratika provider', () => {
         mdStatus: '2',
       });
       expect(lenient.status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    it('keeps the order id on a PREAUTH timeout only when it came from your records', async () => {
+      post.mockRejectedValue(timeout());
+      const result = await provider.completeThreeDSPayment(auth3dCallback);
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.conversationId).toBeUndefined();
+      const trusted = await provider.completeThreeDSPayment(auth3dCallback, { orderId: 'ORDER1' });
+      expect(trusted.conversationId).toBe('ORDER1');
     });
 
     it('fails without ids when PREAUTH is declined', async () => {

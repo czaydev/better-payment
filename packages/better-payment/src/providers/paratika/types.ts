@@ -48,6 +48,15 @@ export interface Paratika3DCallbackData {
   [key: string]: string | undefined;
 }
 
+/**
+ * Values from your own records for `completeThreeDSPayment`, passed separately
+ * from the callback body so that a POSTed field can never stand in for them.
+ */
+export interface ParatikaCompleteContext {
+  /** The merchantPaymentId you started; a callback for another order is rejected */
+  orderId?: string;
+}
+
 /** Common fields of an API answer */
 export interface ParatikaResponse {
   responseCode?: string;
