@@ -48,6 +48,7 @@ import {
   generatePayTRInstallmentRatesToken,
   verifyPayTRCallback,
   formatPayTRBasket,
+  formatPayTRDirectBasket,
   convertToKurus,
   formatPayTRAmount,
   mapPayTRCurrency,
@@ -146,13 +147,16 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
     return this.client.post<T>(path, createPayTRFormData(data), config).then((res) => res.data);
   }
 
-  private buildBasket(items: Array<{ name: string; price: string; quantity?: number }>): string {
+  private buildBasket(
+    items: Array<{ name: string; price: string; quantity?: number }>,
+    api: 'iframe' | 'direct'
+  ): string {
     const basket: PayTRBasketItem[] = items.map((item) => ({
       name: item.name,
       price: formatPayTRAmount(item.price),
       quantity: item.quantity && item.quantity > 0 ? item.quantity : 1,
     }));
-    return formatPayTRBasket(basket);
+    return api === 'iframe' ? formatPayTRBasket(basket) : formatPayTRDirectBasket(basket);
   }
 
   private resolveMerchantOid(conversationId?: string): string {
@@ -218,7 +222,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_name: `${request.buyer.name} ${request.buyer.surname}`,
         user_address: request.billingAddress?.address || request.shippingAddress?.address || '',
         user_phone: request.buyer.gsmNumber,
-        user_basket: this.buildBasket(request.basketItems),
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
         ...this.cardFields(request),
       };
 
@@ -273,7 +277,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         throw new ValidationError('callbackUrl is required');
       }
 
-      const userBasket = this.buildBasket(request.basketItems);
+      const userBasket = this.buildBasket(request.basketItems, 'iframe');
       const paymentAmount = convertToKurus(request.paidPrice ?? request.price);
       const currency = mapPayTRCurrency(request.currency);
       const noInstallment = request.installment === 1 ? '1' : '0';
@@ -665,7 +669,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_name: `${request.buyer.name} ${request.buyer.surname}`,
         user_address: request.billingAddress?.address || request.shippingAddress?.address || '',
         user_phone: request.buyer.gsmNumber,
-        user_basket: this.buildBasket(request.basketItems),
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
         merchant_ok_url: request.callbackUrl,
         merchant_fail_url: request.failUrl || request.callbackUrl,
         ...this.cardFields(request),
@@ -774,7 +778,7 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_name: `${request.buyer.name} ${request.buyer.surname}`,
         user_address: request.buyer.address || '',
         user_phone: request.buyer.gsmNumber,
-        user_basket: this.buildBasket(request.basketItems),
+        user_basket: this.buildBasket(request.basketItems, 'direct'),
         merchant_ok_url: request.callbackUrl,
         merchant_fail_url: request.failUrl || request.callbackUrl,
       });
