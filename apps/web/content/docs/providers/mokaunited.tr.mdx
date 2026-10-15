@@ -1,0 +1,93 @@
+---
+title: Moka United
+description: Moka United ödeme entegrasyon referansı.
+since: 0.12.0
+---
+
+Moka United'ın [developer.mokaunited.com](https://developer.mokaunited.com) adresinde belgelenen API'sini kullanır. Her istek JSON'dur ve bayinin `CheckKey` değerini taşır: `SHA-256(DealerCode + "MK" + Username + "PD" + Password)`.
+
+<Callout type="warn">
+  Henüz bir test bayisiyle doğrulanmadı: Moka United test bayisini talep üzerine verir. Test adresi (`service.refmokaunited.com`), belgelenen biçimde cevap verir (uydurma bir bayi için `GetDealerIdWithName.UsernameOrPasswordInvalid`). Canlıya geçmeden önce küçük bir tutarla deneyin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, mokaUnited } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    mokaunited: mokaUnited({
+      dealerCode: process.env.MOKA_DEALER_CODE!,
+      username: process.env.MOKA_API_USERNAME!,
+      password: process.env.MOKA_API_PASSWORD!,
+      // software?: string (sent as Software, default 'better-payment')
+      // baseUrl: defaults from mode (service.refmokaunited.com / service.mokaunited.com)
+    }),
+  },
+});
+```
+
+`paymentId`, `OtherTrxCode` olarak gönderilen sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara. İptal, iade, tahsilat ve durum sorguları bunu kullanır.
+
+## 3D'siz ödeme [#non-3d-payment]
+
+`createPayment()`, `DoDirectPayment` kullanır. Moka United 3D'siz ödemeyi bayi bazında açar; aksi halde `PaymentDealer.DoDirectPayment.ThreeDRequired` cevabını verir.
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.mokaunited.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/mokaunited/payment/complete-3ds',
+});
+// init.redirectUrl (or init.threeDSHtmlContent) sends the customer to Moka United's 3D page
+// init.codeForHash: store it with ORDER123, server side
+```
+
+`DoDirectPaymentThreeD`, Moka United'ın 3D sayfasını ve bu ödemeye ait bir `CodeForHash` döndürür. `codeForHash` değerini siparişle birlikte saklayın: Moka United sonucu `callbackUrl` adresine, başarılıysa `hashValue = SHA-256(CodeForHash + "T")`, başarısızsa `+ "F"` ile POST eder.
+
+```typescript
+const result = await payment.mokaunited.completeThreeDSPayment({
+  ...callbackBody,
+  codeForHash: order.codeForHash, // from your records
+  orderId: order.id,              // optional, preferred over the callback's OtherTrxCode
+  amount: order.total,            // optional, checked against Moka United's record
+});
+```
+
+- `codeForHash` verilmeden çağrı başarısız olur; ne "T" ne de "F" ile eşleşen bir `hashValue` `INVALID_HASH` ile reddedilir;
+- "F", callback'teki `resultCode` ile numara taşımayan bir başarısızlıktır;
+- "T" olduğunda ödeme `GetDealerPaymentTrxDetailList` ile doğrulanır: o siparişe ait, callback'teki `trxCode` ile onaylanmış bir ödeme ve verdiyseniz `amount` tutarı. Aksi halde `INVALID_HASH` olur.
+
+## İade, iptal ve durum [#refund-cancel--status]
+
+```typescript
+await payment.mokaunited.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // DoVoid
+await payment.mokaunited.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // DoCreateRefundRequest
+const status = await payment.mokaunited.getPayment('ORDER123');                                          // GetDealerPaymentTrxDetailList
+// status: 'success' (also after a partial refund), 'cancelled' (voided or fully refunded), 'failure', 'pending'
+```
+
+`cancel()` ödemeyi gün sonundan önce iptal eder. Moka United iadeleri talep olarak işler; bu yüzden kabul edilen bir `refund()` `pending` olur ve talep numarası `refundId` olarak döner; ne zaman tamamlandığını `getPayment()` gösterir.
+
+## Ön provizyon [#pre-authorization]
+
+```typescript
+const auth = await payment.mokaunited.authorize({ ...paymentRequest, conversationId: 'ORDER123' });
+// or initThreeDSAuthorize() + completeThreeDSPayment() for 3D Secure
+await payment.mokaunited.capture({ paymentId: 'ORDER123', amount: '80.00', ip: '1.2.3.4' }); // DoCapture
+await payment.mokaunited.voidAuthorization({ paymentId: 'ORDER123', ip: '1.2.3.4' });       // DoVoid
+```
+
+Tahsilat, ön provizyondan en fazla %15 fazla ya da daha düşük herhangi bir tutar olabilir.
+
+## BIN ve taksit [#bin--installments]
+
+```typescript
+const bin = await payment.mokaunited.binCheck('52691100');
+const options = await payment.mokaunited.installmentInfo({ binNumber: '52691100', price: '100.00' });
+```
+
+`binCheck()`, kart programını da (`BONUS`, `AXESS`, `WORLD`, ...) döndüren `GetBankCardInformation` kullanır. `installmentInfo()`, 1'den 12'ye her taksit sayısı için `DoCalcPaymentAmount` sorar ve tutar hesaplanan sayıları, karttan çekilecek tutarla listeler. İkisi için de Moka United'ın bayiniz için BIN sorgusunu açması gerekir.
