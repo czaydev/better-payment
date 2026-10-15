@@ -7,6 +7,12 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.11.1
+
+### Fixed
+
+- **[Parampos error codes](/docs/reference/error-codes#what-is-mapped):** failed Parampos payments now return a specific `code` (from the bank's `Banka_Sonuc_Kod`, then Param's `Sonuc`) instead of `UNKNOWN`. The table is exported as `PARAMPOS_ERROR_CODES`.
+
 ## 0.11.0
 
 ### Added

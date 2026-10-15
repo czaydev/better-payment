@@ -3,7 +3,7 @@ title: Giriş
 description: Node.js ve Türk ödeme sağlayıcıları için tip güvenli, birleşik ödeme kütüphanesi.
 ---
 
-**Better Payment**, Türk ödeme sağlayıcılarını (iyzico, PayTR, Akbank, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Kuveyt Türk ve EST bankaları: İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) tek bir TypeScript API'siyle entegre etmenizi sağlar.
+**Better Payment**, Türk ödeme sağlayıcılarını (iyzico, PayTR, Akbank, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank ve EST bankaları: İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) tek bir TypeScript API'siyle entegre etmenizi sağlar.
 
 <Callout type="warn">
   **0.0.1 yeni bir başlangıç.** Sürüm geçmişi sıfırlandı. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bu sürümler kullanımdan kaldırıldı. Nelerin değiştiğini ve nasıl geçiş yapacağınızı [0.0.1'deki yenilikler](/docs/whats-new) sayfasında okuyun.
@@ -26,13 +26,18 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 | Sağlayıcı | 3D'siz | 3D Secure | İade | İptal | Durum | BIN | Taksit |
 |----------|--------|-----------|--------|--------|--------|-----|--------------|
 | iyzico   | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| PayTR    | ✅ ¹ | ✅ iFrame | ✅ | ✅ ² | ✅ | ✅ | ✅ |
+| PayTR    | ✅ ¹ | ✅ iFrame / Direct API | ✅ | ✅ ² | ✅ | ✅ | ✅ |
 | Akbank   | ✅ | ✅ 3D_PAY | ✅ | ✅ | ✅ | — | — |
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
 | Paratika (VakıfPay, ZiraatPay) | ✅ | ✅ Direct POST 3D | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
+| Denizbank | ✅ | ✅ 3D Model | ✅ | ✅ | — | — | — |
+| Albaraka Türk | ✅ | ✅ 3D | ✅ | ✅ | ✅ | — | — |
+| VakıfBank | ✅ | ✅ MPI + VPOS (3DS) | ✅ | ✅ | — | — | — |
+| Yapı Kredi | ✅ | ✅ Posnet OOS | ✅ | ✅ | — | — | — |
+| QNB | ✅ | ✅ 3D Model / 3D Pay | ✅ | ✅ | ✅ | — | — |
 
 ¹ PayTR hesabınızın 3D'siz ödemeler için onaylanmış olması gerekir.
 ² PayTR'de iptal (void) uç noktası yoktur; bu yüzden `cancel()` tam iade yapar.

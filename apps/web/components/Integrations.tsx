@@ -8,6 +8,7 @@ import SectionHeading from "@/components/SectionHeading";
 import { integrations } from "@/lib/integrations";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * "Every gateway has a different API" and the provider showcase in one
@@ -51,7 +52,7 @@ export default function Integrations({
               )}
             >
               <span className="grid size-8 place-items-center rounded-lg border border-border bg-background dark:bg-logo">
-                <Image src={item.logo} alt="" width={28} height={16} className="h-4 w-7 object-contain" />
+                <Image src={withBasePath(item.logo)} alt="" width={28} height={16} className="h-4 w-7 object-contain" />
               </span>
               {item.name}
             </button>
@@ -62,7 +63,7 @@ export default function Integrations({
           <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid size-12 place-items-center rounded-xl border border-border bg-background dark:bg-logo">
-                <Image src={p.logo} alt="" width={40} height={24} className="h-6 w-10 object-contain" />
+                <Image src={withBasePath(p.logo)} alt="" width={40} height={24} className="h-6 w-10 object-contain" />
               </span>
               <div>
                 <h3 className="text-lg leading-tight font-bold text-foreground">{p.name}</h3>

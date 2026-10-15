@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/generate-docs.mjs && next dev",
+    "build": "node scripts/generate-docs.mjs && next build",
+    "docs:generate": "node scripts/generate-docs.mjs",
+    "docs:test": "node --test scripts/docs-content.test.mjs",
+    "docs:check": "node scripts/check-generated-docs.mjs",
     "start": "next start",
     "lint": "eslint"
   },
@@ -28,6 +31,13 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "gray-matter": "^4.0.3",
+    "remark-gfm": "^4.0.1",
+    "remark-mdx": "^3.1.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "typedoc": "^0.28.20",
+    "unified": "^11.0.5",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/mdx": "^2.0.14",
     "@types/node": "^20.19.43",
