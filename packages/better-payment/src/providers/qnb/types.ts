@@ -19,15 +19,6 @@ export interface QnbConfig extends PaymentProviderConfig {
 }
 
 /**
- * Ziraat Katılım virtual POS (PayFor) configuration. The values come from
- * Ziraat Katılım, like QNB's, plus the institution code.
- */
-export interface ZiraatKatilimConfig extends QnbConfig {
-  /** Kurum kodu (`MbrId`) given by Ziraat Katılım */
-  mbrId: string;
-}
-
-/**
  * Fields QNB POSTs to OkUrl / FailUrl. `ResponseHash` covers OrderId,
  * AuthCode, ProcReturnCode, 3DStatus and ResponseRnd.
  */

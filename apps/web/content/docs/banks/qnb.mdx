@@ -9,7 +9,7 @@ Uses the QNB virtual POS (PayFor) XML API. The 3D form is signed with
 and callbacks carry a `ResponseHash` over the result fields.
 
 <Callout type="info">
-  Verified in the QNB test environment with the published demo merchants: 3D Model and 3D Pay payments end to end, non-3D sale, order inquiry and cancel. Refunds apply to sales of an earlier day; on the same day, cancel instead.
+  Verified in the QNB test environment with the published demo merchants: 3D Model and 3D Pay payments end to end, non-3D sale, order inquiry and cancel. A same-day refund was rejected with `V014`, as documented: refunds apply to sales of an earlier day, and on the same day you cancel instead. A successful refund after settlement has not been run yet.
 </Callout>
 
 ## Configuration

@@ -7,7 +7,7 @@ since: 0.12.0
 QNB sanal POS (PayFor) XML API'sini kullanır. 3D formu `base64(SHA1(MbrId + OrderId + PurchAmount + OkUrl + FailUrl + TxnType + InstallmentCount + Rnd + MerchantPass))` ile imzalanır; callback'ler sonuç alanlarını kapsayan bir `ResponseHash` taşır.
 
 <Callout type="info">
-  QNB test ortamında, yayınlanan demo üye işyerleriyle doğrulananlar: uçtan uca 3D Model ve 3D Pay ödemeleri, 3D'siz satış, sipariş sorgusu ve iptal. İade önceki günlerin satışları için geçerlidir; aynı gün iade yerine iptal kullanın.
+  QNB test ortamında, yayınlanan demo üye işyerleriyle doğrulananlar: uçtan uca 3D Model ve 3D Pay ödemeleri, 3D'siz satış, sipariş sorgusu ve iptal. Aynı gün yapılan iade, dokümanda belirtildiği gibi `V014` ile reddedildi: iade önceki günlerin satışları için geçerlidir, aynı gün iptal kullanılır. Gün sonundan sonra başarılı bir iade henüz denenmedi.
 </Callout>
 
 ## Yapılandırma [#configuration]

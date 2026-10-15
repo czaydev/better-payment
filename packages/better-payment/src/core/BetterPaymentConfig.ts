@@ -23,7 +23,6 @@ export enum ProviderType {
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
   QNB = 'qnb',
-  ZIRAATKATILIM = 'ziraatkatilim',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -162,10 +161,6 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.QNB]: {
     sandbox: 'https://vpostest.qnb.com.tr',
     production: 'https://vpos.qnb.com.tr',
-  },
-  [ProviderType.ZIRAATKATILIM]: {
-    sandbox: 'https://payfortestziraatkatilim.cordisnetwork.com',
-    production: 'https://vpos.ziraatkatilim.com.tr',
   },
 };
 
