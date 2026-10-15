@@ -51,9 +51,13 @@ returned page posts the card from the customer's browser to `ProcessCardForm`. T
 result to `callbackUrl`:
 
 ```typescript
-const result = await payment.tosla.completeThreeDSPayment(callbackBody);
-// or, when the callback carries no order id: { ...callbackBody, orderId, amount }
+// orderId and amount come from your own records, never from the callback body
+const result = await payment.tosla.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
+
+Pass `orderId` and `amount` from your own records as the second argument; they are never read from
+the callback body. The default handler route (`/api/pay/tosla/callback`) passes only the body, so it
+cannot check the amount; complete the payment in your own route to use them.
 
 The callback is not signed, so only its order id is used. The result comes from an `inquiry`:
 

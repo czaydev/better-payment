@@ -58,15 +58,14 @@ describe.skipIf(!env)('Tosla sandbox', () => {
   describe.skipIf(!paid)('a payment completed by hand (see the steps above)', () => {
     it('confirms it with an inquiry, only for the right order and amount', async () => {
       const callback = { OrderId: paid!.TOSLA_SANDBOX_PAID_ORDER_ID };
-      const result = await tosla.completeThreeDSPayment({
-        ...callback,
+      const result = await tosla.completeThreeDSPayment(callback, {
         orderId: paid!.TOSLA_SANDBOX_PAID_ORDER_ID,
         amount: paid!.TOSLA_SANDBOX_PAID_AMOUNT,
       });
       record('tosla', 'complete-3d', result.rawResponse);
       expect(result.status, describeResult(result)).toBe(PaymentStatus.SUCCESS);
 
-      const wrongAmount = await tosla.completeThreeDSPayment({ ...callback, amount: '999.99' });
+      const wrongAmount = await tosla.completeThreeDSPayment(callback, { amount: '999.99' });
       expect(wrongAmount.errorCode).toBe('INVALID_HASH');
       expect(wrongAmount.paymentId).toBeUndefined();
     });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import crypto from 'node:crypto';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment } from '../../../../src';
 import { Tosla, tosla, toslaOrderStatus } from '../../../../src/providers/tosla';
@@ -164,9 +165,9 @@ describe('Tosla provider', () => {
 
     it('checks the amount when given', async () => {
       post.mockResolvedValue({ data: toslaInquiry() });
-      const ok = await provider.completeThreeDSPayment({ ...CALLBACK, amount: '1.20' });
+      const ok = await provider.completeThreeDSPayment(CALLBACK, { amount: '1.20' });
       expect(ok.status).toBe(PaymentStatus.SUCCESS);
-      const wrong = await provider.completeThreeDSPayment({ ...CALLBACK, amount: '99.00' });
+      const wrong = await provider.completeThreeDSPayment(CALLBACK, { amount: '99.00' });
       expect(wrong.errorCode).toBe('INVALID_HASH');
       expectNoIds(wrong);
     });
@@ -183,8 +184,45 @@ describe('Tosla provider', () => {
 
     it('prefers the order id from your records', async () => {
       post.mockResolvedValue({ data: toslaInquiry() });
-      await provider.completeThreeDSPayment({ OrderId: 'FORGED', orderId: 'ORDERTS' });
+      await provider.completeThreeDSPayment({ OrderId: 'FORGED' }, { orderId: 'ORDERTS' });
       expect(sent()).toMatchObject({ OrderId: 'ORDERTS' });
+    });
+
+    it('ignores orderId and amount sent in the callback body', async () => {
+      post.mockResolvedValue({ data: toslaInquiry() });
+      const result = await provider.completeThreeDSPayment({
+        ...CALLBACK,
+        orderId: 'VICTIM',
+        amount: '99.00',
+      } as any);
+      expect(sent()).toMatchObject({ OrderId: 'ORDERTS' });
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+      expect(result.paymentId).toBe('ORDERTS');
+    });
+
+    // The default handler passes only the HTTP body: a client must not be able to
+    // name the order or get ids attached to a pending result
+    it('does not trust an orderId in the body through the default handler', async () => {
+      post.mockRejectedValue(timeout());
+      const payment = betterPayment({
+        mode: 'sandbox',
+        providers: { tosla: tosla({ ...TOSLA_TEST, baseUrl: TOSLA_BASE_URL }) },
+      });
+      (payment.use('tosla') as any).client.post = post;
+      const onCallback = vi.fn();
+      await new BetterPaymentHandler(payment, { onCallback }).handle({
+        method: 'POST',
+        url: '/api/pay/tosla/callback',
+        headers: { 'content-type': 'application/json' },
+        body: { ...CALLBACK, orderId: 'VICTIM' },
+      });
+      expect(sent()).toMatchObject({ OrderId: 'ORDERTS' });
+      expect(onCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: PaymentStatus.PENDING }),
+        expect.anything()
+      );
+      const [result] = onCallback.mock.calls[0];
+      expectNoIds(result);
     });
 
     it('needs an order id', async () => {
@@ -203,7 +241,7 @@ describe('Tosla provider', () => {
 
     it('keeps the order id on a timeout when it came from your records', async () => {
       post.mockRejectedValue(timeout());
-      const result = await provider.completeThreeDSPayment({ ...CALLBACK, orderId: 'ORDERTS' });
+      const result = await provider.completeThreeDSPayment(CALLBACK, { orderId: 'ORDERTS' });
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.paymentId).toBe('ORDERTS');
     });

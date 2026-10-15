@@ -39,6 +39,7 @@ import {
 import type {
   ToslaConfig,
   Tosla3DCallbackData,
+  ToslaCompleteContext,
   ToslaCommissionResponse,
   ToslaInquiryResponse,
   ToslaResponse,
@@ -261,17 +262,23 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
 
   /**
    * Completes the payment after the callbackUrl POST. The callback is not
-   * signed, so only the order id is taken from it (or `orderId` from your
-   * records); the result, amount and status come from an inquiry. A callback
-   * claiming a payment the bank does not confirm is rejected as INVALID_HASH.
+   * signed, so only the order id is taken from it (or `context.orderId` from
+   * your records); the result, amount and status come from an inquiry. A
+   * callback claiming a payment the bank does not confirm is rejected as
+   * INVALID_HASH. `context` is read only from the second argument, never from
+   * the callback body.
    *
    * `paymentId` and `conversationId` are set only for a payment the bank
-   * confirmed, and on a timeout of that inquiry only when `orderId` came from
-   * your records.
+   * confirmed, and on a timeout of that inquiry only when `context.orderId`
+   * was given.
    */
-  async completeThreeDSPayment(callbackData: Tosla3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackData: Tosla3DCallbackData,
+    context: ToslaCompleteContext = {}
+  ): Promise<PaymentResponse> {
     const data = callbackData ?? {};
-    const orderId = nonEmpty(data.orderId) ?? nonEmpty(data.OrderId) ?? nonEmpty(data.orderid);
+    const trustedOrderId = nonEmpty(context.orderId);
+    const orderId = trustedOrderId ?? nonEmpty(data.OrderId) ?? nonEmpty(data.orderid);
     if (!orderId) {
       return this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -297,7 +304,7 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
       const approved =
         toslaOrderStatus(inquiry) === PaymentStatus.SUCCESS && inquiry.OrderId === orderId;
       const amountMatches =
-        data.amount === undefined || Number(inquiry.Amount) === toMinorUnits(data.amount);
+        context.amount === undefined || Number(inquiry.Amount) === toMinorUnits(context.amount);
 
       if (!approved || !amountMatches) {
         if (
@@ -327,9 +334,9 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
       // A timeout while asking Tosla about the order: the outcome is unknown. The
-      // ids are kept only when the order came from your records (`orderId`); an
-      // unsigned callback's OrderId is not trusted on its own.
-      return result.status === PaymentStatus.PENDING && nonEmpty(data.orderId) !== undefined
+      // ids are kept only when the order came from your records
+      // (`context.orderId`); an unsigned callback's OrderId is not trusted.
+      return result.status === PaymentStatus.PENDING && trustedOrderId !== undefined
         ? { ...result, paymentId: orderId, conversationId: orderId }
         : result;
     }

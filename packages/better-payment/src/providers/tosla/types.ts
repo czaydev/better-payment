@@ -80,12 +80,16 @@ export interface Tosla3DCallbackData {
   OrderId?: string;
   BankResponseCode?: string;
   BankResponseMessage?: string;
-  /**
-   * The order id from your records, when the callback carries none. Takes
-   * precedence over the callback's `OrderId`.
-   */
+  [key: string]: unknown;
+}
+
+/**
+ * Values from your own records for `completeThreeDSPayment`, passed separately
+ * from the callback body so that a POSTed field can never stand in for them.
+ */
+export interface ToslaCompleteContext {
+  /** The order id you started; takes precedence over the callback's `OrderId` */
   orderId?: string;
   /** The amount you expect, checked against the bank's record when given */
   amount?: string | number;
-  [key: string]: unknown;
 }

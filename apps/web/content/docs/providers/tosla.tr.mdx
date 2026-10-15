@@ -47,9 +47,11 @@ const init = await payment.tosla.initThreeDSPayment({
 `initThreeDSPayment()` sipariş için bir oturum açar (`threeDPayment`, tutar kuruş cinsinden); dönen sayfa kartı müşterinin tarayıcısından `ProcessCardForm` adresine gönderir. Tosla sonucu `callbackUrl` adresine POST eder:
 
 ```typescript
-const result = await payment.tosla.completeThreeDSPayment(callbackBody);
-// or, when the callback carries no order id: { ...callbackBody, orderId, amount }
+// orderId and amount come from your own records, never from the callback body
+const result = await payment.tosla.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
+
+`orderId` ve `amount` değerlerini kendi kayıtlarınızdan ikinci argüman olarak verin; callback gövdesinden asla okunmazlar. Varsayılan handler rotası (`/api/pay/tosla/callback`) yalnızca gövdeyi iletir, bu yüzden tutarı kontrol edemez; bunları kullanmak için ödemeyi kendi rotanızda tamamlayın.
 
 Callback imzalı değildir, bu yüzden yalnızca sipariş numarası kullanılır. Sonuç bir `inquiry` sorgusundan gelir:
 
