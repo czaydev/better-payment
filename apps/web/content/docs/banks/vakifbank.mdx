@@ -75,12 +75,15 @@ The callback is not signed, so its values are never used for the charge:
 ```typescript
 await payment.vakifbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
 await payment.vakifbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
-const status = await payment.vakifbank.getPayment('ORDER123');                                          // record search
-// status: 'success', 'failure', 'pending' (no record in the last 90 days)
+// getPayment() throws NOT_SUPPORTED, see below
 ```
 
 A refund lower than the sale is a partial refund; several partial refunds may add up to the sale
 amount. `cancel()` works before end of day.
+
+<Callout type="warn">
+  `getPayment()` is not supported for VakıfBank and throws `NOT_SUPPORTED`. VakıfBank's record search by order id returns the order's approved sale but not its cancel and refund records, which carry no order id, so it cannot tell whether a paid order was later cancelled or refunded. Keep the payment's state in your own records from the results of `cancel()` and `refund()`; after a timeout, check the order in the VakıfBank merchant panel.
+</Callout>
 
 <Callout type="info">
   BIN and installment queries are not supported for VakıfBank: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates.

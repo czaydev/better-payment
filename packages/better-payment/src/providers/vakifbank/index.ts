@@ -35,7 +35,6 @@ import {
   validateVakifBankOrderId,
   buildVakifBankRequestBody,
   parseVakifBankXml,
-  parseVakifBankSearchRecords,
 } from './utils';
 import type { VakifBankConfig, VakifBank3DCallbackData } from './types';
 
@@ -52,9 +51,6 @@ function isIp(value: string | undefined): value is string {
   return !!value && /^[0-9A-Fa-f:.]{3,45}$/.test(value);
 }
 
-/** Days back searched by getPayment() */
-const SEARCH_DAYS = 90;
-
 /**
  * VakıfBank virtual POS (VPOS 7/24)
  *
@@ -62,7 +58,7 @@ const SEARCH_DAYS = 90;
  * - initThreeDSPayment():     MPI enrollment, then an auto-submitting form to the ACS
  * - completeThreeDSPayment(): VPOS `Sale` with `MpiTransactionId` (3DS product): the
  *                             card and amount come from the bank's MPI record
- * - refund() `Refund`, cancel() `Cancel`, getPayment() record search
+ * - refund() `Refund`, cancel() `Cancel`; getPayment() is not supported (see there)
  *
  * `paymentId` is your order id: the `conversationId` you pass, or a generated one.
  * It is the MPI VerifyEnrollmentRequestId and the VPOS TransactionId.
@@ -347,7 +343,8 @@ export class VakifBank extends PaymentProvider<VakifBankConfig> {
       });
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
-      // A timeout while charging: the outcome is unknown, check with getPayment()
+      // A timeout while charging: the outcome is unknown; check the order in the
+      // VakıfBank merchant panel before retrying
       return reached && result.status === PaymentStatus.PENDING
         ? { ...result, paymentId: orderId, conversationId: orderId }
         : result;
@@ -409,66 +406,16 @@ export class VakifBank extends PaymentProvider<VakifBankConfig> {
   }
 
   /**
-   * Order status via record search by order id (last 90 days). The search
-   * returns the successful sale of the order if there is one, otherwise its
-   * latest attempt.
+   * Not supported: VakıfBank's record search by order id returns the order's
+   * successful sale (or its latest attempt) but not the cancel and refund
+   * records, which carry no order id. It cannot tell whether a paid order was
+   * later cancelled or refunded, so it is not offered as the payment status.
    */
-  async getPayment(paymentId: string): Promise<PaymentResponse> {
-    try {
-      const end = new Date();
-      const start = new Date(end.getTime() - SEARCH_DAYS * 24 * 60 * 60 * 1000);
-      const day = (date: Date) => date.toISOString().slice(0, 10);
-      const response = await this.client.post<string>(
-        VAKIFBANK_ENDPOINTS.SEARCH,
-        buildVakifBankRequestBody('SearchRequest', {
-          MerchantCriteria: {
-            HostMerchantId: this.config.merchantId,
-            MerchantPassword: this.config.password,
-          },
-          DateCriteria: { StartDate: day(start), EndDate: day(end) },
-          TransactionCriteria: { TransactionId: '', OrderId: paymentId, AuthCode: '' },
-        }),
-        { responseType: 'text', retryable: true }
-      );
-      const xml = typeof response.data === 'string' ? response.data : '';
-      const fields = parseVakifBankXml(xml, 'SearchResponse');
-      const searchOk =
-        fields.ResponseCode === VAKIFBANK_SUCCESS_CODE || fields.Status === 'Success';
-      if (!searchOk) {
-        return this.withErrorCode({
-          status: PaymentStatus.FAILURE,
-          paymentId,
-          conversationId: paymentId,
-          errorCode: fields.ResultCode || fields.ResponseCode || undefined,
-          errorMessage: fields.ResultDetail || fields.ResponseMessage || undefined,
-          rawResponse: fields,
-        });
-      }
-
-      const records = parseVakifBankSearchRecords(xml);
-      const sale =
-        records.find((r) => r.TransactionType === 'Sale' && VakifBank.isApproved(r)) ?? records[0];
-      const status = !sale
-        ? PaymentStatus.PENDING
-        : VakifBank.isApproved(sale)
-          ? PaymentStatus.SUCCESS
-          : PaymentStatus.FAILURE;
-
-      return this.withErrorCode({
-        status,
-        paymentId,
-        conversationId: paymentId,
-        ...(status === PaymentStatus.FAILURE
-          ? { errorCode: sale?.ResultCode, errorMessage: sale?.ResponseMessage }
-          : {}),
-        rawResponse: { records },
-      });
-    } catch (error) {
-      return this.failure<PaymentResponse>(error, 'Get payment failed', {
-        paymentId,
-        conversationId: paymentId,
-      });
-    }
+  async getPayment(_paymentId: string): Promise<PaymentResponse> {
+    throw this.notSupported(
+      'Payment status',
+      "VakıfBank's record search by order id does not return cancel or refund records"
+    );
   }
 }
 

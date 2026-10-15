@@ -5,8 +5,6 @@ import { buildXmlFields, unescapeXml, type XmlValue } from '../parampos/utils';
 export const VAKIFBANK_ENDPOINTS = {
   /** VPOS 7/24 (POX request), relative to the provider base URL */
   VPOS: '/VposService/v3/Vposreq.aspx',
-  /** Record search, relative to the provider base URL */
-  SEARCH: '/UIService/Search.aspx',
 } as const;
 
 /** MPI enrollment (3D Secure) service */
@@ -113,23 +111,4 @@ export function parseVakifBankXml(xml: string, root: string): Record<string, str
     throw new Error('VakıfBank returned an unexpected response');
   }
   return leafFields(xml);
-}
-
-/** Each <TransactionSearchResultInfo> record of a search answer */
-export function parseVakifBankSearchRecords(xml: string): Record<string, string>[] {
-  const records: Record<string, string>[] = [];
-  const open = '<TransactionSearchResultInfo>';
-  const close = '</TransactionSearchResultInfo>';
-  let index = xml.indexOf(open);
-  while (index !== -1) {
-    const next = xml.indexOf(open, index + open.length);
-    const end = xml.indexOf(close, index + open.length);
-    // The list and its records share the element name; a record holds no nested one
-    if (end !== -1 && (next === -1 || end < next)) {
-      const record = leafFields(xml.slice(index + open.length, end));
-      if (record.TransactionId || record.ResultCode) records.push(record);
-    }
-    index = next;
-  }
-  return records;
 }

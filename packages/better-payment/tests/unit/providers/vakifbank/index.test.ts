@@ -13,7 +13,6 @@ import {
   validateVakifBankOrderId,
   buildVakifBankRequestBody,
   parseVakifBankXml,
-  parseVakifBankSearchRecords,
 } from '../../../../src/providers/vakifbank/utils';
 import { PaymentStatus } from '../../../../src/types';
 import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../../fixtures/payment-data';
@@ -54,18 +53,6 @@ const CALLBACK = {
   Cavv: 'CAVVVALUE=',
   SessionInfo: '85.34.78.112',
 };
-const searchXml = (records: Record<string, string>[]) =>
-  '<?xml version="1.0" encoding="utf-8"?><SearchResponse><ResponseInfo><Status>Success</Status><ResponseCode>0000</ResponseCode><ResponseMessage>Succeeded.</ResponseMessage></ResponseInfo>' +
-  `<PagedResponseInfo><TotalItemCount>${records.length}</TotalItemCount></PagedResponseInfo><TransactionSearchResultInfo>` +
-  records
-    .map(
-      (r) =>
-        `<TransactionSearchResultInfo>${Object.entries(r)
-          .map(([k, v]) => `<${k}>${v}</${k}>`)
-          .join('')}</TransactionSearchResultInfo>`
-    )
-    .join('') +
-  '</TransactionSearchResultInfo></SearchResponse>';
 const timeout = () => new HttpError('Request timed out', {}, { code: 'ETIMEDOUT' });
 
 describe('VakıfBank utils', () => {
@@ -99,20 +86,12 @@ describe('VakıfBank utils', () => {
     );
   });
 
-  it('parses answers and search records', () => {
+  it('parses answers', () => {
     expect(parseVakifBankXml(APPROVED, 'VposResponse')).toMatchObject({
       ResultCode: '0000',
       AuthCode: '985347',
     });
     expect(() => parseVakifBankXml('<html/>', 'VposResponse')).toThrow(/unexpected response/);
-    const records = parseVakifBankSearchRecords(
-      searchXml([
-        { TransactionType: 'Sale', TransactionId: 'A', ResultCode: '0051' },
-        { TransactionType: 'Sale', TransactionId: 'B', ResultCode: '0000' },
-      ])
-    );
-    expect(records.map((r) => r.TransactionId)).toEqual(['A', 'B']);
-    expect(parseVakifBankSearchRecords(searchXml([]))).toEqual([]);
   });
 });
 
@@ -342,49 +321,29 @@ describe('VakıfBank provider', () => {
       expect(result.status).toBe(PaymentStatus.SUCCESS);
     });
 
-    it('searches the order and returns its status', async () => {
-      post.mockResolvedValue({
-        data: searchXml([
-          {
-            TransactionType: 'Sale',
-            TransactionId: 'ORDER3D',
-            OrderId: 'ORDER3D',
-            ResultCode: '0000',
-          },
-        ]),
-      });
-      const result = await provider.getPayment('ORDER3D');
-      expect(post.mock.calls[0][0]).toBe('/UIService/Search.aspx');
-      expect(post.mock.calls[0][2].retryable).toBe(true);
-      const xml = sentXml();
-      expect(leaf(xml, 'HostMerchantId')).toBe(VAKIF_TEST.merchantId);
-      expect(leaf(xml, 'OrderId')).toBe('ORDER3D');
-      expect(leaf(xml, 'StartDate')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(result.status).toBe(PaymentStatus.SUCCESS);
-    });
+    // The record search by order id returns the order's approved sale but not the
+    // cancel or refund records, so it cannot give the current status: getPayment()
+    // must not report a reversed payment as paid.
+    it.each([
+      ['a cancel', (p: VakifBank) => p.cancel({ paymentId: 'ORDER3D', ip: '1.1.1.1' })],
+      [
+        'a full refund',
+        (p: VakifBank) =>
+          p.refund({ paymentId: 'ORDER3D', price: '1.20', currency: 'TRY', ip: '1.1.1.1' }),
+      ],
+    ])('does not report a sale as paid after %s', async (_case, reverse) => {
+      post.mockResolvedValueOnce({ data: APPROVED });
+      expect(
+        (await provider.createPayment({ ...mockPaymentRequest, conversationId: 'ORDER3D' })).status
+      ).toBe(PaymentStatus.SUCCESS);
+      post.mockResolvedValueOnce({ data: vposXml({ ResultCode: '0000', TransactionId: 'REV1' }) });
+      expect((await reverse(provider)).status).toBe(PaymentStatus.SUCCESS);
+      post.mockClear();
 
-    it('maps a failed attempt, no record, and a search error', async () => {
-      post.mockResolvedValue({
-        data: searchXml([
-          {
-            TransactionType: 'Sale',
-            TransactionId: 'X',
-            ResultCode: '0051',
-            ResponseMessage: 'RED',
-          },
-        ]),
+      await expect(provider.getPayment('ORDER3D')).rejects.toMatchObject({
+        code: 'NOT_SUPPORTED',
       });
-      expect((await provider.getPayment('X')).status).toBe(PaymentStatus.FAILURE);
-
-      post.mockResolvedValue({ data: searchXml([]) });
-      expect((await provider.getPayment('X')).status).toBe(PaymentStatus.PENDING);
-
-      post.mockResolvedValue({
-        data: '<?xml version="1.0" encoding="UTF-8"?><SearchResponse><ResultDetail>Aranan İşyeri Kaydı Bulunamadı.</ResultDetail><ResultCode>9093</ResultCode></SearchResponse>',
-      });
-      const error = await provider.getPayment('X');
-      expect(error.status).toBe(PaymentStatus.FAILURE);
-      expect(error.errorCode).toBe('9093');
+      expect(post).not.toHaveBeenCalled();
     });
   });
 

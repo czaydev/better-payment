@@ -71,11 +71,14 @@ Callback imzalı değildir, bu yüzden değerleri tahsilatta hiç kullanılmaz:
 ```typescript
 await payment.vakifbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
 await payment.vakifbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
-const status = await payment.vakifbank.getPayment('ORDER123');                                          // record search
-// status: 'success', 'failure', 'pending' (no record in the last 90 days)
+// getPayment() throws NOT_SUPPORTED, see below
 ```
 
 Satış tutarından düşük bir iade kısmi iadedir; birden fazla kısmi iade toplamda satış tutarına ulaşabilir. `cancel()` gün sonundan önce çalışır.
+
+<Callout type="warn">
+  VakıfBank için `getPayment()` desteklenmez ve `NOT_SUPPORTED` fırlatır. VakıfBank'ın sipariş numarasıyla kayıt araması siparişin onaylı satışını döndürür, ancak sipariş numarası taşımayan iptal ve iade kayıtlarını döndürmez; bu yüzden ödenmiş bir siparişin sonradan iptal veya iade edilip edilmediğini söyleyemez. Ödemenin durumunu `cancel()` ve `refund()` sonuçlarına göre kendi kayıtlarınızda tutun; zaman aşımından sonra siparişi VakıfBank üye işyeri panelinden kontrol edin.
+</Callout>
 
 <Callout type="info">
   VakıfBank için BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır. Ödeme isteğinde `installment` gönderin ve `paidPrice` değerini anlaşmalı oranlarınızdan hesaplayın.
