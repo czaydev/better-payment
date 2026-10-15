@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Looping frosted-glass icon (vault: Asset_Pipeline/Web/Animasyon). The video
@@ -29,7 +30,7 @@ export default function AnimatedIcon({ name, className }: { name: string; classN
     <video
       ref={video}
       className={cn("size-24 mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180", className)}
-      poster={`/brand/icons/icon-${name}.webp`}
+      poster={withBasePath(`/brand/icons/icon-${name}.webp`)}
       autoPlay
       muted
       loop
@@ -37,8 +38,8 @@ export default function AnimatedIcon({ name, className }: { name: string; classN
       preload="metadata"
       aria-hidden="true"
     >
-      <source src={`/brand/icons/icon-${name}.webm`} type="video/webm" />
-      <source src={`/brand/icons/icon-${name}.mp4`} type="video/mp4" />
+      <source src={withBasePath(`/brand/icons/icon-${name}.webm`)} type="video/webm" />
+      <source src={withBasePath(`/brand/icons/icon-${name}.mp4`)} type="video/mp4" />
     </video>
   );
 }

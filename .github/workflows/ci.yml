@@ -33,6 +33,29 @@ jobs:
             exit 1
           fi
 
+  web-docs:
+    name: Generated docs and web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter better-payment build
+      - run: pnpm --filter web lint
+      - run: pnpm --filter web docs:test
+      - run: pnpm --filter web build
+      - run: pnpm --filter web docs:check
+      - name: Generate and check beta documentation URLs
+        env:
+          NEXT_PUBLIC_BASE_PATH: /beta
+        run: |
+          pnpm --filter web docs:generate
+          pnpm --filter web docs:check
+
   package:
     name: better-payment (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest

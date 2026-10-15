@@ -16,6 +16,7 @@ export enum ProviderType {
   PARAMPOS = 'parampos',
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
+  ALBARAKA = 'albaraka',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -23,6 +24,9 @@ export enum ProviderType {
   TEB = 'teb',
   SEKERBANK = 'sekerbank',
   DENIZBANK = 'denizbank',
+  VAKIFBANK = 'vakifbank',
+  YAPIKREDI = 'yapikredi',
+  QNB = 'qnb',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -137,6 +141,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
     sandbox: 'https://provisioning.sipay.com.tr',
     production: 'https://app.sipay.com.tr',
   },
+  [ProviderType.ALBARAKA]: {
+    sandbox: 'https://epostest.albarakaturk.com.tr',
+    production: 'https://epos.albarakaturk.com.tr',
+  },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {
     sandbox: 'https://entegrasyon.asseco-see.com.tr',
@@ -161,6 +169,18 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.DENIZBANK]: {
     sandbox: 'https://test.inter-vpos.com.tr',
     production: 'https://inter-vpos.com.tr',
+  },
+  [ProviderType.VAKIFBANK]: {
+    sandbox: 'https://onlineodemetest.vakifbank.com.tr:4443',
+    production: 'https://onlineodeme.vakifbank.com.tr:4443',
+  },
+  [ProviderType.YAPIKREDI]: {
+    sandbox: 'https://setmpos.ykb.com',
+    production: 'https://posnet.yapikredi.com.tr',
+  },
+  [ProviderType.QNB]: {
+    sandbox: 'https://vpostest.qnb.com.tr',
+    production: 'https://vpos.qnb.com.tr',
   },
 };
 
