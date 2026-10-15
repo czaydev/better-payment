@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
+import { BetterPaymentHandler } from '../../../../src/core/BetterPaymentHandler';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment, PROVIDER_DEFAULT_URLS, ProviderType } from '../../../../src';
 import { Est, est, estOrderStatus, isEstCapturedSale } from '../../../../src/providers/est';
-import { createEstHash, parseEstXmlResponse } from '../../../../src/providers/est/utils';
+import {
+  createEstHash,
+  parseEstXmlResponse,
+  verifyEstCallback,
+} from '../../../../src/providers/est/utils';
 import { PaymentStatus } from '../../../../src/types';
 import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../../fixtures/payment-data';
 import {
@@ -181,6 +186,14 @@ describe('EST provider', () => {
         failUrl: 'https://example.com/fail',
       });
       expect(formFields(result.threeDSHtmlContent!).failUrl).toBe('https://example.com/fail');
+    });
+
+    it('sends Macedonian denars as 807 (Halkbank Macedonia)', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...mockThreeDSPaymentRequest,
+        currency: 'MKD',
+      });
+      expect(formFields(result.threeDSHtmlContent!).currency).toBe('807');
     });
 
     it('rejects an unsupported currency', async () => {
@@ -395,6 +408,228 @@ describe('EST provider', () => {
     });
   });
 
+  describe('Girogate', () => {
+    beforeEach(() => {
+      provider = create({ storeType: '3d_pay' });
+    });
+
+    const { paymentCard: _card, ...withoutCard } = mockThreeDSPaymentRequest;
+
+    it('sends the method and country instead of card data, covered by the hash', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        currency: 'EUR',
+        conversationId: 'ORDERGG',
+        girogate: { method: 'IDEAL', country: 'nl' },
+      });
+
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      const fields = formFields(result.threeDSHtmlContent!);
+      expect(fields).toMatchObject({
+        storetype: '3d_pay',
+        paymentType: 'GIROGATE_IDEAL',
+        ccode: 'NL',
+        currency: '978',
+        oid: 'ORDERGG',
+      });
+      expect(fields).not.toHaveProperty('pan');
+      expect(fields).not.toHaveProperty('cv2');
+      expect(fields).not.toHaveProperty('girogateemail');
+      const { hash, ...signedFields } = fields;
+      expect(hash).toBe(await createEstHash(signedFields, EST_TEST.storeKey));
+    });
+
+    it.each([
+      ['P24', { girogateemail: 'john@example.com' }],
+      ['TRUSTLY', { girogateconsumerid: 'BY789' }],
+      ['GIROPAY', { girogatemobile: '+905350000000' }],
+      ['DRAGONPAY', { girogateemail: 'john@example.com', girogatephone: '+905350000000' }],
+    ] as const)('adds the customer fields %s needs, from the buyer', async (method, expected) => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        buyer: { ...withoutCard.buyer, email: 'john@example.com' },
+        girogate: { method, country: 'PL' },
+      });
+      const fields = formFields(result.threeDSHtmlContent!);
+      expect(fields).toMatchObject(expected);
+      const { hash, ...signedFields } = fields;
+      expect(hash).toBe(await createEstHash(signedFields, EST_TEST.storeKey));
+    });
+
+    it('prefers the customer fields given in the request', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        girogate: { method: 'P24', country: 'PL', email: 'other@example.com' },
+      });
+      expect(formFields(result.threeDSHtmlContent!).girogateemail).toBe('other@example.com');
+    });
+
+    it.each([
+      [{ method: 'NOPE' as any, country: 'NL' }, /Unknown Girogate method/],
+      [{ method: 'IDEAL', country: 'Netherlands' }, /two-letter/],
+    ] as const)('rejects an invalid request', async (girogate, message) => {
+      const result = await provider.initThreeDSPayment({ ...withoutCard, girogate });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.code).toBe(PaymentErrorCode.INVALID_REQUEST);
+      expect(result.errorMessage).toMatch(message);
+    });
+
+    it('requires the customer field a method needs', async () => {
+      const result = await provider.initThreeDSPayment({
+        ...withoutCard,
+        buyer: { ...withoutCard.buyer, email: '' },
+        girogate: { method: 'ZIMPLER', country: 'SE' },
+      });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorMessage).toMatch(/email/);
+    });
+
+    it('needs a store type where the bank charges', async () => {
+      const result = await create({ storeType: '3d' }).initThreeDSPayment({
+        ...withoutCard,
+        girogate: { method: 'IDEAL', country: 'NL' },
+      });
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorMessage).toMatch(/3d_pay/);
+    });
+
+    // A Pending callback as the bank signs it, with one more echoed field (`oie`) that
+    // holds another order's id
+    const pendingCallback = () =>
+      signed({
+        ...EST_3DPAY_CALLBACK,
+        Response: 'Pending',
+        ProcReturnCode: '',
+        paymentType: 'GIROGATE_SEPA',
+        ccode: 'DE',
+        oie: 'ORDEROTHER',
+      });
+
+    it('returns pending with the order id when it matches your records', async () => {
+      const result = await provider.completeThreeDSPayment(await pendingCallback(), {
+        orderId: 'ORDERPAY',
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.paymentId).toBe('ORDERPAY');
+      expect(result.conversationId).toBe('ORDERPAY');
+    });
+
+    it('returns pending without ids when the order is not given', async () => {
+      const result = await provider.completeThreeDSPayment(await pendingCallback());
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expectNoIds(result);
+    });
+
+    // The ver3 hash covers the sorted values, not their names: renaming the fields
+    // keeps the signed sequence (ORDERPAY, ORDEROTHER) and the HASH, but makes `oid`
+    // another order. Such a callback must not attach a pending result to that order.
+    it('does not attach a relabelled Pending callback to another order', async () => {
+      const { oid: _oid, oie, ...rest } = await pendingCallback();
+      const relabelled = { ...rest, oic: 'ORDERPAY', oid: oie };
+      expect(await verifyEstCallback(relabelled, EST_TEST.storeKey)).toBe(true);
+
+      const unbound = await provider.completeThreeDSPayment(relabelled);
+      expect(unbound.status).toBe(PaymentStatus.PENDING);
+      expectNoIds(unbound);
+
+      const mismatched = await provider.completeThreeDSPayment(relabelled, { orderId: 'ORDERPAY' });
+      expect(mismatched.status).toBe(PaymentStatus.FAILURE);
+      expect(mismatched.errorCode).toBe('INVALID_HASH');
+      expectNoIds(mismatched);
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    // The order from your records is a separate argument: an orderId added to the
+    // body is part of what the HASH must cover, so it breaks the HASH
+    it('rejects an orderId added to the callback body', async () => {
+      const result = await provider.completeThreeDSPayment({
+        ...(await pendingCallback()),
+        orderId: 'ORDEROTHER',
+      } as never);
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expectNoIds(result);
+    });
+
+    it('does not let the context change the signed fields', async () => {
+      post.mockResolvedValue({ data: estOrderStatusXml() });
+      const result = await provider.completeThreeDSPayment(EST_3DPAY_CALLBACK, {
+        orderId: 'ORDERPAY',
+      });
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    // Through the default handler: it passes only the HTTP body, so a client cannot
+    // supply the trusted order
+    describe('through the default handler', () => {
+      const handlerFor = (onCallback: ReturnType<typeof vi.fn>) => {
+        const payment = betterPayment({
+          mode: 'sandbox',
+          providers: { isbank: est({ ...EST_TEST, bank: 'isbank', storeType: '3d_pay' }) },
+        });
+        (payment.use('isbank') as any).client.post = post;
+        return new BetterPaymentHandler(payment, { onCallback });
+      };
+      const callbackRequest = (body: Record<string, unknown>) => ({
+        method: 'POST',
+        url: '/api/pay/isbank/callback',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+
+      it('returns a Pending callback without ids', async () => {
+        const onCallback = vi.fn();
+        await handlerFor(onCallback).handle(callbackRequest(await pendingCallback()));
+        expect(onCallback).toHaveBeenCalledTimes(1);
+        const [result] = onCallback.mock.calls[0];
+        expect(result.status).toBe(PaymentStatus.PENDING);
+        expectNoIds(result);
+        expect(post).not.toHaveBeenCalled();
+      });
+
+      it('does not let a client attach a Pending callback to an order with orderId', async () => {
+        const { oid: _oid, oie, ...rest } = await pendingCallback();
+        const onCallback = vi.fn();
+        const res = await handlerFor(onCallback).handle(
+          callbackRequest({ ...rest, oic: 'ORDERPAY', oid: oie, orderId: 'ORDEROTHER' })
+        );
+        expect(post).not.toHaveBeenCalled();
+        expect(onCallback).not.toHaveBeenCalledWith(
+          expect.objectContaining({ paymentId: 'ORDEROTHER' }),
+          expect.anything()
+        );
+        expect(JSON.stringify(res.body ?? '')).not.toContain('"paymentId":"ORDEROTHER"');
+      });
+    });
+
+    it('rejects an unsigned Pending callback', async () => {
+      const result = await provider.completeThreeDSPayment({
+        ...EST_3DPAY_CALLBACK,
+        Response: 'Pending',
+      });
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expectNoIds(result);
+    });
+
+    // Shaped like the test environment's answer for a store without Girogate
+    it('fails without ids when the store has no Girogate', async () => {
+      const result = await provider.completeThreeDSPayment(
+        await signed({
+          ...EST_3DPAY_CALLBACK,
+          Response: 'Declined',
+          ProcReturnCode: '99',
+          ErrMsg: 'Not a girogate merchant: ',
+          paymentType: 'GIROGATE_IDEAL',
+          ccode: 'NL',
+        })
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('99');
+      expectNoIds(result);
+    });
+  });
+
   describe('refund, cancel, getPayment', () => {
     it('refunds with Credit', async () => {
       post.mockResolvedValue({ data: EST_APPROVED_XML });
@@ -504,7 +739,7 @@ describe('EST provider', () => {
   });
 
   describe('est()', () => {
-    it.each(['isbank', 'ziraat', 'halkbank', 'teb', 'sekerbank'] as const)(
+    it.each(['isbank', 'ziraat', 'halkbank', 'teb', 'sekerbank', 'akbankest', 'halkbankmkd'] as const)(
       'uses the shared test environment for %s in sandbox mode',
       (bank) => {
         const bp = betterPayment({
@@ -517,6 +752,9 @@ describe('EST provider', () => {
 
     it('registers each bank as a provider type with default URLs', () => {
       expect(ProviderType.ISBANK).toBe('isbank');
+      expect(ProviderType.AKBANKEST).toBe('akbankest');
+      expect(ProviderType.HALKBANKMKD).toBe('halkbankmkd');
+      expect(ProviderType.AKBANK).not.toBe(ProviderType.AKBANKEST);
       expect(PROVIDER_DEFAULT_URLS[ProviderType.SEKERBANK]).toEqual({
         sandbox: EST_SANDBOX_URL,
         production: 'https://sanalpos.sekerbank.com.tr',
@@ -535,6 +773,8 @@ describe('EST provider', () => {
       ['halkbank', 'https://sanalpos.halkbank.com.tr'],
       ['teb', 'https://sanalpos.teb.com.tr'],
       ['sekerbank', 'https://sanalpos.sekerbank.com.tr'],
+      ['akbankest', 'https://www.sanalakpos.com'],
+      ['halkbankmkd', 'https://epay.halkbank.mk'],
     ] as const)('uses the %s production host', (bank, url) => {
       const bp = betterPayment({ providers: { pos: est({ ...EST_TEST, bank }) } });
       expect((bp.pos as any).config.baseUrl).toBe(url);

@@ -71,7 +71,7 @@ export interface ParamposInstallmentRates {
 }
 
 export interface ParamposConfig extends PaymentProviderConfig {
-  /** CLIENT_CODE (terminal numarası) */
+  /** CLIENT_CODE (terminal number) */
   clientCode: string;
   /** CLIENT_USERNAME */
   clientUsername: string;

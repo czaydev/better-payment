@@ -17,7 +17,7 @@ import { betterPayment, est } from 'better-payment';
 const payment = betterPayment({
   providers: {
     isbank: est({
-      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank'
+      bank: 'isbank', // 'isbank' | 'ziraat' | 'halkbank' | 'teb' | 'sekerbank' | 'akbankest' | 'halkbankmkd'
       clientId: process.env.EST_CLIENT_ID!,
       username: process.env.EST_API_USER!,
       password: process.env.EST_API_PASSWORD!,
@@ -34,6 +34,22 @@ const payment = betterPayment({
 `clientId` mağaza numaranızdır. `username` ve `password` API kullanıcısına (XML API), `storeKey` ise 3D Secure mağaza anahtarına aittir; hepsi bankanın üye işyeri panelinden alınır. `storeType`, bankanın mağazanız için tanımladığı 3D modeliyle aynı olmalıdır.
 
 `paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+### Bankalar [#banks]
+
+| Banka | `bank` | Canlı ortam adresi |
+| ----- | ------ | ------------------ |
+| İş Bankası | `isbank` | `https://sanalpos.isbank.com.tr` |
+| Ziraat Bankası | `ziraat` | `https://sanalpos2.ziraatbank.com.tr` |
+| Halkbank | `halkbank` | `https://sanalpos.halkbank.com.tr` |
+| TEB | `teb` | `https://sanalpos.teb.com.tr` |
+| Şekerbank | `sekerbank` | `https://sanalpos.sekerbank.com.tr` |
+| Akbank (eski sanal POS) | `akbankest` | `https://www.sanalakpos.com` |
+| Halkbank Makedonya | `halkbankmkd` | `https://epay.halkbank.mk` |
+
+<Since version="0.12.0" />
+
+`akbankest`, Akbank'ın eski EST sanal POS'unu (sanalakpos.com) kullanmaya devam eden üye işyerleri içindir; Akbank'ın yeni JSON API'si ayrı bir sağlayıcıdır: [`akbank`](/docs/banks/akbank). `halkbankmkd`, Halkbank Makedonya'dır (Halk Banka AD Skopje); Makedon dinarı için `currency: 'MKD'` gönderin (`807` olarak iletilir). İki adres de XML API'ye cevap verdi (uydurma bir mağazayla), ancak gerçek bir mağazayla denenmedi.
 
 ## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
 
@@ -70,6 +86,44 @@ Hash, dönen tüm alanların değerlerini kapsar ama alan adlarını kapsamaz; b
 ### mdStatus [#mdstatus]
 
 `mdStatus` `1`, kartın tam olarak doğrulandığı anlamına gelir. `2`, `3` ve `4` yarım güvenlidir: kart ya da bankası 3D Secure'a kayıtlı değildir veya yalnızca bir deneme yapılmıştır. `3d` ve `3d_host` modellerinde varsayılan olarak yalnızca `1` tahsil edilir; diğer değerler `MD_STATUS_<değer>` ile başarısız olur. Yarım güvenli ödemeleri de tahsil etmek için bunları `acceptedMdStatuses` içinde listeleyin (örneğin `['1', '2', '3', '4']`). Bu durumda ters ibraz (chargeback) sorumluluğu sizde kalabilir. `3d_pay` ve `3d_pay_hosting` modellerinde kararı banka verir.
+
+## Girogate [#girogate]
+
+<Since version="0.12.0" />
+
+Girogate, EST ödeme sayfasına iDEAL (Hollanda), Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly, Multibanco, Boleto ve Alipay gibi alternatif ödeme yöntemleri ekler. Banka bunu mağaza bazında, anlaşmanızdaki yöntemlerle açar. Kart yerine `girogate` gönderin; ödemeyi banka aldığı için mağaza tipi `3d_pay` veya `3d_pay_hosting` olmalıdır:
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    isbank: est({
+      bank: 'isbank',
+      clientId: process.env.EST_CLIENT_ID!,
+      username: process.env.EST_API_USER!,
+      password: process.env.EST_API_PASSWORD!,
+      storeKey: process.env.EST_STORE_KEY!,
+      storeType: '3d_pay', // or '3d_pay_hosting'
+    }),
+  },
+});
+
+const init = await payment.isbank.initThreeDSPayment({
+  ...paymentRequest, // no paymentCard
+  currency: 'EUR',
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/isbank/payment/complete-3ds',
+  girogate: { method: 'IDEAL', country: 'NL' },
+});
+// result.status after the callback: 'success', 'failure', or 'pending' for a method that settles later
+```
+
+`method`, `EST_GIROGATE_METHODS` içinden biridir; `country` müşterinin ISO 3166 ülke kodudur. Bazı yöntemler müşteri hakkında ek bilgi ister ve bunlar istekten alınır: Przelewy24, Zimpler ve Asya yöntemleri için e-posta (`buyer.email`), giropay, Dragonpay, eNETS, SingPost ve Tayland bankaları için telefon (`buyer.gsmNumber`), Entercash, Trustly ve AstroPay için müşteri numarası (`buyer.id`). Bunları `girogate` içinde değiştirebilirsiniz (`email`, `phone`, `consumerId`). Hepsi hash'e dahildir. Yöntemin çalıştığı para birimini kullanın (iDEAL için EUR, Przelewy24 için PLN, İsveç'te Trustly için SEK gibi).
+
+Callback `3d_pay` gibi tamamlanır: onaylı bir ödeme sipariş durumu sorgusuyla doğrulanır. Sonradan kesinleşen bir yöntem (havale veya ödeme kuponu) `Response: Pending` ile dönebilir. ver3 hash'i değerleri kapsar ama alan adlarını kapsamaz; bu yüzden callback tek başına hangi siparişin beklemede olduğunu söyleyemez. Kendi kayıtlarınızdaki siparişi gövdenin içinde değil, ayrı bir argüman olarak verin: `completeThreeDSPayment(callbackBody, { orderId })`. Eşleşirse sonuç sipariş numarasıyla birlikte `pending` olur ve sonucu daha sonra `getPayment()` ile sorgularsınız. Verilmezse, örneğin yalnızca bankanın POST'unu ileten varsayılan handler üzerinden, sonuç numara taşımayan bir `pending` olur. Başka bir siparişe ait callback `INVALID_HASH` ile reddedilir; gövdeye eklenen bir `orderId` de, HASH gönderilen her alanı kapsaması gerektiği için reddedilir.
+
+<Callout type="warn">
+  Test mağazasında Girogate açık olmayan ortak EST test ortamında denendi: ödeme sayfası formu ve hash'ini (müşteri alanları dahil) kabul etti ve `Not a girogate merchant` cevabını verdi; bu bir başarısızlık olarak döner. Bir Girogate ödemesi uçtan uca denenmedi.
+</Callout>
 
 ## İade, iptal ve durum sorgusu [#refund-cancel--status]
 

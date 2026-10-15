@@ -7,6 +7,7 @@ import { LOCALES, SITE_URL, alternates, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { i18nUI } from "@/lib/i18n/ui";
 import { Analytics } from "@vercel/analytics/next";
+import { IS_BETA_DOCS } from "@/lib/base-path";
 
 // Brand typography: Manrope for display and headings, Inter for text, JetBrains Mono for code
 const manrope = Manrope({
@@ -39,6 +40,8 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
     keywords: ["payment gateway", "ödeme", "iyzico", "paytr", "parampos", "akbank", "sanal pos", "nodejs", "typescript", "npm"],
     alternates: alternates("/", lang),
     openGraph: { locale: lang === "tr" ? "tr_TR" : "en_US", siteName: "Better Payment" },
+    // The beta docs repeat the stable pages; only the stable ones are indexed
+    ...(IS_BETA_DOCS && { robots: { index: false, follow: true } }),
   };
 }
 
