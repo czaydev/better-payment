@@ -62,6 +62,15 @@ function nonEmpty(value: unknown): string | undefined {
 }
 
 /**
+ * A refund or void is approved only when Tosla accepted it (`Code` 0) and, when
+ * the answer carries the bank's code, the bank approved it too (`00`).
+ */
+function isToslaReversalApproved(result: ToslaReversalResponse): boolean {
+  const bankCode = nonEmpty(result.BankResponseCode);
+  return result.Code === 0 && (bankCode === undefined || bankCode === '00');
+}
+
+/**
  * Maps an inquiry answer: no record is a failure, a declined payment failed, a
  * (partly) refunded one is cancelled, an approved one succeeded.
  */
@@ -79,7 +88,7 @@ export function toslaOrderStatus(inquiry: ToslaInquiryResponse): PaymentStatus {
  *                             posts the card to ProcessCardForm
  * - completeThreeDSPayment(): the callback is not signed, so the result is
  *                             confirmed with an inquiry
- * - refund() `refund`, cancel() `void`, getPayment() `inquiry`
+ * - refund() `refund`, cancel() `void`; getPayment() is not supported yet (see there)
  * - binCheck() / installmentInfo(): GetCommissionAndInstallmentInfo
  *
  * Every request is signed with base64(SHA-512(apiPass + clientId + apiUser + Rnd +
@@ -257,7 +266,8 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
    * claiming a payment the bank does not confirm is rejected as INVALID_HASH.
    *
    * `paymentId` and `conversationId` are set only for a payment the bank
-   * confirmed, and on a timeout after the bank was asked about the order.
+   * confirmed, and on a timeout of that inquiry only when `orderId` came from
+   * your records.
    */
   async completeThreeDSPayment(callbackData: Tosla3DCallbackData): Promise<PaymentResponse> {
     const data = callbackData ?? {};
@@ -316,9 +326,10 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
       });
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
-      // A timeout while asking the bank about the order: keep the ids so it can be
-      // checked with getPayment()
-      return result.status === PaymentStatus.PENDING
+      // A timeout while asking Tosla about the order: the outcome is unknown. The
+      // ids are kept only when the order came from your records (`orderId`); an
+      // unsigned callback's OrderId is not trusted on its own.
+      return result.status === PaymentStatus.PENDING && nonEmpty(data.orderId) !== undefined
         ? { ...result, paymentId: orderId, conversationId: orderId }
         : result;
     }
@@ -332,7 +343,7 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
         OrderId: request.paymentId,
         Amount: formatToslaAmount(request.price),
       });
-      const approved = result.Code === 0;
+      const approved = isToslaReversalApproved(result);
       return this.withErrorCode({
         status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
         refundId: approved ? nonEmpty(result.TransactionId) : undefined,
@@ -354,7 +365,7 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
       const result = await this.post<ToslaReversalResponse>(TOSLA_ENDPOINTS.VOID, {
         OrderId: request.paymentId,
       });
-      const approved = result.Code === 0;
+      const approved = isToslaReversalApproved(result);
       return this.withErrorCode({
         status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
         conversationId: request.conversationId,
@@ -368,24 +379,17 @@ export class Tosla extends PaymentProvider<ToslaConfig> {
     }
   }
 
-  /** Payment status (`inquiry`) by order id */
-  async getPayment(paymentId: string): Promise<PaymentResponse> {
-    try {
-      const inquiry = await this.inquiry(paymentId);
-      const status = toslaOrderStatus(inquiry);
-      return this.withErrorCode({
-        status,
-        paymentId,
-        conversationId: paymentId,
-        ...(status === PaymentStatus.FAILURE ? Tosla.errorOf(inquiry) : {}),
-        rawResponse: inquiry,
-      });
-    } catch (error) {
-      return this.failure<PaymentResponse>(error, 'Get payment failed', {
-        paymentId,
-        conversationId: paymentId,
-      });
-    }
+  /**
+   * Not supported yet: it is not confirmed how a same-day void shows in the
+   * `inquiry` answer (refunds show in `RefundedAmount`), so a voided payment
+   * could be reported as paid. Completion still confirms a new payment with
+   * `inquiry`.
+   */
+  async getPayment(_paymentId: string): Promise<PaymentResponse> {
+    throw this.notSupported(
+      'Payment status',
+      "it is not confirmed how a void shows in Tosla's inquiry answer"
+    );
   }
 
   private async commission(binNumber: string): Promise<ToslaCommissionResponse> {

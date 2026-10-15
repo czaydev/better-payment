@@ -62,11 +62,12 @@ Callback imzalı değildir, bu yüzden yalnızca sipariş numarası kullanılır
 ```typescript
 await payment.tosla.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // refund
 await payment.tosla.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // void
-const status = await payment.tosla.getPayment('ORDER123');                                          // inquiry
-// status: 'success', 'cancelled' (refunded), 'failure' (declined or unknown order)
+// getPayment() throws NOT_SUPPORTED for now, see below
 ```
 
-`cancel()` ödemeyi aynı gün iptal eder; sonrasında `refund()` kullanın (tam veya kısmi). Kısmen de olsa iade edilmiş bir ödeme `cancelled` olur.
+`cancel()` ödemeyi aynı gün iptal eder; sonrasında `refund()` kullanın (tam veya kısmi). Bir iade ya da iptal ancak Tosla kabul ettiğinde (`Code` 0) ve cevap bankanın kodunu da içeriyorsa banka onayladığında (`00`) başarılı olur.
+
+`getPayment()` henüz desteklenmez ve `NOT_SUPPORTED` fırlatır: iadeler `inquiry` cevabında (`RefundedAmount`) görünür, ancak aynı gün yapılan bir iptalin orada nasıl göründüğü doğrulanmadı; bu yüzden iptal edilmiş bir ödeme ödenmiş gibi görünebilirdi. Ödemenin durumunu `cancel()` ve `refund()` sonuçlarından tutun. `completeThreeDSPayment()` sorgusu zaman aşımına uğrarsa sonuç `pending` olur; sipariş numarası yalnızca kendi kayıtlarınızdan `orderId` verdiyseniz döner. Siparişi Tosla İşim panelinden kontrol edin.
 
 ## BIN ve taksit [#bin--installments]
 

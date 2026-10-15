@@ -193,9 +193,17 @@ describe('Tosla provider', () => {
       expect(post).not.toHaveBeenCalled();
     });
 
-    it('returns pending with the order id when the inquiry times out', async () => {
+    it('returns pending without ids when the inquiry times out for an unsigned order id', async () => {
       post.mockRejectedValue(timeout());
       const result = await provider.completeThreeDSPayment(CALLBACK);
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.paymentId).toBeUndefined();
+      expect(result.conversationId).toBeUndefined();
+    });
+
+    it('keeps the order id on a timeout when it came from your records', async () => {
+      post.mockRejectedValue(timeout());
+      const result = await provider.completeThreeDSPayment({ ...CALLBACK, orderId: 'ORDERTS' });
       expect(result.status).toBe(PaymentStatus.PENDING);
       expect(result.paymentId).toBe('ORDERTS');
     });
@@ -238,11 +246,46 @@ describe('Tosla provider', () => {
       expect(result.status).toBe(PaymentStatus.SUCCESS);
     });
 
-    it('maps the inquiry to a status', async () => {
-      post.mockResolvedValue({ data: toslaInquiry({ RefundedAmount: 50 }) });
-      const result = await provider.getPayment('ORDERTS');
-      expect(result.status).toBe(PaymentStatus.CANCELLED);
-      expect(result.paymentId).toBe('ORDERTS');
+    // Tosla's Code acknowledges the request; when the answer also carries the bank's
+    // result, a non-00 code must not count as an approved refund or void
+    it.each([
+      [
+        'refund',
+        (p: Tosla) =>
+          p.refund({ paymentId: 'ORDERTS', price: '0.50', currency: 'TRY', ip: '1.2.3.4' }),
+      ],
+      ['void', (p: Tosla) => p.cancel({ paymentId: 'ORDERTS', ip: '1.2.3.4' })],
+    ] as const)('fails a %s with Code 0 but a declined bank code', async (_name, call) => {
+      post.mockResolvedValue({
+        data: { Code: 0, Message: '', BankResponseCode: '05', BankResponseMessage: 'Red' },
+      });
+      const result = await call(provider);
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('05');
+    });
+
+    it.each([
+      [
+        'refund',
+        (p: Tosla) =>
+          p.refund({ paymentId: 'ORDERTS', price: '0.50', currency: 'TRY', ip: '1.2.3.4' }),
+      ],
+      ['void', (p: Tosla) => p.cancel({ paymentId: 'ORDERTS', ip: '1.2.3.4' })],
+    ] as const)('approves a %s with Code 0 and bank code 00', async (_name, call) => {
+      post.mockResolvedValue({ data: { Code: 0, BankResponseCode: '00', TransactionId: 'T1' } });
+      expect((await call(provider)).status).toBe(PaymentStatus.SUCCESS);
+    });
+
+    // How a same-day void shows in the inquiry answer is not confirmed yet, so the
+    // status is not offered: a voided payment must not be reported as paid
+    it('does not report a status after a void or refund (not supported yet)', async () => {
+      post.mockResolvedValue({ data: { Code: 0, OrderId: 'ORDERTS' } });
+      expect((await provider.cancel({ paymentId: 'ORDERTS', ip: '1.2.3.4' })).status).toBe(
+        PaymentStatus.SUCCESS
+      );
+      post.mockClear();
+      await expect(provider.getPayment('ORDERTS')).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+      expect(post).not.toHaveBeenCalled();
     });
 
     it('maps statuses', () => {

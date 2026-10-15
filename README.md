@@ -140,7 +140,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | PayTR       | ✓ (needs non-3D approval) | ✓ iFrame                    |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
 | Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
-| Tosla       | —                         | ✓ ProcessCardForm           |   ✓    | ✓ (same day)    |   ✓    |  ✓  | ✓ (account rates) |
+| Tosla       | —                         | ✓ ProcessCardForm           |   ✓    | ✓ (same day)    |   —    |  ✓  | ✓ (account rates) |
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |

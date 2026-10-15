@@ -66,12 +66,18 @@ The callback is not signed, so only its order id is used. The result comes from 
 ```typescript
 await payment.tosla.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // refund
 await payment.tosla.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // void
-const status = await payment.tosla.getPayment('ORDER123');                                          // inquiry
-// status: 'success', 'cancelled' (refunded), 'failure' (declined or unknown order)
+// getPayment() throws NOT_SUPPORTED for now, see below
 ```
 
-`cancel()` voids a payment on the same day; after that, use `refund()` (full or partial). A
-refunded payment, even in part, is `cancelled`.
+`cancel()` voids a payment on the same day; after that, use `refund()` (full or partial). A refund
+or void succeeds only when Tosla accepts it (`Code` 0) and, when the answer carries the bank's code,
+the bank approved it (`00`).
+
+`getPayment()` is not supported yet and throws `NOT_SUPPORTED`: refunds show in the `inquiry` answer
+(`RefundedAmount`), but it is not confirmed how a same-day void shows there, so a voided payment could
+be reported as paid. Keep the payment's state from the results of `cancel()` and `refund()`. If the
+inquiry of `completeThreeDSPayment()` times out, the result is `pending`, with the order id only when
+you passed `orderId` from your records; check the order in the Tosla İşim panel.
 
 ## BIN & Installments
 
