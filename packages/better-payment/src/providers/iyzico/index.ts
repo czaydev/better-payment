@@ -137,7 +137,7 @@ function mapIyzicoPaymentStatus(
 }
 
 /**
- * İyzico ödeme sağlayıcısı
+ * iyzico payment provider
  */
 export class Iyzico extends PaymentProvider<IyzicoConfig> {
   private client: HttpClient;
@@ -173,7 +173,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * İyzico status'ünü PaymentStatus'e çevir
+   * Map the iyzico status to PaymentStatus
    */
   private mapStatus(iyzicoStatus: string): PaymentStatus {
     switch (iyzicoStatus) {
@@ -211,7 +211,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
       retryable: options.retryable,
     };
     if (method !== 'GET') {
-      // İmza için kullanılan body ile gönderilen body'nin aynı olması gerekiyor
+      // The body used for signing must match the body sent
       config.data = requestBody;
     }
 
@@ -220,7 +220,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Uygulama request'ini İyzico formatına çevir
+   * Convert the application request to the iyzico format
    */
   /**
    * Card data, or a stored card's tokens (cardUserKey + cardToken). With
@@ -308,7 +308,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Checkout Form request'ini İyzico formatına çevir
+   * Convert the Checkout Form request to the iyzico format
    */
   private mapToIyzicoCheckoutFormRequest(request: CheckoutFormRequest): IyzicoCheckoutFormRequest {
     return {
@@ -361,7 +361,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Direkt ödeme (3D Secure olmadan)
+   * Direct payment (without 3D Secure)
    */
   async createPayment(request: PaymentRequest): Promise<PaymentResponse> {
     return this.cardPayment('/payment/auth', request, 'Payment failed');
@@ -398,7 +398,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * 3D Secure ödeme başlat
+   * Initialize a 3D Secure payment
    */
   async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     return this.threeDSInit('/payment/3dsecure/initialize', request, '3DS initialization failed');
@@ -430,13 +430,13 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
 
       const response = await this.sendRequest<IyzicoThreeDSInitResponse>(path, iyzicoRequest);
 
-      // İyzico threeDSHtmlContent'i Base64 encoded olarak döndürür, decode edelim
+      // iyzico returns threeDSHtmlContent as Base64; decode it
       let decodedHtmlContent: string | undefined;
       if (response.threeDSHtmlContent) {
         try {
           decodedHtmlContent = fromBase64(response.threeDSHtmlContent);
         } catch (decodeError) {
-          // Eğer decode edilemezse, raw halini kullan
+          // Use the raw content if decoding fails
           decodedHtmlContent = response.threeDSHtmlContent;
         }
       }
@@ -484,7 +484,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
     }
 
     try {
-      // Callback'ten gelen token ve conversationId ile ödemeyi tamamla
+      // Complete the payment with the token and conversationId from the callback
       const response = await this.sendRequest<IyzicoPaymentResponse>('/payment/3dsecure/auth', {
         locale: this.config.locale || 'tr',
         conversationId: callbackData.conversationId,
@@ -550,7 +550,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * İptal işlemi
+   * Cancel a payment
    */
   async cancel(request: CancelRequest): Promise<CancelResponse> {
     try {
@@ -608,7 +608,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Ödeme sorgulama
+   * Query a payment
    */
   async getPayment(paymentId: string): Promise<PaymentResponse> {
     try {
@@ -636,7 +636,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Checkout Form başlat
+   * Initialize Checkout Form
    */
   async initCheckoutForm(request: CheckoutFormRequest): Promise<CheckoutFormInitResponse> {
     try {
@@ -665,7 +665,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * Checkout Form sonucunu sorgula
+   * Query the Checkout Form result
    */
   async retrieveCheckoutForm(
     token: string,
@@ -1015,7 +1015,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * BIN sorgulama
+   * Look up a BIN
    */
   async binCheck(binNumber: string): Promise<BinCheckResponse> {
     const request: IyzicoBinCheckRequest = {
@@ -1046,12 +1046,12 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
 
   /**
    * ===================
-   * PWI (Payment With IBAN - Korumalı Havale/EFT) METHODS
+   * PWI (Payment With IBAN - protected bank transfer) METHODS
    * ===================
    */
 
   /**
-   * PWI request'ini İyzico formatına çevir
+   * Convert the PWI request to the iyzico format
    */
   private mapToPWIRequest(request: PWIPaymentRequest): IyzicoPWIPaymentRequest {
     return {
@@ -1102,13 +1102,13 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * PWI Ödeme Başlat
+   * Initialize a PWI payment
    *
-   * Korumalı havale/EFT ile ödeme başlatır. Kullanıcıya IBAN numarası ve ödeme bilgileri gösterilir.
-   * Kullanıcı havale yaptıktan sonra, ödeme onaylandığında satıcıya aktarılır.
+   * Initializes a protected bank transfer. The customer sees an IBAN and payment details.
+   * After the customer makes the transfer, the funds are sent to the merchant once approved.
    *
-   * @param request - PWI ödeme isteği parametreleri
-   * @returns PWI ödeme başlatma yanıtı (HTML içeriği, token, ödeme sayfası URL'i)
+   * @param request - PWI payment request parameters
+   * @returns PWI initialization response (HTML content, token, payment page URL)
    *
    * @example
    * ```typescript
@@ -1125,10 +1125,10 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    * });
    *
    * if (result.status === 'success') {
-   *   // Option 1: HTML içeriğini göster
+   *   // Option 1: Display the HTML content
    *   document.body.innerHTML = result.htmlContent;
    *
-   *   // Option 2: Ödeme sayfasına yönlendir
+   *   // Option 2: Redirect to the payment page
    *   window.location.href = result.paymentPageUrl;
    * }
    * ```
@@ -1160,14 +1160,14 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   }
 
   /**
-   * PWI Ödeme Sorgula
+   * Query a PWI payment
    *
-   * Başlatılmış PWI ödemesinin durumunu sorgular.
-   * Havale yapıldıysa ödeme bilgilerini, yapılmadıysa IBAN ve banka bilgilerini döndürür.
+   * Queries the status of an initialized PWI payment.
+   * Returns payment details if the transfer was made, otherwise the IBAN and bank details.
    *
-   * @param token - PWI ödeme token'ı (initPWIPayment metodundan döner)
-   * @param conversationId - Opsiyonel conversation ID
-   * @returns PWI ödeme durumu ve detayları
+   * @param token - PWI payment token (returned by initPWIPayment)
+   * @param conversationId - Optional conversation ID
+   * @returns PWI payment status and details
    *
    * @example
    * ```typescript
@@ -1175,11 +1175,11 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    *
    * if (result.status === 'success') {
    *   if (result.paymentStatus === 'SUCCESS') {
-   *     console.log('Ödeme başarılı:', result.paymentId);
+   *     console.log('Payment succeeded:', result.paymentId);
    *   } else if (result.paymentStatus === 'WAITING') {
-   *     console.log('Havale bekleniyor');
+   *     console.log('Awaiting bank transfer');
    *     console.log('IBAN:', result.iban);
-   *     console.log('Banka:', result.bankName);
+   *     console.log('Bank:', result.bankName);
    *   }
    * }
    * ```
@@ -1230,18 +1230,18 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
 
   /**
    * ===================
-   * INSTALLMENT (Taksit) METHODS
+   * INSTALLMENT METHODS
    * ===================
    */
 
   /**
-   * Taksit Sorgulama
+   * Query installment options
    *
-   * Belirli bir BIN numarası ve tutar için kullanılabilir taksit seçeneklerini sorgular.
-   * Her banka için farklı taksit oranlarını ve toplam tutarları gösterir.
+   * Queries available installment options for a given BIN and amount.
+   * Shows installment rates and total amounts for each bank.
    *
-   * @param request - Taksit sorgulama isteği (BIN numarası ve tutar)
-   * @returns Taksit seçenekleri ve detayları
+   * @param request - Installment query request (BIN and amount)
+   * @returns Installment options and details
    *
    * @example
    * ```typescript
@@ -1252,10 +1252,10 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    *
    * if (result.status === 'success' && result.installmentDetails) {
    *   result.installmentDetails.forEach(detail => {
-   *     console.log(`Banka: ${detail.bankName}`);
-   *     console.log(`Kart Ailesi: ${detail.cardFamilyName}`);
+   *     console.log(`Bank: ${detail.bankName}`);
+   *     console.log(`Card family: ${detail.cardFamilyName}`);
    *     detail.installmentPrices.forEach(installment => {
-   *       console.log(`${installment.installmentNumber} taksit: ${installment.totalPrice} TL (Taksit başına: ${installment.installmentPrice} TL)`);
+   *       console.log(`${installment.installmentNumber} installments: ${installment.totalPrice} TL (Per installment: ${installment.installmentPrice} TL)`);
    *     });
    *   });
    * }

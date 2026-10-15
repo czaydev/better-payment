@@ -1,0 +1,60 @@
+name: Documentation issue
+description: Report a broken link, unclear explanation, translation problem or missing guide.
+labels: ["documentation", "area: docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the docs! Reports in English or Turkish are welcome.
+        **Remove API keys, secrets, card numbers and personal data** from examples and screenshots.
+        Security problems go to [private reporting](https://github.com/czaydev/better-payment/security/advisories/new), not here.
+  - type: input
+    id: page
+    attributes:
+      label: Page or missing topic
+      description: Link the page or give its repository path. If a page is missing, name the topic you expected to find.
+      placeholder: "https://better-payment.czaylabs.com/docs/quick-start, or missing guide about ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Documentation language
+      options:
+        - English
+        - Turkish
+        - Both
+        - Not language-specific
+    validations:
+      required: true
+  - type: dropdown
+    id: docs-version
+    attributes:
+      label: Documentation version
+      description: Beta docs have /beta in the URL. Choose repository docs for README files and contribution guides.
+      options:
+        - Stable
+        - Beta
+        - Repository docs
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Describe the broken link, confusing explanation, incorrect example or translation problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected information or correction
+      description: What were you trying to learn? You do not need to know the fix to report a problem.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Examples or screenshots (optional)
+      description: Add any helpful context, such as the package version for a code example. Remove sensitive information before sharing.

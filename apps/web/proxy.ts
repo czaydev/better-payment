@@ -46,6 +46,8 @@ function remember(request: NextRequest, response: NextResponse, locale: "en" | "
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const segment = pathname.split("/")[1];
+  // /beta is the beta docs deployment (next.config.ts rewrites it); it handles languages itself
+  if (segment === "beta" && !request.nextUrl.basePath) return NextResponse.next();
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
 
   if (segment === "tr") {

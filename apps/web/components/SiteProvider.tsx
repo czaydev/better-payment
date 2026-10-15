@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentProps } from "react";
 import { isLocale } from "@/lib/i18n/config";
 import { switchLocale } from "@/lib/i18n/switch";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Fumadocs' root provider with next-themes on (system preference by default).
@@ -30,6 +31,7 @@ export default function SiteProvider({ i18n, ...props }: Omit<ComponentProps<typ
           },
         }
       }
+      search={{ ...props.search, options: { api: withBasePath("/api/search"), ...props.search?.options } }}
       theme={{ scriptProps: { type: typeof window === "undefined" ? "text/javascript" : "text/plain" } }}
     />
   );

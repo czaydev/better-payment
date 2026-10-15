@@ -2,13 +2,13 @@ import type { PaymentErrorCode } from '../core/error-codes';
 /**
  * Subscription Types
  *
- * İyzico abonelik ödeme sistemi için type tanımları
+ * Types for the iyzico subscription payment system
  */
 
 import { Address, PaymentCard, PaymentStatus } from './common';
 
 /**
- * Abonelik durumları
+ * Subscription statuses
  */
 export enum SubscriptionStatus {
   ACTIVE = 'ACTIVE',
@@ -19,7 +19,7 @@ export enum SubscriptionStatus {
 }
 
 /**
- * Ödeme aralığı türleri
+ * Payment interval types
  */
 export enum PaymentInterval {
   DAILY = 'DAILY',
@@ -29,7 +29,7 @@ export enum PaymentInterval {
 }
 
 /**
- * Abonelik müşteri bilgileri
+ * Subscription customer details
  */
 export interface SubscriptionCustomer {
   name: string;
@@ -42,7 +42,7 @@ export interface SubscriptionCustomer {
 }
 
 /**
- * Abonelik başlatma isteği
+ * Subscription initialization request
  */
 export interface SubscriptionInitializeRequest {
   locale?: string;
@@ -54,7 +54,7 @@ export interface SubscriptionInitializeRequest {
 }
 
 /**
- * Abonelik başlatma yanıtı
+ * Subscription initialization response
  */
 export interface SubscriptionInitializeResponse {
   status: PaymentStatus;
@@ -82,14 +82,14 @@ export interface SubscriptionInitializeResponse {
 }
 
 /**
- * Abonelik iptal isteği
+ * Subscription cancellation request
  */
 export interface SubscriptionCancelRequest {
   subscriptionReferenceCode: string;
 }
 
 /**
- * Abonelik iptal yanıtı
+ * Subscription cancellation response
  */
 export interface SubscriptionCancelResponse {
   status: PaymentStatus;
@@ -108,7 +108,7 @@ export interface SubscriptionCancelResponse {
 }
 
 /**
- * Abonelik yükseltme isteği
+ * Subscription upgrade request
  */
 export interface SubscriptionUpgradeRequest {
   subscriptionReferenceCode: string;
@@ -118,7 +118,7 @@ export interface SubscriptionUpgradeRequest {
 }
 
 /**
- * Abonelik yükseltme yanıtı
+ * Subscription upgrade response
  */
 export interface SubscriptionUpgradeResponse {
   status: PaymentStatus;
@@ -138,14 +138,14 @@ export interface SubscriptionUpgradeResponse {
 }
 
 /**
- * Abonelik detay sorgulama isteği
+ * Subscription details request
  */
 export interface SubscriptionRetrieveRequest {
   subscriptionReferenceCode: string;
 }
 
 /**
- * Abonelik detay sorgulama yanıtı
+ * Subscription details response
  */
 export interface SubscriptionRetrieveResponse {
   status: PaymentStatus;
@@ -174,7 +174,7 @@ export interface SubscriptionRetrieveResponse {
 }
 
 /**
- * Kart güncelleme isteği (Checkout Form ile)
+ * Card update request (via Checkout Form)
  */
 export interface SubscriptionCardUpdateRequest {
   locale?: string;
@@ -184,7 +184,7 @@ export interface SubscriptionCardUpdateRequest {
 }
 
 /**
- * Kart güncelleme yanıtı
+ * Card update response
  */
 export interface SubscriptionCardUpdateResponse {
   status: PaymentStatus;
@@ -203,7 +203,7 @@ export interface SubscriptionCardUpdateResponse {
 }
 
 /**
- * Abonelik ürünü oluşturma isteği
+ * Subscription product creation request
  */
 export interface SubscriptionProductCreateRequest {
   locale?: string;
@@ -213,7 +213,7 @@ export interface SubscriptionProductCreateRequest {
 }
 
 /**
- * Abonelik ürünü yanıtı
+ * Subscription product response
  */
 export interface SubscriptionProductResponse {
   status: PaymentStatus;
@@ -234,7 +234,7 @@ export interface SubscriptionProductResponse {
 }
 
 /**
- * Fiyatlandırma planı oluşturma isteği
+ * Pricing plan creation request
  */
 export interface PricingPlanCreateRequest {
   locale?: string;
@@ -250,7 +250,7 @@ export interface PricingPlanCreateRequest {
 }
 
 /**
- * Fiyatlandırma planı yanıtı
+ * Pricing plan response
  */
 export interface PricingPlanResponse {
   status: PaymentStatus;

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { GitHubIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { withBasePath } from "@/lib/base-path";
 
 // Sheen colours for buttons that sit on the indigo band
 const onIndigo = { "--bp-sheen": "rgb(67 56 242 / 0.16)", "--bp-sheen-soft": "rgb(67 56 242 / 0.05)" } as React.CSSProperties;
@@ -16,7 +17,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
     <section className="px-5 py-24 sm:px-8">
       <div className="bp-reveal relative mx-auto max-w-6xl overflow-hidden rounded-[20px] bg-primary px-6 py-11 text-primary-foreground sm:px-12 sm:py-14">
         <Image
-          src="/brand/cta-lanes.webp"
+          src={withBasePath("/brand/cta-lanes.webp")}
           alt=""
           width={520}
           height={364}

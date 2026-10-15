@@ -4,9 +4,9 @@ import type { PaymentProviderConfig } from '../../core/PaymentProvider';
  * Akbank Sanal POS (JSON API) configuration
  *
  * Values come from the Akbank Sanal POS panel:
- * - merchantSafeId: Üye işyeri güvenli numarası
- * - terminalSafeId: Terminal güvenli numarası
- * - secretKey: Güvenlik anahtarı (used for HMAC-SHA512 signatures)
+ * - merchantSafeId: Merchant safe ID
+ * - terminalSafeId: Terminal safe ID
+ * - secretKey: Secret key (used for HMAC-SHA512 signatures)
  */
 export interface AkbankConfig extends PaymentProviderConfig {
   merchantSafeId: string;
