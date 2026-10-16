@@ -48,6 +48,7 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
 export default async function RootLayout({ children, params }: LayoutProps<"/[lang]">) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const t = getDictionary(lang);
 
   return (
     <html
@@ -56,6 +57,12 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans antialiased">
+        <a
+          href="#main-content"
+          className="fixed top-4 left-4 z-100 -translate-y-[calc(100%+2rem)] rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-lg transition-transform focus:translate-y-0 focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+        >
+          {t.accessibility.skipToContent}
+        </a>
         <SiteProvider i18n={i18nUI.provider(lang)}>{children}</SiteProvider>
         <Analytics />
       </body>

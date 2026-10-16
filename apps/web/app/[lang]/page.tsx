@@ -22,7 +22,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
   return (
     <>
       <Navbar version={VERSION} lang={lang} t={t.nav} />
-      <main>
+      <main id="main-content" tabIndex={-1} className="scroll-mt-20 focus:outline-none">
         <Hero lang={lang} t={t.hero} />
         <Integrations compare={t.compare} t={t.providers} bankTagline={t.banks.akbankTagline} code={t.code} />
         <Features t={t.features} />

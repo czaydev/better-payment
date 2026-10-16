@@ -1,6 +1,9 @@
 import type { Locale } from "./config";
 
 const en = {
+  accessibility: {
+    skipToContent: "Skip to content",
+  },
   notFound: {
     title: "This page is out of reach.",
     description: "The link may have changed, or the page may no longer exist. Let's get you back on track.",
@@ -230,6 +233,9 @@ const en = {
 export type Dictionary = typeof en;
 
 const tr: Dictionary = {
+  accessibility: {
+    skipToContent: "İçeriğe geç",
+  },
   notFound: {
     title: "Bu sayfaya ulaşamadık.",
     description: "Bağlantı değişmiş veya sayfa kaldırılmış olabilir. Aradığınız yere başka bir yoldan ulaşalım.",
