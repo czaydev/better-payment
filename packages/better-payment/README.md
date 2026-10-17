@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Yapı Kredi, QNB, Ziraat Katılım, VakıfBank, Albaraka Türk, Denizbank and the EST banks
 (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
@@ -128,7 +128,7 @@ list and suggested customer messages.
 if (result.code === PaymentErrorCode.INSUFFICIENT_FUNDS) askForAnotherCard();
 ```
 
-For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, EST, QNB, VakıfBank and Denizbank, `paymentId` is your **order id**: the
+For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, EST, QNB, Ziraat Katılım, VakıfBank and Denizbank, `paymentId` is your **order id**: the
 `conversationId` you pass in, or an alphanumeric id generated for you. Pass
 this id to `refund`, `cancel` and `getPayment`.
 
@@ -148,6 +148,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | VakıfBank   | ✓                         | ✓ MPI + VPOS (3DS)          |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
 | Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | QNB         | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
+| Ziraat Katılım | ✓                      | ✓ 3D Model / 3D Pay         |   ✓    | ✓               |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB, Şekerbank, Akbank's older virtual POS and
 Halkbank Macedonia, with `est({ bank })`.
@@ -186,6 +187,9 @@ Halkbank Macedonia, with `est({ bank })`.
 - **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
+- **Ziraat Katılım:** the same PayFor flow as QNB, with Ziraat Katılım's own callback hash,
+  which cannot tell `OrderId` from `ResponseRnd`. Complete it in your own route with the
+  order from your records: `completeThreeDSPayment(callbackBody, { orderId, amount })`.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

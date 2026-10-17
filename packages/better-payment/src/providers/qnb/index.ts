@@ -9,7 +9,7 @@ import { PaymentProvider } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId } from '../../core/utils';
+import { generateOrderId, toMinorUnits } from '../../core/utils';
 import { randomHex } from '../../core/crypto';
 import type { XmlValue } from '../parampos/utils';
 import {
@@ -26,10 +26,12 @@ import {
 import {
   QNB_ENDPOINTS,
   QNB_MBR_ID,
+  ZIRAAT_KATILIM_ENDPOINTS,
   QNB_SECURE_TYPES,
   type QnbSecureType,
   createQnb3DHash,
   verifyQnbCallback,
+  verifyZiraatKatilimCallback,
   formatQnbAmount,
   getQnbCurrencyCode,
   formatQnbInstallment,
@@ -39,7 +41,12 @@ import {
   parseQnbXmlResponse,
   isQnbApproved,
 } from './utils';
-import type { QnbConfig, Qnb3DCallbackData } from './types';
+import type {
+  QnbConfig,
+  Qnb3DCallbackData,
+  QnbCompleteContext,
+  ZiraatKatilimConfig,
+} from './types';
 
 function escapeHtml(value: string): string {
   return value
@@ -67,24 +74,50 @@ export class Qnb extends PaymentProvider<QnbConfig> {
   constructor(config: QnbConfig) {
     super(config);
 
-    this.client = this.createHttpClient('qnb', {
+    this.client = this.createHttpClient(this.providerId(), {
       timeout: 30000,
       headers: { 'Content-Type': 'application/xml' },
     });
   }
 
+  /** Provider id used in errors and logs */
+  protected providerId(): string {
+    return 'qnb';
+  }
+
+  /** Name used in error messages */
+  protected providerName(): string {
+    return 'QNB';
+  }
+
+  /** Paths of the 3D gateway and the XML API */
+  protected endpoints(): { GATE: string; API: string } {
+    return QNB_ENDPOINTS;
+  }
+
+  /** Institution code (`MbrId`) of the bank on the PayFor platform */
+  protected mbrId(): string {
+    return QNB_MBR_ID;
+  }
+
+  protected verifyCallback(data: Record<string, string | undefined>): Promise<boolean> {
+    return verifyQnbCallback(data, this.credentials);
+  }
+
   protected validateConfig(): void {
+    const name = this.providerName();
+    const id = this.providerId();
     const missing = (['merchantId', 'userCode', 'userPass', 'merchantPass'] as const).filter(
       (key) => !this.config[key]
     );
     if (missing.length > 0) {
-      throw new ConfigurationError(`QNB configuration is missing: ${missing.join(', ')}`, 'qnb');
+      throw new ConfigurationError(`${name} configuration is missing: ${missing.join(', ')}`, id);
     }
     if (!this.config.baseUrl) {
-      throw new ConfigurationError('QNB baseUrl is required', 'qnb');
+      throw new ConfigurationError(`${name} baseUrl is required`, id);
     }
     if (this.config.secureType && !QNB_SECURE_TYPES.includes(this.config.secureType)) {
-      throw new ConfigurationError(`Unknown QNB secureType: ${this.config.secureType}`, 'qnb');
+      throw new ConfigurationError(`Unknown ${name} secureType: ${this.config.secureType}`, id);
     }
   }
 
@@ -98,7 +131,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     };
   }
 
-  private get secureType(): QnbSecureType {
+  protected get secureType(): QnbSecureType {
     return this.config.secureType ?? '3DModel';
   }
 
@@ -106,7 +139,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     return (this.config.locale || 'tr').toLowerCase().startsWith('en') ? 'EN' : 'TR';
   }
 
-  private get credentials() {
+  protected get credentials() {
     return {
       merchantId: this.config.merchantId,
       merchantPass: this.config.merchantPass,
@@ -119,7 +152,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     fallback: string,
     extra: Partial<T> = {}
   ): T {
-    return this.withErrorCode(failureResult<T>('QNB', error, fallback, extra));
+    return this.withErrorCode(failureResult<T>(this.providerName(), error, fallback, extra));
   }
 
   private static errorOf(fields: Record<string, string | undefined>) {
@@ -134,9 +167,9 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     retryable = false
   ): Promise<Record<string, string>> {
     const response = await this.client.post<string>(
-      QNB_ENDPOINTS.API,
+      this.endpoints().API,
       buildQnbXml({
-        MbrId: QNB_MBR_ID,
+        MbrId: this.mbrId(),
         MerchantId: this.config.merchantId,
         UserCode: this.config.userCode,
         UserPass: this.config.userPass,
@@ -211,7 +244,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       }
 
       const fields: Record<string, string> = {
-        MbrId: QNB_MBR_ID,
+        MbrId: this.mbrId(),
         MerchantID: this.config.merchantId,
         UserCode: this.config.userCode,
         SecureType: this.secureType,
@@ -230,6 +263,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
         CardHolderName: card.cardHolderName,
       };
       fields.Hash = await createQnb3DHash({
+        mbrId: fields.MbrId,
         orderId,
         amount: fields.PurchAmount,
         okUrl: fields.OkUrl,
@@ -246,7 +280,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
             `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`
         )
         .join('');
-      const action = `${this.config.baseUrl}${QNB_ENDPOINTS.GATE}`;
+      const action = `${this.config.baseUrl}${this.endpoints().GATE}`;
       const html =
         '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' +
         `<form id="qnb-3d-form" method="POST" action="${escapeHtml(action)}">${inputs}</form>` +
@@ -273,14 +307,20 @@ export class Qnb extends PaymentProvider<QnbConfig> {
    * The ResponseHash joins its values without a separator, so a valid hash
    * alone does not pin each value; the result is confirmed with the bank:
    * 3DModel charges with `3DModelPayment` (the bank's answer decides), 3DPay
-   * is checked with `OrderInquiry` (status Y, amount equal to the callback).
-   * A callback with an invalid hash, for another merchant, or claiming a
-   * payment the bank does not confirm is rejected as INVALID_HASH.
+   * is checked with `OrderInquiry` (status Y, amount equal to `context.amount`,
+   * or the callback's without it). A callback with an invalid hash, for
+   * another merchant or another order than `context.orderId`, or claiming a
+   * payment the bank does not confirm is rejected as INVALID_HASH. `context`
+   * is read only from the second argument, never from the callback body.
    *
    * `paymentId` and `conversationId` are set only for a payment the bank
-   * confirmed, and on a timeout after the bank was reached for this order.
+   * confirmed, and on a timeout only when `context.orderId` was given.
    */
-  async completeThreeDSPayment(callbackData: Qnb3DCallbackData): Promise<PaymentResponse> {
+  async completeThreeDSPayment(
+    callbackData: Qnb3DCallbackData,
+    context: QnbCompleteContext = {}
+  ): Promise<PaymentResponse> {
+    const expected = context ?? {};
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -289,7 +329,7 @@ export class Qnb extends PaymentProvider<QnbConfig> {
         rawResponse,
       });
 
-    if (!(await verifyQnbCallback(callbackData ?? {}, this.credentials))) {
+    if (!(await this.verifyCallback(callbackData ?? {}))) {
       return untrusted('Invalid 3D Secure callback hash', callbackData);
     }
     const orderId = callbackData.OrderId!;
@@ -298,6 +338,9 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       callbackData.MerchantID !== this.config.merchantId
     ) {
       return untrusted('Callback belongs to a different merchant', callbackData);
+    }
+    if (expected.orderId !== undefined && expected.orderId !== orderId) {
+      return untrusted('Callback belongs to another order than yours', callbackData);
     }
     if (callbackData['3DStatus'] !== '1') {
       return this.withErrorCode({
@@ -347,10 +390,12 @@ export class Qnb extends PaymentProvider<QnbConfig> {
       }
       reached = true;
       const inquiry = await this.orderInquiry(orderId);
-      if (
-        !isQnbCapturedSale(inquiry) ||
-        (callbackData.PurchAmount !== undefined && inquiry.PurchAmount !== callbackData.PurchAmount)
-      ) {
+      const amountMatches =
+        expected.amount !== undefined
+          ? toMinorUnits(inquiry.PurchAmount ?? NaN) === toMinorUnits(expected.amount)
+          : callbackData.PurchAmount === undefined ||
+            inquiry.PurchAmount === callbackData.PurchAmount;
+      if (!isQnbCapturedSale(inquiry) || !amountMatches) {
         return untrusted('3D Secure callback does not match the order at the bank', {
           callback: callbackData,
           inquiry,
@@ -365,9 +410,10 @@ export class Qnb extends PaymentProvider<QnbConfig> {
     } catch (error) {
       const result = this.failure<PaymentResponse>(error, '3D Secure completion failed');
       // A timeout after the bank was asked about this order: the outcome is
-      // unknown, keep the ids so the order can be checked with getPayment()
-      return reached && result.status === PaymentStatus.PENDING
-        ? { ...result, paymentId: orderId, conversationId: orderId }
+      // unknown. The ids are kept only for an order from your records, so it can
+      // be checked with getPayment(); the callback's own order is not trusted
+      return reached && result.status === PaymentStatus.PENDING && expected.orderId
+        ? { ...result, paymentId: expected.orderId, conversationId: expected.orderId }
         : result;
     }
   }
@@ -476,6 +522,88 @@ export function mapQnbOrderStatus(inquiry: Record<string, string | undefined>): 
 export function isQnbCapturedSale(inquiry: Record<string, string | undefined>): boolean {
   return isQnbApproved(inquiry) && mapQnbOrderStatus(inquiry) === PaymentStatus.SUCCESS;
 }
+
+/**
+ * Ziraat Katılım virtual POS: the PayFor platform of QNB, with its own hosts,
+ * institution code (`mbrId`) and callback hash.
+ *
+ * - 3DModel callbacks are signed over MerchantID, MerchantPass, OrderId and
+ *   ResponseRnd only, so the 3D result itself is not covered; the payment is
+ *   decided by `3DModelPayment`, as with QNB
+ * - those values are joined without a separator, so OrderId and ResponseRnd
+ *   can be re-split under the same hash: completeThreeDSPayment() needs the
+ *   order id from your records
+ * - the XML API answers in `Key=Value;;` text, read like the XML answer
+ */
+export class ZiraatKatilim extends Qnb {
+  declare protected config: ZiraatKatilimConfig;
+
+  constructor(config: ZiraatKatilimConfig) {
+    super(config);
+  }
+
+  protected providerId(): string {
+    return 'ziraatkatilim';
+  }
+
+  protected providerName(): string {
+    return 'Ziraat Katılım';
+  }
+
+  protected endpoints(): { GATE: string; API: string } {
+    return ZIRAAT_KATILIM_ENDPOINTS;
+  }
+
+  protected mbrId(): string {
+    return this.config.mbrId;
+  }
+
+  protected verifyCallback(data: Record<string, string | undefined>): Promise<boolean> {
+    return verifyZiraatKatilimCallback(data, this.credentials, this.secureType);
+  }
+
+  /**
+   * As QNB's, but `context.orderId` from your records is required: the
+   * callback hash cannot tell OrderId from ResponseRnd. Complete these payments
+   * in your own route; the default handler passes only the callback body.
+   */
+  async completeThreeDSPayment(
+    callbackData: Qnb3DCallbackData,
+    context: QnbCompleteContext = {}
+  ): Promise<PaymentResponse> {
+    if (!context?.orderId) {
+      return this.withErrorCode({
+        status: PaymentStatus.FAILURE,
+        errorCode: 'VALIDATION_ERROR',
+        errorMessage:
+          'Ziraat Katılım needs the order from your records: ' +
+          'completeThreeDSPayment(callbackBody, { orderId, amount })',
+        rawResponse: callbackData,
+      });
+    }
+    return super.completeThreeDSPayment(callbackData, context);
+  }
+
+  protected validateConfig(): void {
+    if (!this.config.mbrId) {
+      throw new ConfigurationError(
+        'Ziraat Katılım configuration is missing: mbrId',
+        'ziraatkatilim'
+      );
+    }
+    super.validateConfig();
+  }
+}
+
+/**
+ * The Ziraat Katılım provider, for
+ * `betterPayment({ providers: { ziraatkatilim: ziraatKatilim({ mbrId, merchantId, userCode, userPass, merchantPass }) } })`.
+ * The base URL follows `mode` unless `baseUrl` is set.
+ */
+export const ziraatKatilim = (config: ZiraatKatilimConfig): ProviderDefinition<ZiraatKatilim> =>
+  defineProvider(
+    (ctx) => new ZiraatKatilim(withProviderDefaults(ProviderType.ZIRAATKATILIM, config, ctx))
+  );
 
 /**
  * The QNB provider, for

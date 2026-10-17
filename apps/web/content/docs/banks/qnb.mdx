@@ -58,17 +58,18 @@ const init = await payment.qnb.initThreeDSPayment({
 QNB POSTs the result to `callbackUrl`:
 
 ```typescript
-const result = await payment.qnb.completeThreeDSPayment(callbackBody);
+// orderId and amount: optional, from your records, never from the callback body
+const result = await payment.qnb.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
 
 The `ResponseHash` is checked with your merchant id, user code and `merchantPass`. Its values are
 joined without a separator, so the result is also confirmed with the bank:
 
-- a callback with an invalid hash or for another merchant is rejected as `INVALID_HASH`;
+- a callback with an invalid hash, for another merchant, or for another order than the `orderId` you pass is rejected as `INVALID_HASH`;
 - `3DModel`: when `3DStatus` is `1`, the payment is charged with `3DModelPayment`, and the bank's answer decides;
-- `3DPay`: an approved callback is checked with an order inquiry (approved, not cancelled, same amount); a payment the bank does not confirm is rejected as `INVALID_HASH`.
+- `3DPay`: an approved callback is checked with an order inquiry (approved, not cancelled, your `amount`, or the callback's without it); a payment the bank does not confirm is rejected as `INVALID_HASH`.
 
-`paymentId` and `conversationId` are set only for a payment the bank confirmed.
+`paymentId` and `conversationId` are set only for a payment the bank confirmed, and on a timeout only when you passed `orderId`.
 
 ## Refund, Cancel & Status
 

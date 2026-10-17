@@ -243,11 +243,24 @@ describe('QNB provider', () => {
       expectNoIds(result);
     });
 
-    it('returns pending with the order id on a timeout', async () => {
+    it('returns pending with the order id on a timeout only for an order from your records', async () => {
       post.mockRejectedValue(timeout());
       const result = await provider.completeThreeDSPayment(QNB_3DMODEL_CALLBACK);
       expect(result.status).toBe(PaymentStatus.PENDING);
-      expect(result.paymentId).toBe('ORDER3D');
+      expect(result.paymentId).toBeUndefined();
+      expect(result.conversationId).toBeUndefined();
+      const trusted = await provider.completeThreeDSPayment(QNB_3DMODEL_CALLBACK, {
+        orderId: 'ORDER3D',
+      });
+      expect(trusted.paymentId).toBe('ORDER3D');
+    });
+
+    it('rejects a callback for another order than yours', async () => {
+      const result = await provider.completeThreeDSPayment(QNB_3DMODEL_CALLBACK, {
+        orderId: 'ORDER2',
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
     });
   });
 
@@ -274,6 +287,21 @@ describe('QNB provider', () => {
       const result = await provider.completeThreeDSPayment(QNB_3DPAY_CALLBACK);
       expect(result.errorCode).toBe('INVALID_HASH');
       expectNoIds(result);
+    });
+
+    it("checks the bank's amount against yours when given", async () => {
+      post.mockResolvedValue({ data: qnbInquiryXml() });
+      const ok = await provider.completeThreeDSPayment(QNB_3DPAY_CALLBACK, {
+        orderId: 'ORDERPAY',
+        amount: QNB_3DPAY_CALLBACK.PurchAmount,
+      });
+      expect(ok.status).toBe(PaymentStatus.SUCCESS);
+      const wrong = await provider.completeThreeDSPayment(QNB_3DPAY_CALLBACK, {
+        orderId: 'ORDERPAY',
+        amount: '999.00',
+      });
+      expect(wrong.errorCode).toBe('INVALID_HASH');
+      expectNoIds(wrong);
     });
   });
 
