@@ -169,6 +169,13 @@ export type {
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { MokaUnited, mokaUnited, mokaUnitedPaymentStatus } from './providers/mokaunited';
+export type {
+  MokaUnitedConfig,
+  MokaUnited3DCallbackData,
+  MokaUnitedCompleteContext,
+  MokaUnitedThreeDSInitResponse,
+} from './providers/mokaunited/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,
