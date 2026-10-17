@@ -30,6 +30,7 @@ Every payment provider has its own SDK, request format, signature scheme and err
 | Akbank   | ✅ | ✅ 3D_PAY | ✅ | ✅ | ✅ | — | — |
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
+| QNBpay ⁵ | ✅ | ✅ paySmart3D | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
 | Denizbank | ✅ | ✅ 3D Model | ✅ | ✅ | — | — | — |
@@ -42,6 +43,7 @@ Every payment provider has its own SDK, request format, signature scheme and err
 ² PayTR has no void endpoint, so `cancel()` issues a full refund.
 ³ Kuveyt Türk cancels on the same day, before end of day; after that, use `refund()`.
 ⁴ Sipay has no void endpoint: `cancel()` refunds the rest of the payment, which Sipay processes as a void on the same day. Sipay must also approve your account for non-3D payments.
+⁵ QNBpay runs on Sipay's platform (`qnbpay()`), so Sipay's notes apply. It has not been verified with a test merchant yet.
 
 ## Quick Example
 
