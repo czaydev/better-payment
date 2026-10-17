@@ -29,6 +29,7 @@ tests/
 │   ├── parampos.sandbox.test.ts
 │   ├── paytr.sandbox.test.ts
 │   ├── sipay.sandbox.test.ts
+│   ├── lidio.sandbox.test.ts
 │   └── setup.ts               # Ortam değişkenleri, test verisi ve kayıt yardımcıları
 ├── fixtures/
 │   ├── akbank.ts

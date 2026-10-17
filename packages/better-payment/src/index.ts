@@ -163,6 +163,12 @@ export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
 export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
 export { Sipay, sipay } from './providers/sipay';
 export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
+export { Lidio, lidio, lidioPaymentStatus } from './providers/lidio';
+export type {
+  LidioConfig,
+  Lidio3DCallbackData,
+  LidioCompleteContext,
+} from './providers/lidio/types';
 export { Albaraka, albaraka } from './providers/albaraka';
 export type {
   AlbarakaConfig,

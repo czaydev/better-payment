@@ -1,0 +1,95 @@
+---
+title: Lidio
+description: Lidio ödeme entegrasyonu referansı.
+since: 0.12.0
+---
+
+Lidio'nun (eski adıyla Mobilexpress) REST API'sini kullanır; dokümanı
+[developer.lidio.com](https://developer.lidio.com/docs/api-documentation/72b66de24898e-introduction) adresindedir.
+Her istek JSON'dur ve API anahtarınızı (`Authorization: MxS2S <apiKey>`) ve `MerchantCode` başlığınızı taşır. Banka POS'unu kart BIN'ine göre Lidio seçer.
+
+<Callout type="warn">
+  Henüz bir test üye işyeriyle doğrulanmadı: Lidio test üye işyerini müşterilerine verir. Test sunucusu (`test.lidio.com/api`) uydurma bir üye işyerini HTTP 401 ile reddediyor. Canlıya geçmeden önce küçük bir tutarla deneyin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, lidio } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    lidio: lidio({
+      merchantCode: process.env.LIDIO_MERCHANT_CODE!,
+      apiKey: process.env.LIDIO_API_KEY!,
+      merchantKey: process.env.LIDIO_MERCHANT_KEY!, // signs the 3D Secure return
+      // baseUrl: defaults from mode (test.lidio.com/api / api.lidio.com)
+    }),
+  },
+});
+```
+
+`paymentId` sizin sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara. İptal, iade, capture ve durum sorguları bunu kullanır. `buyer.email`, `buyer.id` ve `buyer.ip`, `customerInfo` ve `clientIp` olarak gönderilir; hesabınızın müşteriyi tanıdığı alan 3D Secure dönüşünün imzasına da girer.
+
+## 3D'siz ödeme [#non-3d-payment]
+
+`createPayment()`, yeni kartla `ProcessPayment` (`processType` `sales`) kullanır. `SystemError` ya da zaman aşımı sonucun bilinmediği anlamına gelir: sonuç sipariş numarasıyla `pending` olur, `getPayment()` ile kontrol edin.
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.lidio.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/lidio/return',
+});
+// init.threeDSHtmlContent is Lidio's redirect form
+```
+
+3D Secure'dan sonra Lidio müşterinin tarayıcısını sonucu query string'de taşıyarak `callbackUrl` adresine geri gönderir: `OrderId`, `SystemTransId`, `Result` (`3DSuccess` / `3DFailed`), `TotalAmount`, `MDStatus` ve `Hash`. Ödemeyi bu rotada, kendi kayıtlarınızdaki siparişle tamamlayın:
+
+```typescript
+// in your own return route: the order is a separate argument, never read from the query
+const query = Object.fromEntries(new URL(request.url).searchParams);
+const result = await payment.lidio.completeThreeDSPayment(query, {
+  orderId: order.id,
+  amount: order.total,           // "100.00"
+  currency: 'TRY',
+  customer: order.customerEmail, // or the customer id, as your Lidio account identifies customers
+});
+```
+
+- `Hash`, `Base64(SHA-256(OrderId:MerchantKey:TotalAmount:Result:customer))` olmalı; Lidio dokümanının istediği gibi `OrderId` sizin siparişiniz, `TotalAmount` sizin tutarınız olmalıdır. Aksi `INVALID_HASH` olur;
+- `3DFailed`, numara taşımayan bir başarısızlıktır;
+- `3DSuccess`, sizin sipariş ve tutarınızla `FinishPaymentProcess` üzerinden tahsil edilir ve sonucu Lidio'nun cevabı belirler. Zaman aşımı ya da `SystemError` sipariş numaranızla `pending` olur.
+
+Varsayılan handler'ın callback rotası yalnızca POST gövdesi alır; bu yüzden bu ödemeleri tamamlayamaz.
+
+## İade, iptal ve durum [#refund-cancel--status]
+
+```typescript
+await payment.lidio.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // Cancel
+await payment.lidio.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Refund
+const status = await payment.lidio.getPayment('ORDER123');                                          // PaymentInquiry
+// status: 'success' (also after a partial refund), 'cancelled' (cancelled or fully refunded), 'failure', 'pending'
+```
+
+`cancel()` ödemeyi gün sonundan önce iptal eder; sonrasında `refund()` kullanın (tam veya kısmi). Lidio daha önce başarılı olmuş bir iade için `DuplicateRequest` döner; bu da başarılı sayılır. `getPayment()` satışı sorgular: `isCancelled` ve `isFullRefunded` sonucu `cancelled` yapar; `Waiting`, `Pending` ya da `SystemError` ise `pending` yapar.
+
+## Ön provizyon [#pre-authorization]
+
+```typescript
+const auth = await payment.lidio.authorize({ ...paymentRequest, conversationId: 'ORDER123' });
+// or initThreeDSAuthorize() + completeThreeDSPayment() for 3D Secure
+await payment.lidio.capture({ paymentId: 'ORDER123', amount: '80.00', ip: '1.2.3.4' }); // Postauth
+await payment.lidio.voidAuthorization({ paymentId: 'ORDER123', ip: '1.2.3.4' });       // Cancel
+```
+
+## BIN ve taksit [#bin--installments]
+
+```typescript
+const bin = await payment.lidio.binCheck('549604');
+const options = await payment.lidio.installmentInfo({ binNumber: '549604', price: '100.00' });
+```
+
+`binCheck()`, banka kodunu, kart şemasını ve kart programını (`Bonus`, `Axess`, ...) döndüren `GetBankOfBINNumber` kullanır. `installmentInfo()`, BIN ve tutarla `GetInstallmentInfo` kullanır: Lidio'nun o BIN için seçtiği POS'un taksit sayılarını, hesabınızın müşteriye yansıttığı toplamla (`interestRateToUser`) listeler. Yalnızca ticari kartlara açık ya da en düşük tutarının altında kalan seçenekler listelenmez.
