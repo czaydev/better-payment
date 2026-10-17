@@ -169,6 +169,12 @@ export type {
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { VakifKatilim, vakifKatilim } from './providers/vakifkatilim';
+export type {
+  VakifKatilimConfig,
+  VakifKatilimCallbackFields,
+  VakifKatilimCompleteContext,
+} from './providers/vakifkatilim/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,

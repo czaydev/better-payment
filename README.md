@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Vakıf Katılım, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
 (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
@@ -148,10 +148,12 @@ this id to `refund`, `cancel` and `getPayment`.
 | VakıfBank   | ✓                         | ✓ MPI + VPOS (3DS)          |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
 | Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | QNB         | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
+| Vakıf Katılım ³ | ✓                     | ✓ 3D Model                  |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB, Şekerbank, Akbank's older virtual POS and
 Halkbank Macedonia, with `est({ bank })`.
 ² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
+³ Vakıf Katılım: the 3D completion needs the order id, amount, currency and callbackUrl from your records.
 
 ### 3D Secure completion
 
@@ -186,6 +188,10 @@ Halkbank Macedonia, with `est({ bank })`.
 - **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
+- **Vakıf Katılım:** the bank POSTs to your `callbackUrl`. Call
+  `completeThreeDSPayment(callbackBody, { orderId, amount, currency, callbackUrl })` with
+  the order from your records, never read from the body: the card is charged with the
+  callback's `MD` and the bank's answer decides.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies

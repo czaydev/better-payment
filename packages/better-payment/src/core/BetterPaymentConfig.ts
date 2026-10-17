@@ -17,6 +17,7 @@ export enum ProviderType {
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
   ALBARAKA = 'albaraka',
+  VAKIFKATILIM = 'vakifkatilim',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -148,6 +149,11 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.ALBARAKA]: {
     sandbox: 'https://epostest.albarakaturk.com.tr',
     production: 'https://epos.albarakaturk.com.tr',
+  },
+  [ProviderType.VAKIFKATILIM]: {
+    // One gateway for test and live merchants
+    sandbox: 'https://boa.vakifkatilim.com.tr/VirtualPOS.Gateway',
+    production: 'https://boa.vakifkatilim.com.tr/VirtualPOS.Gateway',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {
