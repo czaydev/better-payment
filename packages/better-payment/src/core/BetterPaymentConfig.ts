@@ -31,6 +31,7 @@ export enum ProviderType {
   VAKIFBANK = 'vakifbank',
   YAPIKREDI = 'yapikredi',
   QNB = 'qnb',
+  GARANTI = 'garanti',
   /** In-memory provider for tests, from `better-payment/testing` */
   MOCK = 'mock',
 }
@@ -193,6 +194,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.QNB]: {
     sandbox: 'https://vpostest.qnb.com.tr',
     production: 'https://vpos.qnb.com.tr',
+  },
+  [ProviderType.GARANTI]: {
+    sandbox: 'https://sanalposprovtest.garantibbva.com.tr',
+    production: 'https://sanalposprov.garanti.com.tr',
   },
 };
 
