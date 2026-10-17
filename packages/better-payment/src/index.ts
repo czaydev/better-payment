@@ -169,6 +169,13 @@ export type {
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { Paratika, paratika } from './providers/paratika';
+export type {
+  ParatikaConfig,
+  Paratika3DCallbackData,
+  ParatikaCompleteContext,
+} from './providers/paratika/types';
+export type { ParatikaBrand } from './providers/paratika/utils';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,
