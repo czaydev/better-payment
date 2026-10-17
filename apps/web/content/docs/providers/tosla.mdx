@@ -1,0 +1,97 @@
+---
+title: Tosla
+description: Tosla İşim (AKÖde) virtual POS integration reference.
+since: 0.12.0
+---
+
+Tosla İşim is the virtual POS of AKÖde, Akbank's payment institution. Every request is signed with
+`base64(SHA-512(apiPass + clientId + apiUser + Rnd + timeSpan))`, where `timeSpan` is the time in
+Turkey (`yyyyMMddHHmmss`).
+
+<Callout type="warn">
+  Not verified with a test merchant yet: Tosla gives test merchants on request, and there is no public one. The test host (`prepentegrasyon.tosla.com`) answered every endpoint, with a made-up merchant, in the format this provider reads: requests signed by the provider reach the merchant check (`202`, merchant user not found), while a `timeSpan` in UTC instead of Turkey time is refused as `998` (validation error). Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, tosla } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    tosla: tosla({
+      clientId: process.env.TOSLA_CLIENT_ID!,
+      apiUser: process.env.TOSLA_API_USER!,
+      apiPass: process.env.TOSLA_API_PASS!,
+      // baseUrl: defaults from mode (prepentegrasyon.tosla.com / entegrasyon.tosla.com)
+    }),
+  },
+});
+```
+
+`clientId`, `apiUser` and `apiPass` come from the API user information in the Tosla İşim panel.
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+## 3D Secure
+
+Tosla processes card payments with 3D Secure; `createPayment()` throws `NOT_SUPPORTED`.
+
+```typescript
+const init = await payment.tosla.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/tosla/payment/complete-3ds',
+});
+// init.threeDSHtmlContent posts the card to Tosla's card form, which runs 3D Secure
+```
+
+`initThreeDSPayment()` opens a session for the order (`threeDPayment`, amount in kuruş), and the
+returned page posts the card from the customer's browser to `ProcessCardForm`. Tosla POSTs the
+result to `callbackUrl`:
+
+```typescript
+// orderId and amount come from your own records, never from the callback body
+const result = await payment.tosla.completeThreeDSPayment(callbackBody, { orderId, amount });
+```
+
+Pass `orderId` and `amount` from your own records as the second argument; they are never read from
+the callback body. The default handler route (`/api/pay/tosla/callback`) passes only the body, so it
+cannot check the amount; complete the payment in your own route to use them.
+
+The callback is not signed, so only its order id is used. The result comes from an `inquiry`:
+
+- a callback that reports a decline fails with the bank's code, without ids;
+- otherwise the order is looked up at Tosla. The payment is `success` only when Tosla has an approved (`BankResponseCode` `00`), unrefunded payment for that order id, and, when you pass `amount`, for that amount;
+- a callback claiming a payment Tosla does not confirm is rejected as `INVALID_HASH`.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.tosla.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // refund
+await payment.tosla.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // void
+// getPayment() throws NOT_SUPPORTED for now, see below
+```
+
+`cancel()` voids a payment on the same day; after that, use `refund()` (full or partial). A refund
+or void succeeds only when Tosla accepts it (`Code` 0) and, when the answer carries the bank's code,
+the bank approved it (`00`).
+
+`getPayment()` is not supported yet and throws `NOT_SUPPORTED`: refunds show in the `inquiry` answer
+(`RefundedAmount`), but it is not confirmed how a same-day void shows there, so a voided payment could
+be reported as paid. Keep the payment's state from the results of `cancel()` and `refund()`. If the
+inquiry of `completeThreeDSPayment()` times out, the result is `pending`, with the order id only when
+you passed `orderId` from your records; check the order in the Tosla İşim panel.
+
+## BIN & Installments
+
+```typescript
+const bin = await payment.tosla.binCheck('540667');
+const options = await payment.tosla.installmentInfo({ binNumber: '540667', price: '100.00' });
+// options.installmentDetails[0].installmentPrices: counts your account allows, with their rates
+```
+
+Both use `GetCommissionAndInstallmentInfo`, which returns the card's bank and type and the
+commission rate of each installment count your account allows (`T1`, `T2`, ...). Each total
+adds its rate (`commissionRate`); send the chosen total as `paidPrice` and the count as
+`installment`.

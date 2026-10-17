@@ -169,6 +169,12 @@ export type {
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { Tosla, tosla, toslaOrderStatus } from './providers/tosla';
+export type {
+  ToslaConfig,
+  Tosla3DCallbackData,
+  ToslaCompleteContext,
+} from './providers/tosla/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,
