@@ -148,10 +148,12 @@ this id to `refund`, `cancel` and `getPayment`.
 | VakıfBank   | ✓                         | ✓ MPI + VPOS (3DS)          |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
 | Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | QNB         | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
+| Stripe ³    | ✓ (Stripe.js token)       | ✓ on your page              |   ✓    | ✓ (refund)      |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB, Şekerbank, Akbank's older virtual POS and
 Halkbank Macedonia, with `est({ bank })`.
 ² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
+³ For businesses with a Stripe account (Stripe does not onboard Turkish companies). The card is collected with Stripe.js and never reaches your server.
 
 ### 3D Secure completion
 
@@ -186,12 +188,15 @@ Halkbank Macedonia, with `est({ bank })`.
 - **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
+- **Stripe:** the 3D Secure page runs Stripe.js `handleNextAction()` on your page, with no
+  redirect, then POSTs the PaymentIntent id to `callbackUrl`. The status is always read
+  from Stripe.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies
   `OK`.
 
-Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank and Albaraka Türk:
+Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank, Albaraka Türk and Stripe:
 `authorize()` / `initThreeDSAuthorize()`, then `capture({ paymentId, amount, ip })` or
 `voidAuthorization({ paymentId, ip })`. See the
 [pre-authorization guide](https://better-payment.czaylabs.com/docs/payments/pre-authorization).

@@ -48,9 +48,10 @@ The 3D Secure variant is completed exactly like a 3D payment: the bank posts to 
 | Akbank | txnCode `1004` | txnCode `3004` (3D_PAY) | txnCode `1005` | txnCode `1003` |
 | Sipay | `paySmart2D` (`PreAuth`) | `paySmart3D` (`PreAuth`) | `confirmPayment` (status 1) | `confirmPayment` (status 2) |
 | Albaraka Türk | JSON `Auth` | 3D form (`TransactionType` Auth) + `Auth` | JSON `Capture` | JSON `Reverse` |
+| Stripe | PaymentIntent (`capture_method: manual`) | PaymentIntent + `handleNextAction()` | `/capture` (`amount_to_capture`) | `/cancel` |
 | PayTR | not yet ([#60](https://github.com/czaydev/better-payment/issues/60)) | — | — | — |
 
-- `paymentId` is iyzico's payment id, the ReferenceCode for Albaraka Türk, and your order id for Parampos, Sipay and Akbank.
+- `paymentId` is iyzico's payment id, the PaymentIntent id (`pi_...`) for Stripe, the ReferenceCode for Albaraka Türk, and your order id for Parampos, Sipay and Akbank.
 - `amount` is required for `capture()`. Pass less than the authorized amount for a partial capture.
 - Unsupported providers throw `NOT_SUPPORTED`; the HTTP handler answers `400`.
 
@@ -71,4 +72,4 @@ Capture and void move money, so they can only be enabled together with an `autho
 
 ## Verification
 
-The iyzico flow (authorize, partial capture, void, 3D authorize) runs every night against the real iyzico sandbox. The Sipay flow (authorize, partial capture) runs every night against Sipay's test environment. Albaraka Türk's pre-authorization was checked against its test host for the request format only. Parampos and Akbank follow the providers' specifications and reference test vectors, and have not yet been run against their sandboxes.
+The iyzico flow (authorize, partial capture, void, 3D authorize) runs every night against the real iyzico sandbox. The Sipay flow (authorize, partial capture) runs every night against Sipay's test environment. The Stripe flow (authorize, partial capture) was run in Stripe test mode. Albaraka Türk's pre-authorization was checked against its test host for the request format only. Parampos and Akbank follow the providers' specifications and reference test vectors, and have not yet been run against their sandboxes.

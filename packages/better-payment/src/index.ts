@@ -169,6 +169,13 @@ export type {
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { Stripe, stripe } from './providers/stripe';
+export type {
+  StripeConfig,
+  StripePaymentRequest,
+  StripeThreeDSPaymentRequest,
+  Stripe3DCallbackData,
+} from './providers/stripe/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,

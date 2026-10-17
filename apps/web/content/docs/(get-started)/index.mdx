@@ -3,7 +3,7 @@ title: Introduction
 description: A unified, type-safe payment gateway library for Node.js and Turkish payment providers.
 ---
 
-**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — through one TypeScript API.
+**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — plus Stripe, through one TypeScript API.
 
 <Callout type="warn">
   **0.0.1 is a fresh start.** The version history was reset. Releases `1.x`–`3.x` contained incorrect provider integrations and callback checks that could be bypassed, and are deprecated. Read [What's New in 0.0.1](/docs/whats-new) for what changed and how to migrate.
@@ -37,11 +37,13 @@ Every payment provider has its own SDK, request format, signature scheme and err
 | VakıfBank | ✅ | ✅ MPI + VPOS (3DS) | ✅ | ✅ | — | — | — |
 | Yapı Kredi | ✅ | ✅ Posnet OOS | ✅ | ✅ | — | — | — |
 | QNB | ✅ | ✅ 3D Model / 3D Pay | ✅ | ✅ | ✅ | — | — |
+| Stripe ⁵ | ✅ | ✅ Stripe.js | ✅ | ✅ | ✅ | — | — |
 
 ¹ Your PayTR account must be approved for non-3D payments.
 ² PayTR has no void endpoint, so `cancel()` issues a full refund.
 ³ Kuveyt Türk cancels on the same day, before end of day; after that, use `refund()`.
 ⁴ Sipay has no void endpoint: `cancel()` refunds the rest of the payment, which Sipay processes as a void on the same day. Sipay must also approve your account for non-3D payments.
+⁵ For businesses with a Stripe account. The card is collected with Stripe.js and never reaches your server; 3D Secure opens on your page. `cancel()` refunds a charged payment in full.
 
 ## Quick Example
 
