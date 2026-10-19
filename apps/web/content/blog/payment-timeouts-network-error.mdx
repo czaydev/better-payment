@@ -1,0 +1,53 @@
+---
+title: "Payment timeouts, and why you must never retry a charge blindly"
+description: "A payment request that times out has an unknown outcome. Learn why retrying can charge a customer twice, and how Better Payment reports and handles it."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, Reliability, Error handling]
+---
+
+You send a payment request. The provider takes the card, then your connection drops before the answer arrives. Your code sees a timeout.
+
+What happened to the payment? **You don't know.** The charge may have gone through, or it may not. Treating a timeout as a failure and letting the customer try again is how people get charged twice.
+
+## A timeout is not a decline
+
+A decline is an answer: the provider told you no. A timeout is the absence of an answer. The two need different handling:
+
+- A **decline** is safe to retry with another card.
+- A **timeout** must be checked first.
+
+Many integrations map both to "error" and show the customer the same message. That is the bug.
+
+## What Better Payment returns
+
+When a provider does not answer, the result is not a failure. It is `pending`, with the provider-independent code `NETWORK_ERROR`:
+
+```typescript
+import { PaymentErrorCode } from 'better-payment';
+
+const result = await payment.createPayment(request);
+
+if (result.status === 'pending' && result.code === PaymentErrorCode.NETWORK_ERROR) {
+  // The charge may have gone through. Do not let the customer pay again.
+  await orders.markNeedsCheck(request.conversationId);
+}
+```
+
+The suggested customer message for this code is "We're checking your payment. Don't pay again." The [localizedErrors plugin](/docs/plugins/localized-errors) puts that message, in the customer's language, into `errorMessage`.
+
+## Never retried automatically
+
+Payment, refund and cancel requests are **never retried automatically**. A library that silently retries a charge after a timeout is a library that double charges. Better Payment leaves the decision to you, after you have checked.
+
+Before you let the customer try again, check the payment with `getPayment()`. If the provider has the payment, mark the order accordingly. If it does not, a new attempt is safe. The [quick start](/docs/quick-start) lists the result statuses and the same warning.
+
+## A short checklist
+
+1. Branch on `status` and `code`, not on a generic "error".
+2. Treat `pending` with `NETWORK_ERROR` as "unknown", never as "failed".
+3. Check the payment before any retry.
+4. Use one `conversationId` per order, so a retry can't turn into a second order.
+5. Show the customer a message that tells them not to pay again.
+
+See all [error codes](/docs/reference/error-codes) for the full list and suggested messages.

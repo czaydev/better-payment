@@ -1,0 +1,67 @@
+---
+title: "Verifying 3D Secure callbacks, and why you can't trust a success POST"
+description: "After 3D Secure, the bank POSTs the result to a public URL on your server. Learn why that request must be verified with your credentials and how Better Payment does it."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, 3D Secure, Security]
+---
+
+After a customer completes 3D Secure, the bank sends the result back to your server with a POST to your `callbackUrl`. Your code reads it and marks the order as paid.
+
+There is a problem hidden in that sentence: **`callbackUrl` is a public URL.** Anyone who knows it can send a POST that says "success".
+
+## A forged callback is a free order
+
+If your server believes whatever arrives at the callback, an attacker doesn't need a card. They need the URL, which sits in the page source of your checkout, and a request body that looks right. The order is marked paid and the goods ship.
+
+The fix is not hiding the URL. The fix is **verifying every callback against something only you and the provider know**: your credentials.
+
+## How Better Payment handles it
+
+Pass the callback body exactly as it arrived:
+
+```typescript
+const result = await payment.completeThreeDSPayment(callbackBody);
+
+if (result.status === 'success') {
+  // mark the order as paid
+}
+```
+
+The library checks the callback with your credentials and, when the provider requires it, finalizes the payment with the provider. A forged or failed callback always returns `failure`.
+
+Some details that matter in practice:
+
+- **Pass the body untouched.** Parsing and re-serializing can change what was signed. Hand over the POST body as it is.
+- **`INVALID_HASH` means forged.** When a signature does not verify, the result carries this code. Treat it as an attack, log it and flag the order for review.
+- **Never show the details to the customer.** `INVALID_HASH` and `FRAUD_SUSPECTED` details help an attacker, not a customer. Show a generic message.
+
+## Let the handler do it
+
+You do not have to write the route yourself. The [HTTP handler](/docs/concepts/handler) mounts the callback routes for you, and it is secure by default: it exposes only callbacks and card queries. Refunds, cancels and lookups require an `authorize` hook, so they are not open to the internet by accident.
+
+For Next.js, see the [Next.js guide](/docs/integrations/nextjs).
+
+## React to verified results only
+
+Instead of checking every result by hand, listen to [payment events](/docs/concepts/events). They are emitted for every provider and flow, after the provider verified the result:
+
+```typescript
+payment.on('payment.succeeded', async (event) => {
+  await orders.markPaid(event.conversationId, event.paymentId);
+});
+
+payment.on('payment.failed', async (event) => {
+  await orders.markFailed(event.conversationId, event.code);
+});
+```
+
+Your order logic then runs on results that were verified, not on whatever reached your URL.
+
+## A short checklist
+
+1. Never mark an order paid because a request reached your callback.
+2. Verify with your credentials, and finalize with the provider when it requires it.
+3. Pass the callback body as it is.
+4. Treat `INVALID_HASH` as forged.
+5. Build amounts on the server from your own order data, never from the browser.

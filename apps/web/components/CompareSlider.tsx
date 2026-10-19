@@ -33,7 +33,7 @@ export default function CompareSlider({
     setPos(Math.min(96, Math.max(4, pct)));
   }, []);
 
-  const pre = "col-start-1 row-start-1 m-0 min-w-0 overflow-hidden p-4 font-mono text-[12px] leading-[1.7] whitespace-pre-wrap break-words sm:p-5 sm:text-[13px] sm:leading-[1.75] sm:whitespace-pre";
+  const pre = "col-start-1 row-start-1 m-0 min-w-0 overflow-hidden p-4 font-mono text-meta leading-code whitespace-pre-wrap break-words sm:p-5 sm:text-caption sm:leading-code sm:whitespace-pre";
 
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">

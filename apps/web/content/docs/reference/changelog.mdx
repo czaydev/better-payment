@@ -7,6 +7,23 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.12.0-beta.0
+
+### Added
+
+- **[Albaraka Türk provider](/docs/banks/albaraka):** non-3D sale, 3D Secure, refund, cancel, order inquiry and pre-authorization over Albaraka's Posnet JSON API. Bank-compatible order ids are generated when conversationId is omitted.
+- **[Denizbank provider](/docs/banks/denizbank):** non-3D sale, 3D Secure (3D Model), refund and cancel over InterVPos. The callback hash is rebuilt from `HASHPARAMS`, and the bank's charge decides the result.
+- **[EST Girogate](/docs/banks/est#girogate):** pay with iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly and other alternative methods through the EST gate, with `girogate: { method, country }` instead of a card.
+- **[More EST banks](/docs/banks/est#banks):** `akbankest` (Akbank's older virtual POS) and `halkbankmkd` (Halkbank Macedonia, with `MKD`) join the EST provider.
+- **[PayTR Direct API 3D Secure](/docs/providers/paytr):** with `threeDSMode: 'direct'`, `initThreeDSPayment()` takes the card from your own checkout form and returns a signed Direct API form instead of PayTR's iFrame.
+- **[QNB provider](/docs/banks/qnb):** non-3D sale, 3D Secure (3D Model and 3D Pay), refund, cancel and order inquiry over the PayFor XML API. 3D callbacks are verified with the ResponseHash and confirmed with the bank.
+- **[VakıfBank provider](/docs/banks/vakifbank):** non-3D sale, 3D Secure (MPI enrollment, then a VPOS authorization that takes the card and amount from VakıfBank's own 3D record), refund and cancel. `getPayment()` is not supported.
+- **[Yapı Kredi provider](/docs/banks/yapikredi):** non-3D sale, 3D Secure through Posnet OOS, refund, cancel and order status. 3D payments are completed with the order from your records and confirmed with the bank. Bank-compatible order ids are generated when conversationId is omitted.
+
+### Fixed
+
+- **[PayTR basket encoding](/docs/providers/paytr):** Direct API payments now send JSON baskets instead of Base64. iFrame basket encoding and token signatures remain unchanged.
+
 ## 0.11.1
 
 ### Fixed

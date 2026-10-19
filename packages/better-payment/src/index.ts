@@ -161,14 +161,14 @@ export type { ParamposConfig } from './providers/parampos';
 export type { Parampos3DSCallbackData } from './providers/parampos/types';
 export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
 export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
-export { Sipay, sipay } from './providers/sipay';
-export type { SipayConfig, Sipay3DCallbackData } from './providers/sipay/types';
 export { Albaraka, albaraka } from './providers/albaraka';
 export type {
   AlbarakaConfig,
   AlbarakaCallbackFields,
   AlbarakaCompleteRequest,
 } from './providers/albaraka/types';
+export { Sipay, sipay, qnbpay } from './providers/sipay';
+export type { SipayConfig, Sipay3DCallbackData, SipayBrand } from './providers/sipay/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,

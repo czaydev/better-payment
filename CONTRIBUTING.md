@@ -97,7 +97,7 @@ apps/web/                       website and docs (Next.js + fumadocs)
    tr: **[React Router adaptörü](/docs/integrations/frameworks#react-router):** `better-payment/react-router`, bir splat resource route için `loader` ve `action` döndürür.
    ```
 
-   The entry goes under `Added` (minor), `Fixed` (patch) or `Changed (breaking)` (major). Add a `section:` line (`added`, `changed`, `changed-breaking` or `fixed`) to pick another, for example `section: changed-breaking` for a breaking change in 0.x. Credit contributors in the entry.
+   The entry goes under `Added` (minor), `Fixed` (patch) or `Changed (breaking)` (major). Add a `section:` line (`added`, `changed`, `changed-breaking` or `fixed`) to pick another, for example `section: changed-breaking` for a breaking change in 0.x. Contributors are thanked automatically: the release adds "Thanks to @user (#123)." from the pull request that added the changeset (`scripts/credits.mjs`), to both `CHANGELOG.md` and the docs changelog. Write your own "Thanks to ..." only to credit someone else, and the automatic one is skipped.
 5. Update the docs in English and Turkish when behaviour changes.
 6. Open a pull request against `main`. The template has a short checklist. Link the issue with `Closes #123`.
 
@@ -189,7 +189,7 @@ Maintainers release with [Changesets](https://github.com/changesets/changesets).
 1. Every user-facing pull request includes a changeset (`pnpm changeset`).
 2. When changesets land on `main`, the **Release PR** workflow opens or updates the `chore(release): version packages` pull request. It runs `pnpm version-packages`, which consumes the changesets into `package.json`, `src/version.ts`, `CHANGELOG.md`, the docs changelog (from each changeset's `<!-- docs -->` entry) and the `VERSION` example in the installation docs.
 3. Before merging it, edit the release PR (push to its `changeset-release/main` branch):
-   - `CHANGELOG.md`: the new section lists each changeset summary under `Added` (minor), `Fixed` (patch) or `Changed (breaking)` (major). Reword it for users, move entries to `Changed` where that fits, and credit contributors, like the earlier releases.
+   - `CHANGELOG.md`: the new section lists each changeset summary under `Added` (minor), `Fixed` (patch) or `Changed (breaking)` (major). Reword it for users, move entries to `Changed` where that fits, and keep the "Thanks to ..." lines the release added.
    - The docs changelog (`apps/web/content/docs/reference/changelog.mdx` and `changelog.tr.mdx`) gets the new version's section from the changesets. Add a one-line intro for a large release if you like. **Publish to NPM** stops if it has no section for the new version.
 4. Merging the release PR publishes the release: the **Publish to NPM** workflow runs on every push to `main` and publishes when the package version has no GitHub release yet. It runs lint, typecheck and tests, publishes on the `latest` tag with npm trusted publishing (provenance, no tokens) and creates the GitHub release from the `CHANGELOG.md` section. If it stopped (for example, the docs changelog section was missing), fix it on `main` and the next push publishes. Run the workflow by hand for a dry run or another `npm_tag`. Prereleases from `beta` work the same way on the `beta` tag (see [Beta releases](#beta-releases)).
 

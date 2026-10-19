@@ -1,0 +1,62 @@
+---
+title: "Node.js'te iyzico, PayTR ve Parampos için tek API"
+description: "iyzico, PayTR ve Parampos ile 3D Secure ödemelerini üç ayrı entegrasyon yerine tek tipli bir Node.js arayüzüyle nasıl alırsınız."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, iyzico, PayTR, Parampos]
+---
+
+Türkiye'de satış yapıyorsanız tek bir ödeme sağlayıcısıyla kalmanız nadirdir. Daha iyi oranlar için ikinci bir altyapı, büyük bir müşteri için banka sanal POS'u ya da birinin kesinti yaşadığı gün için yedek eklenir. Her ekleme genellikle yeni bir entegrasyon demektir.
+
+Entegrasyonlar yalnızca endpoint'te farklılaşmaz. İstek yapıları, imza şemaları, hata formatları ve callback kuralları farklıdır. Her fark, para taşıyan kodda bir hatanın saklanabileceği yeni bir yerdir.
+
+## Tek API ile ne değişir?
+
+[Better Payment](/docs) sağlayıcıları tek tipli bir arayüzün arkasına koyar. Ödeme nesnesini bir kez oluşturur ve kullandığınız sağlayıcıları listelersiniz:
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: 'sandbox', // sandbox URL'leri ve sağlayıcı test modları; varsayılan 'production'
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+});
+```
+
+İstek her sağlayıcı için aynıdır. Geçiş yapmak, istediğiniz sağlayıcıyı adlandırmaktan ibarettir:
+
+```typescript
+await payment.createPayment(request);                 // varsayılan sağlayıcı
+await payment.paytr.initThreeDSPayment(paytrRequest); // belirli bir sağlayıcı
+await payment.use('paytr').getPayment('ORDER123');
+```
+
+## Tek sonuç yapısı
+
+Sağlayıcı ne derse desin, aynı `status` değerine sahip aynı yapıda bir sonuç alırsınız:
+
+| status | anlamı |
+|--------|--------|
+| `success` | Sağlayıcı tarafından onaylandı |
+| `failure` | Reddedildi; `errorCode` / `errorMessage` alanlarına bakın |
+| `pending` | Müşteri bekleniyor ya da sonuç bilinmiyor |
+| `cancelled` | İptal edildi veya tamamen iade edildi (durum sorguları) |
+
+Hatalar ayrıca sağlayıcıdan bağımsız bir listeden `code` taşır; yani "yetersiz bakiye", iyzico, PayTR ve bankalarda aynı `INSUFFICIENT_FUNDS` değeridir. Her sağlayıcının ham kodlarını öğrenmek yerine bunun üzerinden dallanırsınız. Bkz. [hata kodları](/docs/reference/error-codes).
+
+## Sağlayıcıya özgü kalanlar
+
+Tek API, sağlayıcıların farklı olduğu gerçeğini gizlemez; bu farkın tüm kod tabanınıza yayılmasını engeller. Sağlayıcıya özgü kurallar geçerliliğini korur ve her sağlayıcı sayfasında belgelenir. Örneğin PayTR sipariş kimlikleri yalnızca harf ve rakam kabul eder. Kullandığınız sağlayıcının sayfasını okuyun: [iyzico](/docs/providers/iyzico), [PayTR](/docs/providers/paytr), [Parampos](/docs/providers/parampos) ve [Sipay](/docs/providers/sipay).
+
+## Sonraki adımlar
+
+- İlk ödemenizi [hızlı başlangıç](/docs/quick-start) ile alın.
+- Bugün desteklenen [sağlayıcılara ve banka sanal POS'larına](/docs/providers/iyzico) göz atın.
+- Callback'lerin sizin için doğrulanması için [HTTP handler](/docs/concepts/handler)'ı bağlayın.
