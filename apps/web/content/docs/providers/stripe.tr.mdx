@@ -1,0 +1,170 @@
+---
+title: Stripe
+description: Stripe (PaymentIntents) entegrasyon referansı.
+since: 0.12.0
+---
+
+Stripe'ın PaymentIntents API'sini kullanır. Kart sunucunuza hiç gelmez: Stripe.js kartı sizin sayfanızda alır ve bir token döndürür; 3D Secure penceresi de sizin sayfanızda açılır. Stripe sayfasına yönlendirme yoktur.
+
+<Callout type="info">
+  Stripe test modunda doğrulandı: kartla ödeme, red, tarayıcıda uçtan uca 3D Secure (başarılı ve başarısız), kısmi iade, iptal ve kısmi tahsilatlı ön provizyon. Stripe Türk şirketlerini kabul etmez; sağlayıcı yurt dışında Stripe hesabı olan işletmeler içindir. TRY desteklenir; Stripe'ın alt sınırı yaklaşık 0,50 USD'dir.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, stripe } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    stripe: stripe({
+      secretKey: process.env.STRIPE_SECRET_KEY!, // sk_test_... / sk_live_...
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY!, // pk_test_... / pk_live_...
+      // paymentMethodTypes?: string[] (default ['card'])
+      // statementDescriptorSuffix?: string
+    }),
+  },
+});
+```
+
+Anahtarlar Stripe panelinde **Developers → API keys** altındadır. Test anahtarları test modunda çalışır; `mode: 'sandbox'` canlı anahtarları reddeder. Stripe'ın iki mod için tek bir API adresi vardır.
+
+`paymentId`, PaymentIntent numarasıdır (`pi_...`). `conversationId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara; PaymentIntent'in `metadata.order_id` alanında saklanır.
+
+## Kartın alınması [#collecting-the-card]
+
+Stripe.js'i `js.stripe.com` adresinden yükleyin ve Payment Element'i sayfanıza yerleştirin. Müşteri formu gönderince bir ConfirmationToken oluşturun ve numarasını `paymentToken` olarak sunucunuza gönderin. PaymentMethod numarası (`pm_...`, `stripe.createPaymentMethod()` ile) ve `storedCard` (`customerToken`: `cus_...`, `cardToken`: `pm_...`) da kullanılabilir.
+
+```html
+<script src="https://js.stripe.com/v3/"></script>
+<form id="payment-form">
+  <div id="payment-element"></div>
+  <button>Pay</button>
+</form>
+<script>
+  const stripe = Stripe('pk_test_...');
+  const elements = stripe.elements({ mode: 'payment', amount: 10000, currency: 'try', paymentMethodTypes: ['card'] });
+  elements.create('payment').mount('#payment-element');
+
+  document.getElementById('payment-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const { error: submitError } = await elements.submit();
+    if (submitError) return showError(submitError.message);
+    const { error, confirmationToken } = await stripe.createConfirmationToken({ elements });
+    if (error) return showError(error.message);
+
+    // Your endpoint calls initThreeDSPayment() and returns threeDSHtmlContent
+    const { html } = await fetch('/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentToken: confirmationToken.id }),
+    }).then((res) => res.json());
+    document.open();
+    document.write(html);
+    document.close();
+  });
+</script>
+```
+
+`paymentCard` içeren bir istek reddedilir: Stripe kart numarasını sunucunuzdan almaz.
+
+## Apple Pay ve Google Pay [#apple-pay--google-pay]
+
+Stripe için Apple Pay ve Google Pay de kartla ödemedir: cüzdan aynı token'ı döndürür, bu yüzden sunucuda ek kod olmadan aynı `paymentToken` akışından geçer. Payment Element bu butonları şu durumlarda kendisi gösterir:
+
+- Stripe panelinde açık olmaları (**Settings → Payment methods**);
+- sayfanın HTTPS ile sunulması;
+- Apple Pay için alan adınızın panelde kayıtlı olması (**Settings → Payment method domains**);
+- müşterinin cihazının ve tarayıcısının desteklemesi (Apple Pay: Wallet'ında kart olan Safari; Google Pay: kayıtlı kartı olan Chrome).
+
+Yalnızca cüzdan butonlarını göstermek için Express Checkout Element'i kullanın:
+
+```javascript
+// Optional: Apple Pay / Google Pay buttons on their own, above your form
+const express = elements.create('expressCheckout');
+express.mount('#express-checkout');
+express.on('confirm', async () => {
+  const { error, confirmationToken } = await stripe.createConfirmationToken({ elements });
+  if (error) return showError(error.message);
+  // Send confirmationToken.id to your server as paymentToken, as with the card form
+});
+```
+
+Tarayıcıda yalnızca kartla ödeme test edildi; cüzdanlar aynı yolu kullanır ama bir cihazda denenmedi.
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.stripe.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  paymentToken: body.paymentToken, // ctoken_... or pm_... from Stripe.js
+  callbackUrl: 'https://yoursite.com/api/pay/stripe/payment/complete-3ds',
+});
+// init.threeDSHtmlContent: render it in the customer's browser
+
+// In the callback route (the handler does this for you)
+const result = await payment.stripe.completeThreeDSPayment(callbackBody);
+// result.paymentId: the PaymentIntent id (pi_...); result.conversationId: 'ORDER123'
+```
+
+`initThreeDSPayment()` PaymentIntent'i onaylar. Döndürdüğü sayfa Stripe.js'i yükler, banka 3D Secure isterse `handleNextAction()` çalıştırır (bankanın penceresi sayfanın üstünde açılır) ve ardından `payment_intent` alanını `callbackUrl` adresine POST eder. 3D Secure gerekmezse sayfa hemen POST eder.
+
+`completeThreeDSPayment()` POST'tan yalnızca PaymentIntent numarasını alır ve PaymentIntent'i Stripe'tan çeker; durum ve sipariş numarası Stripe'tan gelir. `paymentId` ve `conversationId` onaylanmış bir ödemede ve ödeme hâlâ işlenirken doldurulur; başarısız bir sonuç numara taşımaz.
+
+Tek sayfalık bir uygulamada dönen sayfayı kullanmanız gerekmez: `rawResponse` içinden `client_secret` değerini okuyup `stripe.handleNextAction({ clientSecret })` çağrısını kendiniz yapın, ardından callback adresinizi çağırın.
+
+## 3D'siz ödeme [#non-3d-payment]
+
+```typescript
+const result = await payment.stripe.createPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  paymentToken: 'pm_...',
+});
+// A card that needs 3D Secure fails with code THREEDS_FAILED (authentication_not_handled)
+```
+
+## İade, iptal, durum ve ön provizyon [#refund-cancel-status--pre-authorization]
+
+```typescript
+await payment.stripe.refund({ paymentId: 'pi_...', price: '30.00', currency: 'TRY', ip: '1.2.3.4' });
+await payment.stripe.cancel({ paymentId: 'pi_...', ip: '1.2.3.4' }); // refunds a charged payment in full
+const status = await payment.stripe.getPayment('pi_...');
+// status: 'success', 'cancelled' (canceled or refunded), 'failure', 'pending'
+
+const auth = await payment.stripe.authorize({ ...paymentRequest, paymentToken: 'pm_...' });
+await payment.stripe.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
+await payment.stripe.voidAuthorization({ paymentId: auth.paymentId!, ip: '1.2.3.4' });
+```
+
+Stripe'ta tahsilattan sonra void yoktur; bu yüzden `cancel()` tahsil edilmiş bir ödemeyi tamamen iade eder, henüz tahsil edilmemiş olanı iptal eder. Kısmi tahsilat, provizyonun kalanını serbest bırakır.
+
+## Kayıtlı kartlar [#saved-cards]
+
+```typescript
+const result = await payment.stripe.createPayment({ ...paymentRequest, paymentToken, saveCard: true });
+// result.storedCard: { customerToken: 'cus_...', cardToken: 'pm_...' }
+
+await payment.stripe.createPayment({ ...paymentRequest, storedCard: result.storedCard });
+const { cards } = await payment.stripe.listCards({ customerToken: result.storedCard!.customerToken });
+await payment.stripe.deleteCard(result.storedCard!);
+```
+
+`saveCard` ile alıcıdan bir Stripe müşterisi (Customer) oluşturulur (ya da kartı mevcut bir müşteriye eklemek için `saveCard: { customerToken: 'cus_...' }` verin) ve kart `setup_future_usage: 'off_session'` ile kaydedilir. `deleteCard()` kartı yalnızca o müşteriye aitse kaldırır. Ödemesiz `saveCard()` desteklenmez, çünkü kartın sunucunuza gelmesi gerekirdi.
+
+## Test [#testing]
+
+Stripe'ın test PaymentMethod'ları tarayıcı olmadan `paymentToken` olarak kullanılabilir:
+
+```typescript
+await payment.stripe.createPayment({ ...paymentRequest, paymentToken: 'pm_card_visa' });
+await payment.stripe.createPayment({ ...paymentRequest, paymentToken: 'pm_card_chargeDeclinedInsufficientFunds' });
+await payment.stripe.initThreeDSPayment({ ...paymentRequest, paymentToken: 'pm_card_authenticationRequired', callbackUrl });
+```
+
+Tarayıcıda Stripe'ın test kartlarını kullanın, örneğin `4242 4242 4242 4242` veya `4000 0027 6000 3184` (3D Secure).
+
+<Callout type="info">
+  Webhook'lar henüz sağlayıcı tarafından işlenmiyor. Taksit ve BIN sorgusu desteklenmez; `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır.
+</Callout>

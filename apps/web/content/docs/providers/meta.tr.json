@@ -5,6 +5,7 @@
     "iyzico",
     "paytr",
     "parampos",
-    "sipay"
+    "sipay",
+    "stripe"
   ]
 }

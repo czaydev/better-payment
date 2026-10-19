@@ -75,6 +75,7 @@ const saved = await payment.use('iyzico').saveCard({
 | -------- | ------------------- | ------------ | ------------- | -------------- | ------------ |
 | iyzico | `registerCard` | `/cardstorage/card` | `/cardstorage/cards` | `/cardstorage/card` | `cardUserKey` + `cardToken` |
 | PayTR | Direct API `store_card=1` | not supported | `/odeme/capi/list` | `/odeme/capi/delete` | `utoken` + `ctoken` |
+| Stripe | `setup_future_usage` (a Customer is created, or pass `customerToken`) | not supported (needs Stripe.js) | Customer payment methods | detach | `cus_...` + `pm_...` |
 | Parampos | not yet ([#65](https://github.com/czaydev/better-payment/issues/65)) | — | — | — | — |
 | Akbank | not yet ([#65](https://github.com/czaydev/better-payment/issues/65)) | — | — | — | — |
 
