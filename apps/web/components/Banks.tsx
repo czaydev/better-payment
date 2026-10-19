@@ -40,6 +40,7 @@ const banks: RouteItem[] = [
   { name: "Şekerbank", live: true },
   { name: "Halkbank Makedonya", since: "0.12.0" },
   { name: "Albaraka Türk", since: "0.12.0" },
+  { name: "Vakıf Katılım", since: "0.12.0" },
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, issue: 37 },
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, since: "0.12.0" },
   { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, since: "0.12.0" },

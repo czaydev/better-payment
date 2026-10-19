@@ -19,6 +19,7 @@ export enum ProviderType {
   ALBARAKA = 'albaraka',
   /** QNBpay, on Sipay's platform: `sipay({ brand: 'qnbpay' })` or `qnbpay()` */
   QNBPAY = 'qnbpay',
+  VAKIFKATILIM = 'vakifkatilim',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -154,6 +155,11 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.QNBPAY]: {
     sandbox: 'https://test.qnbpay.com.tr',
     production: 'https://portal.qnbpay.com.tr',
+  },
+  [ProviderType.VAKIFKATILIM]: {
+    // One gateway for test and live merchants
+    sandbox: 'https://boa.vakifkatilim.com.tr/VirtualPOS.Gateway',
+    production: 'https://boa.vakifkatilim.com.tr/VirtualPOS.Gateway',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {
