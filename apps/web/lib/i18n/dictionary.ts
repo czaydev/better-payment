@@ -1,6 +1,9 @@
 import type { Locale } from "./config";
 
 const en = {
+  accessibility: {
+    skipToContent: "Skip to content",
+  },
   notFound: {
     title: "This page is out of reach.",
     description: "The link may have changed, or the page may no longer exist. Let's get you back on track.",
@@ -12,6 +15,7 @@ const en = {
     description:
       "A unified, type-safe payment gateway library for Node.js and edge runtimes. Integrate iyzico, PayTR, Parampos and Akbank with a single consistent API and verified callbacks.",
     docsTitleSuffix: "Better Payment docs",
+    socialImageAlt: "Better Payment — One API for Turkish payments.",
   },
   nav: {
     features: "Features",
@@ -22,19 +26,76 @@ const en = {
     openMenu: "Open menu",
     language: "Language",
     theme: "Toggle dark mode",
+    menu: {
+      product: {
+        label: "Product",
+        desc: "Everything you need to take payments in Turkey with one typed interface.",
+        cta: "Explore the product",
+        groups: { payment: "Payment layer", security: "Security & events", extend: "Extensibility" },
+        items: {
+          unified: "Unified API", basket: "Baskets & items", preAuth: "Pre-authorization", storedCards: "Stored cards",
+          handler: "HTTP handler", events: "Events & callbacks", errorCodes: "Normalized errors",
+          plugins: "Plugins", customProviders: "Custom providers", testing: "Testing utilities",
+        },
+      },
+      providers: {
+        label: "Providers",
+        desc: "Eleven providers behind one API: payment gateways and bank virtual POS.",
+        cta: "Compare providers",
+        tagline: "11 providers, one API.",
+        groups: { gateways: "Payment gateways", banks: "Bank virtual POS", more: "Go further" },
+        items: {
+          iyzico: "iyzico", paytr: "PayTR", sipay: "Sipay", parampos: "Parampos",
+          akbank: "Akbank", est: "EST / NestPay banks", kuveytturk: "Kuveyt Türk",
+          customProviders: "Add your own provider", testCards: "Sandbox test cards",
+        },
+      },
+      developers: {
+        label: "Developers",
+        desc: "Typed APIs, clear docs and a sandbox for every provider. Ship your first payment today.",
+        cta: "Open the docs",
+        groups: { start: "Get started", integrations: "Integrations", reference: "Reference" },
+        items: {
+          quickStart: "Quick start", installation: "Installation", configuration: "Configuration",
+          nextjs: "Next.js", edge: "Edge runtimes", frameworks: "Express, Hono & more",
+          api: "API reference", types: "Types", errorCodes: "Error codes", testCards: "Test cards",
+        },
+      },
+      resources: {
+        label: "Resources",
+        desc: "Release notes, migration guides and the open source community behind the project.",
+        cta: "Read what's new",
+        groups: { releases: "Releases", community: "Community" },
+        items: {
+          blog: "Blog", changelog: "Changelog", whatsNew: "What's new", migration: "Migration guide",
+          github: "GitHub repository", npm: "npm package", issues: "Report an issue",
+        },
+      },
+    },
   },
   hero: {
     titleLine1: "One API for",
     titleLine2: "Turkish payments.",
-    lead: "gives iyzico, PayTR, Parampos and Akbank one type-safe interface, with signature-verified callbacks and a secure-by-default HTTP handler.",
+    lead: "gives iyzico, PayTR, Sipay, Parampos and seven banks one type-safe interface, with signature-verified callbacks and a secure-by-default HTTP handler.",
     getStarted: "Get Started",
     star: "Star on GitHub",
+    badge: "See what's new",
+    proof: {
+      label: "One API for",
+      more: "+2 more",
+      stats: [
+        { value: "11", label: "providers, one interface" },
+        { value: "0", label: "runtime dependencies" },
+        { value: "MIT", label: "open source license" },
+        { value: "Node + Edge", label: "runs anywhere JS runs" },
+      ],
+    },
     network: {
       label: "How a payment moves through Better Payment",
       request: "request",
       verified: "verified",
-      all: "4 providers",
-      idle: "One API · 4 providers",
+      all: "11 providers",
+      idle: "One API · 11 providers",
       caps: {
         iyzico: "3D Secure · Non-3D · Refund · Cancel · BIN · Installments",
         paytr: "3D Secure (iFrame) · Non-3D · Refund · BIN · Installments",
@@ -57,6 +118,7 @@ const en = {
   features: {
     titleLine1: "Everything you need,",
     titleLine2: "nothing you don't.",
+    learnMore: "Learn more",
     items: {
       unified: {
         title: "Unified API surface",
@@ -90,6 +152,14 @@ const en = {
     drag: "Drag to compare",
     gateway: "Payment gateway",
     virtualPos: "Virtual POS (SOAP)",
+    summary: "11 banks and payment institutions, one API",
+    pick: "Pick one to compare its API",
+    estBanks: "Same integration for",
+    groups: {
+      gateway: "Payment institutions",
+      virtualPos: "Virtual POS",
+      bankPos: "Bank virtual POS",
+    },
     iyzico: {
       description:
         "IYZWSv2-signed JSON API with non-3D and 3D Secure payments, a hosted checkout form, pay with IBAN (PWI), subscriptions, and BIN and installment queries.",
@@ -138,6 +208,42 @@ const en = {
         "Signature-verified callbacks",
       ],
     },
+    sipay: {
+      description:
+        "Sipay's ccpayment API with a Bearer token and an AES-256-CBC hash_key on every payment. 3D Secure callbacks are trusted only through their signed hash_key.",
+      features: [
+        "Non-3D & 3D Secure",
+        "Pre-authorization & capture",
+        "BIN & installment queries",
+        "Refund & cancel",
+        "Status queries",
+        "TRY, USD, EUR, GBP",
+      ],
+    },
+    kuveytturk: {
+      description:
+        "Kuveyt Türk's KT Pay Gate with an HMAC-SHA512 hashData on every request. The unsigned callback is confirmed at the bank before the card is charged with Provision.",
+      features: [
+        "3D Secure",
+        "Bank-confirmed callbacks",
+        "Charge with Provision",
+        "Cancel & partial refund",
+        "Order status queries",
+        "TRY, USD, EUR",
+      ],
+    },
+    est: {
+      description:
+        "One provider for the EST (Asseco) virtual POS that five banks share: hash version 3 signed forms, all four 3D models, and payments confirmed with the bank.",
+      features: [
+        "3D, 3D Pay, 3D Host, 3D Pay Hosting",
+        "Non-3D payments (XML API)",
+        "Hash v3 verified callbacks",
+        "mdStatus control",
+        "Refund & void",
+        "Order status queries",
+      ],
+    },
   },
   banks: {
     titleLine1: "Bank virtual POS,",
@@ -164,6 +270,7 @@ const en = {
     planned: "Planned",
   },
   contributors: {
+    owner: "CODEOWNER",
     titleLine1: "Want to contribute?",
     titleLine2: "Let's build the next part together.",
     lead: "A new provider, a clearer guide, a test that catches a bug. Every contribution makes Better Payment better for everyone.",
@@ -175,16 +282,41 @@ const en = {
     you: "You?",
     join: "Your first contribution starts here",
   },
+  blog: {
+    metaTitle: "Blog",
+    metaDescription:
+      "Guides on integrating iyzico, PayTR, Parampos and bank virtual POS with Node.js: 3D Secure, callbacks, refunds and error handling.",
+    titleLine1: "Payments,",
+    titleLine2: "explained for developers.",
+    lead: "Practical guides for taking payments in Turkey with Node.js: 3D Secure, callbacks, timeouts and provider differences.",
+    latest: "Latest",
+    allPosts: "All posts",
+    toc: "On this page",
+    readMore: "Read the article",
+    minutes: "min read",
+    updated: "Updated",
+    by: "By",
+    moreTitle: "Keep reading",
+    rss: "RSS feed",
+    empty: "No posts yet.",
+    cta: {
+      title: "Try it in your project",
+      lead: "One typed API for iyzico, PayTR, Sipay, Parampos and seven banks.",
+      docs: "Read the docs",
+      github: "Star on GitHub",
+    },
+  },
   quickStart: {
     titleLine1: "Up and running",
     titleLine2: "in minutes.",
+    lead: "Install the package, configure one provider and take your first 3D Secure payment. No adapters, no glue code.",
     steps: ["Install the package", "Configure your providers", "Start a 3D Secure payment"],
     fullDocs: "View full documentation",
   },
   cta: {
     titleLine1: "Stop rewriting",
     titleLine2: "payment logic.",
-    lead: "One package for iyzico, PayTR, Parampos and Akbank, with full TypeScript support. Upgrading from 3.x? Read",
+    lead: "One package for iyzico, PayTR, Sipay, Parampos and seven banks, with full TypeScript support. Upgrading from 3.x? Read",
     whatsNew: "what's new since the reset",
     readDocs: "Read the Docs",
     github: "View on GitHub",
@@ -202,6 +334,7 @@ const en = {
       providers: "Providers",
       quickStart: "Quick Start",
       docs: "Docs",
+      blog: "Blog",
       introduction: "Introduction",
       installation: "Installation",
       configuration: "Configuration",
@@ -230,6 +363,9 @@ const en = {
 export type Dictionary = typeof en;
 
 const tr: Dictionary = {
+  accessibility: {
+    skipToContent: "İçeriğe geç",
+  },
   notFound: {
     title: "Bu sayfaya ulaşamadık.",
     description: "Bağlantı değişmiş veya sayfa kaldırılmış olabilir. Aradığınız yere başka bir yoldan ulaşalım.",
@@ -241,6 +377,7 @@ const tr: Dictionary = {
     description:
       "Node.js ve edge ortamları için tip güvenli, birleşik ödeme kütüphanesi. iyzico, PayTR, Parampos ve Akbank'ı tek bir tutarlı API ve doğrulanmış callback'lerle entegre edin.",
     docsTitleSuffix: "Better Payment dokümantasyonu",
+    socialImageAlt: "Better Payment — Türk ödeme sistemleri için tek API.",
   },
   nav: {
     features: "Özellikler",
@@ -251,19 +388,76 @@ const tr: Dictionary = {
     openMenu: "Menüyü aç",
     language: "Dil",
     theme: "Karanlık modu aç/kapat",
+    menu: {
+      product: {
+        label: "Ürün",
+        desc: "Türkiye'de ödeme almak için gereken her şey, tek bir tipli arayüzde.",
+        cta: "Ürünü inceleyin",
+        groups: { payment: "Ödeme katmanı", security: "Güvenlik ve olaylar", extend: "Genişletilebilirlik" },
+        items: {
+          unified: "Birleşik API", basket: "Sepet ve ürünler", preAuth: "Ön provizyon", storedCards: "Kayıtlı kartlar",
+          handler: "HTTP handler", events: "Olaylar ve callback'ler", errorCodes: "Normalize hatalar",
+          plugins: "Eklentiler", customProviders: "Özel sağlayıcılar", testing: "Test araçları",
+        },
+      },
+      providers: {
+        label: "Sağlayıcılar",
+        desc: "Tek API arkasında on bir sağlayıcı: ödeme altyapıları ve banka sanal POS'ları.",
+        cta: "Sağlayıcıları karşılaştırın",
+        tagline: "11 sağlayıcı, tek API.",
+        groups: { gateways: "Ödeme altyapıları", banks: "Banka sanal POS", more: "Daha fazlası" },
+        items: {
+          iyzico: "iyzico", paytr: "PayTR", sipay: "Sipay", parampos: "Parampos",
+          akbank: "Akbank", est: "EST / NestPay bankaları", kuveytturk: "Kuveyt Türk",
+          customProviders: "Kendi sağlayıcınızı ekleyin", testCards: "Sandbox test kartları",
+        },
+      },
+      developers: {
+        label: "Geliştiriciler",
+        desc: "Tipli API'ler, net dokümantasyon ve her sağlayıcı için sandbox. İlk ödemenizi bugün alın.",
+        cta: "Dokümantasyonu açın",
+        groups: { start: "Başlangıç", integrations: "Entegrasyonlar", reference: "Referans" },
+        items: {
+          quickStart: "Hızlı başlangıç", installation: "Kurulum", configuration: "Yapılandırma",
+          nextjs: "Next.js", edge: "Edge ortamları", frameworks: "Express, Hono ve diğerleri",
+          api: "API referansı", types: "Tipler", errorCodes: "Hata kodları", testCards: "Test kartları",
+        },
+      },
+      resources: {
+        label: "Kaynaklar",
+        desc: "Sürüm notları, geçiş rehberleri ve projenin arkasındaki açık kaynak topluluğu.",
+        cta: "Yenilikleri okuyun",
+        groups: { releases: "Sürümler", community: "Topluluk" },
+        items: {
+          blog: "Blog", changelog: "Değişiklik günlüğü", whatsNew: "Yenilikler", migration: "Geçiş rehberi",
+          github: "GitHub deposu", npm: "npm paketi", issues: "Sorun bildirin",
+        },
+      },
+    },
   },
   hero: {
     titleLine1: "Türk ödeme sistemleri",
     titleLine2: "için tek API.",
-    lead: "iyzico, PayTR, Parampos ve Akbank'ı tek bir tip güvenli arayüzde toplar; imzası doğrulanan callback'ler ve varsayılan olarak güvenli bir HTTP handler sunar.",
+    lead: "iyzico, PayTR, Sipay, Parampos ve yedi bankayı tek bir tip güvenli arayüzde toplar; imzası doğrulanan callback'ler ve varsayılan olarak güvenli bir HTTP handler sunar.",
     getStarted: "Başlayın",
     star: "GitHub'da yıldızlayın",
+    badge: "Yenilikleri görün",
+    proof: {
+      label: "Tek API ile",
+      more: "+2 daha",
+      stats: [
+        { value: "11", label: "sağlayıcı, tek arayüz" },
+        { value: "0", label: "çalışma zamanı bağımlılığı" },
+        { value: "MIT", label: "açık kaynak lisansı" },
+        { value: "Node + Edge", label: "JS'in çalıştığı her yerde" },
+      ],
+    },
     network: {
       label: "Bir ödemenin Better Payment içindeki yolu",
       request: "istek",
       verified: "doğrulandı",
-      all: "4 sağlayıcı",
-      idle: "Tek API · 4 sağlayıcı",
+      all: "11 sağlayıcı",
+      idle: "Tek API · 11 sağlayıcı",
       caps: {
         iyzico: "3D Secure · Non-3D · İade · İptal · BIN · Taksit",
         paytr: "3D Secure (iFrame) · Non-3D · İade · BIN · Taksit",
@@ -286,6 +480,7 @@ const tr: Dictionary = {
   features: {
     titleLine1: "İhtiyacınız olan her şey,",
     titleLine2: "fazlası değil.",
+    learnMore: "Detaylı incele",
     items: {
       unified: {
         title: "Birleşik API",
@@ -319,6 +514,14 @@ const tr: Dictionary = {
     drag: "Karşılaştırmak için sürükleyin",
     gateway: "Ödeme sağlayıcısı",
     virtualPos: "Sanal POS (SOAP)",
+    summary: "11 banka ve ödeme kuruluşu, tek API",
+    pick: "API'sini karşılaştırmak için birini seçin",
+    estBanks: "Aynı entegrasyonla",
+    groups: {
+      gateway: "Ödeme kuruluşları",
+      virtualPos: "Sanal POS",
+      bankPos: "Banka sanal POS'ları",
+    },
     iyzico: {
       description:
         "IYZWSv2 imzalı JSON API: 3D'siz ve 3D Secure ödemeler, hazır ödeme formu, IBAN ile ödeme (PWI), abonelikler, BIN ve taksit sorguları.",
@@ -367,6 +570,42 @@ const tr: Dictionary = {
         "İmzası doğrulanan callback'ler",
       ],
     },
+    sipay: {
+      description:
+        "Sipay ccpayment API'si: her istekte Bearer token, her ödemede AES-256-CBC ile şifrelenmiş hash_key. 3D Secure callback'lerinde yalnızca imzalı hash_key'e güvenilir.",
+      features: [
+        "3D'siz ve 3D Secure",
+        "Ön provizyon ve kapama",
+        "BIN ve taksit sorguları",
+        "İade ve iptal",
+        "Durum sorguları",
+        "TRY, USD, EUR, GBP",
+      ],
+    },
+    kuveytturk: {
+      description:
+        "Kuveyt Türk KT Pay Gate: her istekte HMAC-SHA512 hashData. İmzasız callback, kart Provision ile çekilmeden önce bankada doğrulanır.",
+      features: [
+        "3D Secure",
+        "Bankada doğrulanan callback'ler",
+        "Provision ile tahsilat",
+        "İptal ve kısmi iade",
+        "Sipariş durumu sorgusu",
+        "TRY, USD, EUR",
+      ],
+    },
+    est: {
+      description:
+        "Beş bankanın ortak kullandığı EST (Asseco) sanal POS'u için tek sağlayıcı: hash v3 imzalı formlar, dört 3D modelinin tamamı ve bankayla teyit edilen ödemeler.",
+      features: [
+        "3D, 3D Pay, 3D Host, 3D Pay Hosting",
+        "3D'siz ödemeler (XML API)",
+        "Hash v3 ile doğrulanan callback'ler",
+        "mdStatus kontrolü",
+        "İade ve iptal",
+        "Sipariş durumu sorgusu",
+      ],
+    },
   },
   banks: {
     titleLine1: "Banka sanal POS'u,",
@@ -393,6 +632,7 @@ const tr: Dictionary = {
     planned: "Planlanıyor",
   },
   contributors: {
+    owner: "CODEOWNER",
     titleLine1: "Katkı sağlamak ister misin?",
     titleLine2: "Sıradaki adımı birlikte atalım.",
     lead: "Yeni bir sağlayıcı, daha anlaşılır bir rehber, bir hatayı yakalayan test. Her katkı, Better Payment’ı herkes için biraz daha iyi yapıyor.",
@@ -404,16 +644,41 @@ const tr: Dictionary = {
     you: "Sen?",
     join: "İlk katkın burada başlıyor",
   },
+  blog: {
+    metaTitle: "Blog",
+    metaDescription:
+      "iyzico, PayTR, Parampos ve banka sanal POS entegrasyonu için Node.js rehberleri: 3D Secure, callback'ler, iade ve hata yönetimi.",
+    titleLine1: "Ödeme altyapıları,",
+    titleLine2: "geliştiriciler için anlatıldı.",
+    lead: "Node.js ile Türkiye'de ödeme almak için pratik rehberler: 3D Secure, callback'ler, zaman aşımları ve sağlayıcı farkları.",
+    latest: "En yeni",
+    allPosts: "Tüm yazılar",
+    toc: "Bu sayfada",
+    readMore: "Yazıyı oku",
+    minutes: "dk okuma",
+    updated: "Güncellendi",
+    by: "Yazar:",
+    moreTitle: "Okumaya devam edin",
+    rss: "RSS beslemesi",
+    empty: "Henüz yazı yok.",
+    cta: {
+      title: "Kendi projenizde deneyin",
+      lead: "iyzico, PayTR, Sipay, Parampos ve yedi banka için tek tipli API.",
+      docs: "Dokümantasyonu okuyun",
+      github: "GitHub'da yıldızlayın",
+    },
+  },
   quickStart: {
     titleLine1: "Dakikalar içinde",
     titleLine2: "çalışır durumda.",
+    lead: "Paketi kurun, bir sağlayıcı yapılandırın ve ilk 3D Secure ödemenizi alın. Adaptör yok, yapıştırma kod yok.",
     steps: ["Paketi kurun", "Sağlayıcılarınızı yapılandırın", "3D Secure ödeme başlatın"],
     fullDocs: "Tüm dokümantasyonu görün",
   },
   cta: {
     titleLine1: "Ödeme kodunu",
     titleLine2: "yeniden yazmayı bırakın.",
-    lead: "iyzico, PayTR, Parampos ve Akbank için tam TypeScript destekli tek paket. 3.x'ten mi geçiyorsunuz? Okuyun:",
+    lead: "iyzico, PayTR, Sipay, Parampos ve yedi banka için tam TypeScript destekli tek paket. 3.x'ten mi geçiyorsunuz? Okuyun:",
     whatsNew: "sıfırlamadan bu yana yenilikler",
     readDocs: "Dokümantasyonu okuyun",
     github: "GitHub'da görün",
@@ -431,6 +696,7 @@ const tr: Dictionary = {
       providers: "Sağlayıcılar",
       quickStart: "Hızlı Başlangıç",
       docs: "Dokümantasyon",
+      blog: "Blog",
       introduction: "Giriş",
       installation: "Kurulum",
       configuration: "Yapılandırma",

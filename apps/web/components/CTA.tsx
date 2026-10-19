@@ -9,13 +9,13 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import { withBasePath } from "@/lib/base-path";
 
 // Sheen colours for buttons that sit on the indigo band
-const onIndigo = { "--bp-sheen": "rgb(67 56 242 / 0.16)", "--bp-sheen-soft": "rgb(67 56 242 / 0.05)" } as React.CSSProperties;
+const onIndigo = { "--bp-sheen": "color-mix(in srgb, var(--color-brand-500) 16%, transparent)", "--bp-sheen-soft": "color-mix(in srgb, var(--color-brand-500) 5%, transparent)" } as React.CSSProperties;
 const onIndigoOutline = { "--bp-sheen": "rgb(255 255 255 / 0.22)", "--bp-sheen-soft": "rgb(255 255 255 / 0.06)" } as React.CSSProperties;
 
 export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] }) {
   return (
     <section className="px-5 py-24 sm:px-8">
-      <div className="bp-reveal relative mx-auto max-w-6xl overflow-hidden rounded-[20px] bg-primary px-6 py-11 text-primary-foreground sm:px-12 sm:py-14">
+      <div className="bp-reveal relative mx-auto max-w-7xl overflow-hidden rounded-[20px] bg-primary px-6 py-11 text-primary-foreground sm:px-12 sm:py-14">
         <Image
           src={withBasePath("/brand/cta-lanes.webp")}
           alt=""
@@ -25,12 +25,12 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
         />
 
         <div className="relative max-w-xl">
-          <h2 className="text-[2rem] leading-[1.08] font-extrabold tracking-[-0.03em] sm:text-[2.5rem]">
+          <h2 className="text-title-lg sm:text-title-xl">
             {t.titleLine1}
             <br />
             {t.titleLine2}
           </h2>
-          <p className="mt-4 max-w-md leading-relaxed text-[#dcd9ff]">
+          <p className="mt-4 max-w-md leading-relaxed text-brand-100">
             {t.lead}{" "}
             <Link href={localePath(lang, "/docs/whats-new")} className="text-white underline underline-offset-4">
               {t.whatsNew}
@@ -39,7 +39,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
           </p>
 
           <div className="mt-6 inline-flex items-center gap-2.5 rounded-[10px] border border-white/20 bg-white/10 px-3.5 py-2.5 font-mono text-sm">
-            <span className="text-[#c9c5ff] select-none">$</span>
+            <span className="text-brand-200 select-none">$</span>
             npm install better-payment
           </div>
 

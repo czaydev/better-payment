@@ -33,9 +33,12 @@ const nextConfig: NextConfig = {
   // 90 keeps the soft gradients in the hero artwork free of banding
   images: { qualities: [75, 90] },
   async rewrites() {
-    if (basePath || !betaOrigin) return [];
+    // The proxy skips paths with a dot, so the default-language feed needs its own rewrite
+    const feed = { source: "/blog/rss.xml", destination: "/en/blog/rss.xml" };
+    if (basePath || !betaOrigin) return [feed];
     return {
       beforeFiles: [
+        feed,
         { source: "/beta", destination: `${betaOrigin}/beta` },
         { source: "/beta/:path*", destination: `${betaOrigin}/beta/:path*` },
       ],

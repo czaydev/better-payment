@@ -52,41 +52,36 @@ const result = await payment.iyzico.initThreeDSPayment({
 
 export default function QuickStart({ lang, t, code }: { lang: Locale; t: Dictionary["quickStart"]; code: Dictionary["code"] }) {
   return (
-    <section id="quickstart" className="py-24 px-5 sm:px-8">
-      <div className="max-w-4xl mx-auto">
-        <SectionHeading line1={t.titleLine1} line2={t.titleLine2} className="mb-14" />
-
-        <ol className="flex flex-col">
-          {steps.map((step, idx) => (
-            <li key={step.number} className="bp-reveal flex gap-6 sm:gap-8">
-              <div className="flex flex-col items-center shrink-0 pt-1">
-                <div className="w-9 h-9 rounded-lg bg-tint flex items-center justify-center">
-                  <span className="text-[11px] font-semibold text-accent-text font-mono">
-                    {step.number}
-                  </span>
-                </div>
-                {idx < steps.length - 1 && <div className="w-px flex-1 bg-border my-3" />}
-              </div>
-
-              <div className={`flex-1 min-w-0 ${idx < steps.length - 1 ? "pb-10" : ""}`}>
-                <h3 className="font-semibold text-foreground text-[15px] mb-4 mt-1.5">
-                  {t.steps[idx]}
-                </h3>
-                <Code code={step.code} file={step.file} shell={step.shell} copy={code} />
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <div className="bp-reveal mt-12 pl-[calc(36px+1.5rem)] sm:pl-[calc(36px+2rem)]">
+    <section id="quickstart" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
+      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-20">
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} className="mb-8" />
           <Link
             href={localePath(lang, "/docs")}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text group"
+            className="bp-reveal group inline-flex items-center gap-1.5 text-sm font-semibold text-accent-text"
           >
             {t.fullDocs}
             <ChevronRight className="size-4 transition-transform duration-(--bp-d-md) ease-spring group-hover:translate-x-[3px]" />
           </Link>
         </div>
+
+        <ol className="flex min-w-0 flex-col">
+          {steps.map((step, idx) => (
+            <li key={step.number} className="bp-reveal flex gap-5 sm:gap-6">
+              <div className="flex shrink-0 flex-col items-center pt-1">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-tint">
+                  <span className="font-mono text-label font-semibold text-accent-text">{step.number}</span>
+                </div>
+                {idx < steps.length - 1 && <div className="my-3 w-px flex-1 bg-border" />}
+              </div>
+
+              <div className={`min-w-0 flex-1 ${idx < steps.length - 1 ? "pb-10" : ""}`}>
+                <h3 className="mt-1.5 mb-4 text-body font-semibold text-foreground">{t.steps[idx]}</h3>
+                <Code code={step.code} file={step.file} shell={step.shell} copy={code} />
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );

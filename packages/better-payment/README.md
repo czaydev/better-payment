@@ -140,6 +140,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | PayTR       | ✓ (needs non-3D approval) | ✓ iFrame / Direct API       |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
 | Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| QNBpay ³    | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | Lidio       | ✓                         | ✓ ProcessPayment            |   ✓    | ✓ (same day)    |   ✓    |  ✓  | ✓ (account rates) |
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
@@ -153,6 +154,7 @@ this id to `refund`, `cancel` and `getPayment`.
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB, Şekerbank, Akbank's older virtual POS and
 Halkbank Macedonia, with `est({ bank })`.
 ² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
+³ QNBpay runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })`. Not verified with a test merchant yet.
 
 ### 3D Secure completion
 

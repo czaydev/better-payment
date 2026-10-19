@@ -18,6 +18,8 @@ export enum ProviderType {
   SIPAY = 'sipay',
   LIDIO = 'lidio',
   ALBARAKA = 'albaraka',
+  /** QNBpay, on Sipay's platform: `sipay({ brand: 'qnbpay' })` or `qnbpay()` */
+  QNBPAY = 'qnbpay',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -153,6 +155,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.ALBARAKA]: {
     sandbox: 'https://epostest.albarakaturk.com.tr',
     production: 'https://epos.albarakaturk.com.tr',
+  },
+  [ProviderType.QNBPAY]: {
+    sandbox: 'https://test.qnbpay.com.tr',
+    production: 'https://portal.qnbpay.com.tr',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {

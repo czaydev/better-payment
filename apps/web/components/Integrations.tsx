@@ -5,10 +5,12 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import CompareSlider from "@/components/CompareSlider";
 import SectionHeading from "@/components/SectionHeading";
-import { integrations } from "@/lib/integrations";
+import { integrations, providerTiles, type ProviderGroup } from "@/lib/integrations";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { withBasePath } from "@/lib/base-path";
+
+const GROUPS: ProviderGroup[] = ["gateway", "virtualPos", "bankPos"];
 
 /**
  * "Every gateway has a different API" and the provider showcase in one
@@ -27,52 +29,93 @@ export default function Integrations({
   code: Dictionary["code"];
 }) {
   const [active, setActive] = useState(0);
-  const p = integrations[active];
+  const tile = providerTiles[active];
+  const p = integrations.find((item) => item.id === tile.integration)!;
   const info = t[p.id];
   const tagline = p.kind === "gateway" ? t.gateway : p.kind === "virtualPos" ? t.virtualPos : bankTagline;
+  // EST banks share one snippet; show the selected bank's provider key
+  const after = tile.bank
+    ? { ...p.after, code: p.after.code.replaceAll("isbank", tile.bank) }
+    : p.after;
+  const estBanks = providerTiles.filter((item) => item.integration === "est");
 
   return (
     <section id="providers" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <SectionHeading line1={compare.titleLine1} line2={compare.titleLine2} lead={compare.lead} />
 
-        <div role="tablist" aria-label={t.capabilities} className="bp-reveal mb-5 flex flex-wrap gap-1.5">
-          {integrations.map((item, i) => (
-            <button
-              key={item.id}
-              role="tab"
-              type="button"
-              aria-selected={active === i}
-              onClick={() => setActive(i)}
-              className={cn(
-                "flex items-center gap-2.5 rounded-xl border py-1.5 pr-4 pl-1.5 text-sm font-medium transition-[border-color,box-shadow,color] duration-(--bp-d-sm) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-                active === i
-                  ? "border-primary bg-card text-foreground shadow-[0_0_0_4px_var(--bp-tint)]"
-                  : "border-border bg-card text-muted-foreground hover:border-line-strong hover:text-foreground",
-              )}
-            >
-              <span className="grid size-8 place-items-center rounded-lg border border-border bg-background dark:bg-logo">
-                <Image src={withBasePath(item.logo)} alt="" width={28} height={16} className="h-4 w-7 object-contain" />
-              </span>
-              {item.name}
-            </button>
-          ))}
+        <div className="bp-reveal mb-5 rounded-2xl border border-border bg-card p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1">
+            <p className="text-body font-bold tracking-tight text-foreground">{t.summary}</p>
+            <p className="text-caption text-muted-foreground">{t.pick}</p>
+          </div>
+          <div role="tablist" aria-label={t.capabilities} className="flex flex-col gap-y-4 sm:flex-row sm:flex-wrap sm:gap-x-6">
+            {GROUPS.map((group) => (
+              <div key={group} role="presentation" className="min-w-0">
+                <p className="mb-2 px-1 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                  {t.groups[group]}
+                </p>
+                <div role="presentation" className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                  {providerTiles.map((item, i) =>
+                    item.group !== group ? null : (
+                      <button
+                        key={item.key}
+                        role="tab"
+                        type="button"
+                        aria-selected={active === i}
+                        aria-label={item.name}
+                        title={item.name}
+                        onClick={() => setActive(i)}
+                        className={cn(
+                          "grid h-14 w-full place-items-center sm:w-[118px] rounded-xl border px-3 transition-[border-color,box-shadow,background-color] duration-(--bp-d-sm) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-logo",
+                          active === i
+                            ? "border-primary bg-background shadow-[0_0_0_4px_var(--bp-tint)]"
+                            : "border-border bg-background hover:border-line-strong",
+                        )}
+                      >
+                        {item.logo ? (
+                          <Image
+                            src={withBasePath(item.logo)}
+                            alt=""
+                            width={96}
+                            height={32}
+                            className={cn("w-auto max-w-full object-contain", item.tall ? "max-h-11" : "max-h-7")}
+                          />
+                        ) : (
+                          <span className="text-body-sm font-bold tracking-tight text-foreground dark:text-brand-950">{item.name}</span>
+                        )}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="bp-reveal grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid size-12 place-items-center rounded-xl border border-border bg-background dark:bg-logo">
-                <Image src={withBasePath(p.logo)} alt="" width={40} height={24} className="h-6 w-10 object-contain" />
+                {tile.logo ? (
+                  <Image src={withBasePath(tile.logo)} alt="" width={40} height={24} className="h-6 w-10 object-contain" />
+                ) : (
+                  <span className="text-xs font-bold text-foreground dark:text-brand-950">{tile.name.slice(0, 2)}</span>
+                )}
               </span>
               <div>
-                <h3 className="text-lg leading-tight font-bold text-foreground">{p.name}</h3>
+                <h3 className="text-lg leading-tight font-bold text-foreground">{tile.name}</h3>
                 <p className="text-sm text-muted-foreground">{tagline}</p>
               </div>
             </div>
-            <p className="text-[14.5px] leading-relaxed text-muted-foreground">{info.description}</p>
+            <p className="text-body leading-relaxed text-muted-foreground">{info.description}</p>
+            {p.id === "est" && (
+              <p className="mt-3 text-caption text-muted-foreground">
+                {t.estBanks}: <span className="font-medium text-foreground">{estBanks.map((b) => b.name).join(", ")}</span>
+              </p>
+            )}
 
-            <p className="mt-6 mb-3 text-[13px] font-medium text-muted-foreground">{t.capabilities}</p>
+            <p className="mt-6 mb-3 text-caption font-medium text-muted-foreground">{t.capabilities}</p>
             <ul className="grid gap-2.5">
               {info.features.map((feature) => (
                 <li key={feature} className="flex items-center gap-2.5 text-sm text-foreground">
@@ -86,10 +129,10 @@ export default function Integrations({
           </div>
 
           <CompareSlider
-            key={p.id}
+            key={tile.key}
             before={p.before}
-            after={p.after}
-            labels={{ without: `${compare.without} · ${p.name} API`, with: compare.with, drag: t.drag }}
+            after={after}
+            labels={{ without: `${compare.without} · ${p.id === "est" ? "EST" : tile.name} API`, with: compare.with, drag: t.drag }}
             copy={code}
           />
         </div>
