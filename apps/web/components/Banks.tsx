@@ -49,6 +49,7 @@ const banks: RouteItem[] = [
 
 const institutions: RouteItem[] = [
   { name: "Sipay", logo: "/brand/institutions/sipay.svg", w: 140, h: 68, live: true },
+  { name: "QNBpay", since: "0.12.0" },
   { name: "Tosla", since: "0.12.0" },
   { name: "Moka United", logo: "/brand/institutions/moka-united.svg", w: 196, h: 80, tall: true, issue: 40 },
   { name: "Papara", logo: "/brand/institutions/papara.png", w: 1280, h: 354, issue: 40 },
@@ -62,7 +63,7 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
   const beta = isBeta(item);
   const body = (
     <>
-      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_rgb(19_19_43/0.04)] dark:bg-logo transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]">
+      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_var(--bp-shadow-xs)] dark:bg-logo transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]">
         {item.logo ? (
           <Image
             src={withBasePath(item.logo)}
@@ -76,12 +77,12 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
             )}
           />
         ) : (
-          <span className="text-[15px] font-bold tracking-tight text-muted-foreground">{item.name}</span>
+          <span className="text-body font-bold tracking-tight text-muted-foreground">{item.name}</span>
         )}
       </span>
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-semibold",
+          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-label font-semibold",
           live ? "bg-success-soft text-success" : beta ? "bg-tint text-accent-text" : "bg-muted text-muted-foreground",
         )}
       >
@@ -144,7 +145,7 @@ function RouteTrack({ groups, t }: { groups: { title: string; items: RouteItem[]
               style={{ left: x[i], top: MID - 32 }}
             >
               {"label" in stop ? (
-                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-[12px] font-semibold tracking-wide text-accent-text uppercase" style={{ width: LABEL_W }}>
+                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-meta font-semibold tracking-wide text-accent-text uppercase" style={{ width: LABEL_W }}>
                   {stop.label}
                 </h4>
               ) : (
@@ -162,7 +163,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
   const highlights = t.highlights.map((h, i) => ({ ...h, icon: highlightIcons[i] }));
   return (
     <section id="banks" className="scroll-mt-20 overflow-x-clip px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} />
 
         <div className="bp-reveal grid gap-3">
@@ -174,7 +175,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
               <div className="min-w-0">
                 <h3 className="flex items-center gap-2 text-lg leading-tight font-bold text-foreground">
                   Akbank
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-label font-semibold text-success">
                     <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
                     {t.live}
                   </span>
@@ -183,7 +184,7 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
               </div>
             </div>
             <div>
-              <p className="text-[14.5px] leading-relaxed text-muted-foreground">{t.akbankDescription}</p>
+              <p className="text-body leading-relaxed text-muted-foreground">{t.akbankDescription}</p>
               <Link
                 href={localePath(lang, "/docs/banks/akbank")}
                 className="group mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent-text"
@@ -201,8 +202,8 @@ export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"
                   <h.icon className="size-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[14.5px] font-semibold text-foreground">{h.label}</span>
-                  <span className="mt-1 block text-[13.5px] leading-snug text-muted-foreground">{h.desc}</span>
+                  <span className="block text-body font-semibold text-foreground">{h.label}</span>
+                  <span className="mt-1 block text-body-sm leading-snug text-muted-foreground">{h.desc}</span>
                 </span>
               </li>
             ))}

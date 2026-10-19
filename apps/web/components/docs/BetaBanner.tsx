@@ -16,7 +16,8 @@ export function BetaBanner({ lang }: { lang: Locale }) {
   const t = LABELS[lang];
 
   return (
-    <Banner className="gap-2 bg-tint text-accent-text">
+    // Scrolls away with the page: the site navbar is the sticky bar above the docs
+    <Banner changeLayout={false} className="relative gap-2 bg-tint text-accent-text">
       <span className="font-semibold">{t.title}</span>
       <a href={pathname} className="underline underline-offset-4">
         {t.link}

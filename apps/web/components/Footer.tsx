@@ -14,6 +14,7 @@ function footerLinks(t: Dictionary["footer"]) {
         { label: t.links.providers, href: "/#providers" },
         { label: t.links.quickStart, href: "/#quickstart" },
         { label: t.links.docs, href: "/docs" },
+        { label: t.links.blog, href: "/blog" },
       ],
     },
     {
@@ -51,7 +52,7 @@ function footerLinks(t: Dictionary["footer"]) {
 export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["footer"] }) {
   return (
     <footer className="border-t border-border bg-card/30">
-      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
+      <div className="max-w-[84rem] mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-10">
           {/* Brand */}
           <div className="col-span-2 sm:col-span-2">
@@ -100,7 +101,7 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
           {/* Link columns */}
           {footerLinks(t).map(({ group, items }) => (
             <div key={group} className="col-span-1">
-              <h4 className="text-[13px] font-semibold text-foreground mb-4">
+              <h4 className="text-caption font-semibold text-foreground mb-4">
                 {group}
               </h4>
               <ul className="space-y-2.5">

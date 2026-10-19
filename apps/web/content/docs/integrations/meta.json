@@ -1,7 +1,6 @@
 {
   "title": "Integrations",
   "icon": "integrations",
-  "defaultOpen": true,
   "pages": [
     "nextjs",
     "frameworks",

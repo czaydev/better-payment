@@ -27,6 +27,7 @@ tests/
 │   ├── akbank.sandbox.test.ts
 │   ├── iyzico.sandbox.test.ts
 │   ├── parampos.sandbox.test.ts
+│   ├── qnbpay.sandbox.test.ts
 │   ├── paytr.sandbox.test.ts
 │   ├── sipay.sandbox.test.ts
 │   ├── tosla.sandbox.test.ts

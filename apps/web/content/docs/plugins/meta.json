@@ -1,7 +1,6 @@
 {
   "title": "Plugins",
   "icon": "plugins",
-  "defaultOpen": true,
   "pages": [
     "localized-errors",
     "chaos",
