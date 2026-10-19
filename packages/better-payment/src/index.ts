@@ -169,6 +169,12 @@ export type {
 } from './providers/albaraka/types';
 export { Sipay, sipay, qnbpay } from './providers/sipay';
 export type { SipayConfig, Sipay3DCallbackData, SipayBrand } from './providers/sipay/types';
+export { Tosla, tosla, toslaOrderStatus } from './providers/tosla';
+export type {
+  ToslaConfig,
+  Tosla3DCallbackData,
+  ToslaCompleteContext,
+} from './providers/tosla/types';
 export { Est, est } from './providers/est';
 export type {
   EstConfig,
