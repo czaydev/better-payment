@@ -34,7 +34,13 @@ export default async function Page({ params }: PageProps<"/[lang]/docs/[[...slug
   const inStable = !page.data.since || releaseStatus(page.data.since) === "stable";
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage
+      id="main-content"
+      tabIndex={-1}
+      className="scroll-mt-20 focus:outline-none"
+      toc={page.data.toc}
+      full={page.data.full}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       {page.data.since && <Since version={page.data.since} lang={lang} />}
       <DocsDescription>{page.data.description}</DocsDescription>

@@ -57,7 +57,7 @@ export default function Code({
           {copy && <CopyButton text={code} labels={copy} />}
         </div>
       )}
-      <pre className="p-5 font-mono text-[13px] leading-[1.75] overflow-x-auto text-foreground">
+      <pre className="p-5 font-mono text-caption leading-code overflow-x-auto text-foreground">
         {shell ? (
           <code>
             <span className="text-muted-foreground select-none">$ </span>

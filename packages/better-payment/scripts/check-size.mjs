@@ -9,10 +9,10 @@ const budgets = [
   // 0.8.1 security fixes (Akbank order check, body limits, response filtering),
   // 31 kB since the Kuveyt Türk provider, 34 kB since the EST provider, 38 kB since
   // the Sipay provider, 40 kB since QNB, 42 kB with Yapı Kredi, 44 kB with VakıfBank,
-  // 46 kB with Albaraka Türk, 48 kB with Denizbank, 51 kB with Moka United alongside the
+  // 46 kB with Albaraka Türk, 48 kB with Denizbank, 49 kB with QNBpay, 52 kB with Moka United alongside the
   // other providers
-  { file: 'dist/index.mjs', maxGzipKb: 51 },
-  { file: 'dist/index.js', maxGzipKb: 51 },
+  { file: 'dist/index.mjs', maxGzipKb: 52 },
+  { file: 'dist/index.js', maxGzipKb: 52 },
   { file: 'dist/client/index.mjs', maxGzipKb: 2 },
   { file: 'dist/client/index.js', maxGzipKb: 2 },
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },

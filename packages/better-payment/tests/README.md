@@ -28,6 +28,7 @@ tests/
 │   ├── iyzico.sandbox.test.ts
 │   ├── mokaunited.sandbox.test.ts
 │   ├── parampos.sandbox.test.ts
+│   ├── qnbpay.sandbox.test.ts
 │   ├── paytr.sandbox.test.ts
 │   ├── sipay.sandbox.test.ts
 │   └── setup.ts               # Ortam değişkenleri, test verisi ve kayıt yardımcıları

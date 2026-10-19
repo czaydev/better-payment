@@ -6,6 +6,23 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.12.0-beta.0
+
+### Added
+
+- Add the Albaraka Türk provider (e-POS, Posnet JSON API): non-3D sale, 3D Secure completed with the 3D data and the order values from your records, refund, cancel, order inquiry and pre-authorization. Generate bank-compatible order ids when conversationId is omitted.
+- Add the Denizbank provider (InterVPos): non-3D sale, 3D Secure (3D Model) verified from HASHPARAMS and charged with the 3D Secure data, refund and cancel
+- EST: Girogate alternative payment methods (iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly and more) with `initThreeDSPayment({ girogate: { method, country } })` on the 3d_pay store types. A `Pending` callback returns `pending` with the order id. The EST currency list gains the methods' currencies (PLN, SEK, CHF, ...)
+- Add two banks to the EST provider: `est({ bank: 'akbankest' })` for Akbank's older virtual POS (sanalakpos.com) and `est({ bank: 'halkbankmkd' })` for Halkbank Macedonia, with Macedonian denars (`MKD`, sent as `807`)
+- PayTR: `threeDSMode: 'direct'` runs 3D Secure payments with a new card through the Direct API (your own card form, posted from the customer's browser) instead of the iFrame
+- Add the QNB provider (PayFor): non-3D sale, 3D Secure (3D Model and 3D Pay) verified with the ResponseHash and confirmed with the bank, refund, cancel and order inquiry
+- Add the VakıfBank provider (VPOS 7/24): non-3D sale, 3D Secure through the MPI and VakıfBank's 3DS product, refund and cancel (no payment status query: VakıfBank's record search cannot see cancels and refunds)
+- Add the Yapı Kredi provider (Posnet XML): non-3D sale, 3D Secure through Posnet OOS (resolved and charged with a MAC over your order, the bank's answer MACs checked), refund, cancel and order inquiry (agreement). Generate bank-compatible order ids when conversationId is omitted.
+
+### Fixed
+
+- Serialize PayTR Direct API baskets as JSON for new-card and stored-card payments, including 3D Secure forms. Keep iFrame baskets Base64-encoded and preserve their token signatures.
+
 ## 0.11.1
 
 ### Fixed

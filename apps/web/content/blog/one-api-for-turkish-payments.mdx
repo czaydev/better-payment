@@ -1,0 +1,62 @@
+---
+title: "One API for iyzico, PayTR and Parampos in Node.js"
+description: "How to take 3D Secure payments with iyzico, PayTR and Parampos through one typed Node.js interface, instead of three separate integrations."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, iyzico, PayTR, Parampos]
+---
+
+If you sell in Turkey, you rarely end up with a single payment provider. A second gateway is added for better rates, a bank virtual POS for a large customer, or a fallback for the day one of them has an outage. Each addition usually means a new integration.
+
+The integrations differ in more than the endpoint. Request shapes, signature schemes, error formats and callback rules are all different, and every difference is one more place for a bug to hide in code that moves money.
+
+## What changes with one API
+
+[Better Payment](/docs) puts the providers behind one typed interface. You create the payment object once and list the providers you use:
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: 'sandbox', // sandbox URLs and provider test modes; default is 'production'
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+});
+```
+
+The request is the same for every provider, so switching is a matter of naming the one you want:
+
+```typescript
+await payment.createPayment(request);                 // default provider
+await payment.paytr.initThreeDSPayment(paytrRequest); // specific provider
+await payment.use('paytr').getPayment('ORDER123');
+```
+
+## One result shape
+
+Whatever the provider says, you get the same result with the same `status`:
+
+| status | meaning |
+|--------|---------|
+| `success` | Confirmed by the provider |
+| `failure` | Rejected; see `errorCode` / `errorMessage` |
+| `pending` | Waiting for the customer, or the outcome is unknown |
+| `cancelled` | Voided or fully refunded (status queries) |
+
+Failures also carry a `code` from a provider-independent list, so "insufficient funds" is the same `INSUFFICIENT_FUNDS` for iyzico, PayTR and the banks. You branch on that instead of learning each provider's raw codes. See the [error codes](/docs/reference/error-codes).
+
+## What stays provider-specific
+
+One API does not hide that providers are different, it stops that difference from leaking into your whole codebase. Provider-specific rules still apply, and they are documented per provider. For example, PayTR order ids accept letters and digits only. Read the page of the provider you use: [iyzico](/docs/providers/iyzico), [PayTR](/docs/providers/paytr), [Parampos](/docs/providers/parampos) and [Sipay](/docs/providers/sipay).
+
+## Where to go next
+
+- Take your first payment in the [quick start](/docs/quick-start).
+- Browse the [providers and bank virtual POS](/docs/providers/iyzico) supported today.
+- Mount the [HTTP handler](/docs/concepts/handler) so callbacks are verified for you.
