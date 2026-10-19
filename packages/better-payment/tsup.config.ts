@@ -12,6 +12,7 @@ export default defineConfig({
     'fastify/index': 'src/adapters/fastify.ts',
     'elysia/index': 'src/adapters/elysia.ts',
     'react-router/index': 'src/adapters/react-router.ts',
+    'nuxt/index': 'src/adapters/nuxt.ts',
   },
   format: ['cjs', 'esm'],
   dts: {
@@ -22,7 +23,7 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   // better-payment/testing and /plugins import classes from the main entry at runtime
-  external: ['better-payment'],
+  external: ['better-payment', 'h3'],
   // Smaller published bundles; sourcemaps keep stack traces readable.
   minify: true,
   // Keep class and function names: error names, instanceof checks in user code

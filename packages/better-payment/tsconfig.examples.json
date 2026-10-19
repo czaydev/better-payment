@@ -43,6 +43,9 @@
       ],
       "better-payment/react-router": [
         "src/adapters/react-router.ts"
+      ],
+      "better-payment/nuxt": [
+        "src/adapters/nuxt.ts"
       ]
     },
     "noUnusedLocals": false,
