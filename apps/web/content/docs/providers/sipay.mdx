@@ -126,3 +126,33 @@ account; send the chosen total as `paidPrice` and the count as `installment`.
 Set `saleWebhookKey` to have Sipay notify the sale webhook that you defined for
 that key in the merchant panel. Webhooks are not verified by this provider yet:
 confirm a webhook with `getPayment()` before acting on it.
+
+## QNBpay
+
+<Since version="0.12.0" />
+
+QNBpay runs the same `ccpayment` API as Sipay on its own hosts, so the Sipay provider covers it with
+`brand: 'qnbpay'`, or `qnbpay()` for short:
+
+```typescript
+import { betterPayment, qnbpay } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    qnbpay: qnbpay({
+      appId: process.env.QNBPAY_APP_ID!,
+      appSecret: process.env.QNBPAY_APP_SECRET!,
+      merchantKey: process.env.QNBPAY_MERCHANT_KEY!,
+      // baseUrl: defaults from mode (test.qnbpay.com.tr / portal.qnbpay.com.tr)
+    }),
+  },
+});
+// same as sipay({ ...config, brand: 'qnbpay' })
+```
+
+Everything on this page applies: tokens, `hash_key`, 3D Secure, refunds, pre-authorization and
+`getpos`. Errors name QNBpay, and the provider id is `qnbpay` (`client.qnbpay`).
+
+<Callout type="warn">
+  QNBpay has not been verified with a test merchant yet: QNBpay gives test merchants on request. Its test host (`test.qnbpay.com.tr`) answers the token request in the same format as Sipay (`status_code` 30 for made-up credentials). Test with a small amount before going live.
+</Callout>

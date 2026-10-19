@@ -425,6 +425,7 @@ IYZICO_SANDBOX_API_KEY=... IYZICO_SANDBOX_SECRET_KEY=... pnpm test:sandbox
 | Albaraka  | `ALBARAKA_SANDBOX_MERCHANT_ID`, `ALBARAKA_SANDBOX_TERMINAL_ID`, `ALBARAKA_SANDBOX_POSNET_ID`, `ALBARAKA_SANDBOX_ENC_KEY` | `ALBARAKA_SANDBOX_CARD_*` (zorunlu: testler kartsız çalışmaz) |
 | Stripe    | `STRIPE_SANDBOX_SECRET_KEY` (`sk_test_`), `STRIPE_SANDBOX_PUBLISHABLE_KEY` (`pk_test_`): herhangi bir Stripe hesabının test modu | — (Stripe'ın test PaymentMethod'ları kullanılır) |
 | Sipay     | `SIPAY_SANDBOX_APP_ID`, `SIPAY_SANDBOX_APP_SECRET`, `SIPAY_SANDBOX_MERCHANT_KEY` (Sipay dokümanındaki ortak test üye işyeri kullanılabilir) | `SIPAY_SANDBOX_CARD_*` (varsayılan: Sipay test kartı `4508034508034509`) |
+| QNBpay    | `QNBPAY_SANDBOX_APP_ID`, `QNBPAY_SANDBOX_APP_SECRET`, `QNBPAY_SANDBOX_MERCHANT_KEY` (test üye işyeri talep üzerine verilir) | `QNBPAY_SANDBOX_CARD_*` |
 | EST       | `EST_SANDBOX_CLIENT_ID`, `EST_SANDBOX_USERNAME`, `EST_SANDBOX_PASSWORD`, `EST_SANDBOX_STORE_KEY` | `EST_SANDBOX_BANK` (varsayılan `isbank`), `EST_SANDBOX_CARD_*` |
 
 Kart değişkenleri: `<PREFIX>_CARD_NUMBER`, `<PREFIX>_CARD_EXPIRE_MONTH`,

@@ -30,6 +30,7 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 | Akbank   | ✅ | ✅ 3D_PAY | ✅ | ✅ | ✅ | — | — |
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
+| QNBpay ⁵ | ✅ | ✅ paySmart3D | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
 | Denizbank | ✅ | ✅ 3D Model | ✅ | ✅ | — | — | — |
@@ -37,13 +38,14 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 | VakıfBank | ✅ | ✅ MPI + VPOS (3DS) | ✅ | ✅ | — | — | — |
 | Yapı Kredi | ✅ | ✅ Posnet OOS | ✅ | ✅ | — | — | — |
 | QNB | ✅ | ✅ 3D Model / 3D Pay | ✅ | ✅ | ✅ | — | — |
-| Stripe ⁵ | ✅ | ✅ Stripe.js | ✅ | ✅ | ✅ | — | — |
+| Stripe ⁶ | ✅ | ✅ Stripe.js | ✅ | ✅ | ✅ | — | — |
 
 ¹ PayTR hesabınızın 3D'siz ödemeler için onaylanmış olması gerekir.
 ² PayTR'de iptal (void) uç noktası yoktur; bu yüzden `cancel()` tam iade yapar.
 ³ Kuveyt Türk'te iptal aynı gün, gün sonundan önce yapılır; sonrasında `refund()` kullanın.
 ⁴ Sipay'de iptal (void) uç noktası yoktur: `cancel()` ödemenin kalanını iade eder, Sipay bunu aynı gün içinde iptal olarak işler. 3D'siz ödeme için hesabınızın Sipay tarafından onaylanması da gerekir.
-⁵ Stripe hesabı olan işletmeler için. Kart Stripe.js ile alınır ve sunucunuza hiç gelmez; 3D Secure sizin sayfanızda açılır. `cancel()` tahsil edilmiş bir ödemeyi tamamen iade eder.
+⁵ QNBpay, Sipay'in altyapısında çalışır (`qnbpay()`); bu yüzden Sipay notları geçerlidir. Henüz bir test üye işyeriyle doğrulanmadı.
+⁶ Stripe hesabı olan işletmeler için. Kart Stripe.js ile alınır ve sunucunuza hiç gelmez; 3D Secure sizin sayfanızda açılır. `cancel()` tahsil edilmiş bir ödemeyi tamamen iade eder.
 
 ## Kısa örnek [#quick-example]
 

@@ -103,3 +103,31 @@ const options = await payment.sipay.installmentInfo({ binNumber: '540667', price
 ## Webhook'lar [#webhooks]
 
 `saleWebhookKey` verirseniz Sipay, panelde bu anahtar için tanımladığınız satış webhook'una bildirim gönderir. Webhook'lar bu sağlayıcı tarafından henüz doğrulanmıyor: bir webhook'a göre işlem yapmadan önce `getPayment()` ile ödemeyi kontrol edin.
+
+## QNBpay [#qnbpay]
+
+<Since version="0.12.0" />
+
+QNBpay, Sipay ile aynı `ccpayment` API'sini kendi adreslerinde çalıştırır; bu yüzden Sipay sağlayıcısı onu `brand: 'qnbpay'` ile ya da kısaca `qnbpay()` ile kapsar:
+
+```typescript
+import { betterPayment, qnbpay } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    qnbpay: qnbpay({
+      appId: process.env.QNBPAY_APP_ID!,
+      appSecret: process.env.QNBPAY_APP_SECRET!,
+      merchantKey: process.env.QNBPAY_MERCHANT_KEY!,
+      // baseUrl: defaults from mode (test.qnbpay.com.tr / portal.qnbpay.com.tr)
+    }),
+  },
+});
+// same as sipay({ ...config, brand: 'qnbpay' })
+```
+
+Bu sayfadaki her şey geçerlidir: token, `hash_key`, 3D Secure, iade, ön provizyon ve `getpos`. Hata mesajlarında QNBpay adı geçer; sağlayıcı kimliği `qnbpay`'dir (`client.qnbpay`).
+
+<Callout type="warn">
+  QNBpay henüz bir test üye işyeriyle doğrulanmadı: QNBpay test üye işyerini talep üzerine verir. Test adresi (`test.qnbpay.com.tr`), token isteğine Sipay ile aynı biçimde cevap verir (uydurma bilgiler için `status_code` 30). Canlıya geçmeden önce küçük bir tutarla deneyin.
+</Callout>

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../../src/core/http';
 import { PaymentErrorCode } from '../../../../src/core/error-codes';
 import { betterPayment } from '../../../../src';
-import { Sipay, sipay } from '../../../../src/providers/sipay';
+import { Sipay, sipay, qnbpay } from '../../../../src/providers/sipay';
+import { ProviderType, PROVIDER_DEFAULT_URLS } from '../../../../src';
 import { createSipayHashKey, decryptSipayHashKey } from '../../../../src/providers/sipay/utils';
 import { PaymentStatus } from '../../../../src/types';
 import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../../fixtures/payment-data';
@@ -76,6 +77,68 @@ describe('Sipay provider', () => {
     const live = betterPayment({ mode: 'production', providers: { sipay: sipay(SIPAY_TEST) } });
     expect((sandbox.use('sipay') as any).config.baseUrl).toBe('https://provisioning.sipay.com.tr');
     expect((live.use('sipay') as any).config.baseUrl).toBe('https://app.sipay.com.tr');
+  });
+
+  describe('brands (QNBpay)', () => {
+    it("qnbpay() uses QNBpay's hosts and provider id", () => {
+      const sandbox = betterPayment({ mode: 'sandbox', providers: { qnbpay: qnbpay(SIPAY_TEST) } });
+      const live = betterPayment({ mode: 'production', providers: { qnbpay: qnbpay(SIPAY_TEST) } });
+      expect((sandbox.use('qnbpay') as any).config.baseUrl).toBe('https://test.qnbpay.com.tr');
+      expect((live.use('qnbpay') as any).config.baseUrl).toBe('https://portal.qnbpay.com.tr');
+      expect(ProviderType.QNBPAY).toBe('qnbpay');
+      expect(PROVIDER_DEFAULT_URLS[ProviderType.QNBPAY].sandbox).toBe('https://test.qnbpay.com.tr');
+    });
+
+    it("sipay({ brand: 'qnbpay' }) is the same", () => {
+      const bp = betterPayment({
+        mode: 'sandbox',
+        providers: { pos: sipay({ ...SIPAY_TEST, brand: 'qnbpay' }) },
+      });
+      expect((bp.use('pos') as any).config.baseUrl).toBe('https://test.qnbpay.com.tr');
+    });
+
+    it('rejects an unknown brand', () => {
+      expect(
+        () => new Sipay({ ...SIPAY_TEST, baseUrl: SIPAY_BASE_URL, brand: 'nope' as any })
+      ).toThrow(/Unknown Sipay brand/);
+    });
+
+    it('names the brand in its errors', async () => {
+      const brand = new Sipay({
+        ...SIPAY_TEST,
+        baseUrl: 'https://test.qnbpay.com.tr',
+        brand: 'qnbpay',
+      });
+      (brand as any).client.post = vi.fn(async () => ({
+        data: { status_code: 30, status_description: 'Invalid credentials.' },
+        status: 200,
+      }));
+      const result = await brand.getPayment('ORDER1');
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.errorCode).toBe('30');
+      expect(result.errorMessage).toMatch(/^QNBpay did not issue a token/);
+    });
+
+    it("runs the same flows on QNBpay's host", async () => {
+      const brand = new Sipay({
+        ...SIPAY_TEST,
+        baseUrl: 'https://test.qnbpay.com.tr',
+        brand: 'qnbpay',
+      });
+      (brand as any).client.post = post;
+      const hashKey = await createSipayHashKey(
+        ['1', '1.20', 'INVQ1', 'ORDQ1', 'TRY'],
+        SIPAY_TEST.appSecret
+      );
+      const result = await brand.completeThreeDSPayment({
+        invoice_id: 'INVQ1',
+        order_id: 'ORDQ1',
+        payment_status: '1',
+        hash_key: hashKey,
+      } as any);
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+      expect(result.paymentId).toBe('INVQ1');
+    });
   });
 
   describe('token', () => {

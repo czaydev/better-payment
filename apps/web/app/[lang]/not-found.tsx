@@ -63,7 +63,11 @@ export default function NotFound() {
           <ThemeToggle label={dictionary.nav.theme} />
         </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex flex-1 scroll-mt-20 flex-col items-center justify-center py-16 text-center focus:outline-none"
+        >
           <div aria-hidden="true" className="select-none font-display text-[clamp(7rem,24vw,15rem)] leading-none font-semibold tracking-[-0.08em] text-primary">
             404
           </div>
