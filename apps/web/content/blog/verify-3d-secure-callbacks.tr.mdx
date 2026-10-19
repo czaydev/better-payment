@@ -1,0 +1,67 @@
+---
+title: "3D Secure callback'lerini doğrulamak ve başarılı bir POST'a neden güvenmemelisiniz"
+description: "3D Secure sonrası banka sonucu sunucunuzdaki herkese açık bir URL'ye POST eder. Bu isteğin neden kendi bilgilerinizle doğrulanması gerektiğini ve Better Payment'in bunu nasıl yaptığını öğrenin."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, 3D Secure, Güvenlik]
+---
+
+Müşteri 3D Secure'u tamamladıktan sonra banka sonucu sunucunuza, `callbackUrl` adresinize bir POST ile geri gönderir. Kodunuz bunu okur ve siparişi ödendi olarak işaretler.
+
+Bu cümlede gizli bir sorun var: **`callbackUrl` herkese açık bir URL'dir.** Adresi bilen herkes "başarılı" diyen bir POST gönderebilir.
+
+## Sahte bir callback bedava sipariştir
+
+Sunucunuz callback'e gelen her şeye inanıyorsa saldırganın karta ihtiyacı yoktur. Ödeme sayfanızın kaynağında duran URL'ye ve doğru görünen bir istek gövdesine ihtiyacı vardır. Sipariş ödendi olarak işaretlenir ve ürün gönderilir.
+
+Çözüm URL'yi gizlemek değildir. Çözüm, **her callback'i yalnızca sizin ve sağlayıcının bildiği bir şeye karşı doğrulamaktır**: kimlik bilgileriniz.
+
+## Better Payment bunu nasıl ele alır?
+
+Callback gövdesini geldiği gibi iletin:
+
+```typescript
+const result = await payment.completeThreeDSPayment(callbackBody);
+
+if (result.status === 'success') {
+  // siparişi ödendi olarak işaretle
+}
+```
+
+Kütüphane callback'i kimlik bilgilerinizle doğrular ve sağlayıcı gerektiriyorsa ödemeyi sağlayıcıyla sonlandırır. Sahte veya başarısız bir callback her zaman `failure` döner.
+
+Pratikte önemli birkaç ayrıntı:
+
+- **Gövdeyi olduğu gibi iletin.** Ayrıştırıp yeniden serileştirmek imzalanan veriyi değiştirebilir. POST gövdesini aynen verin.
+- **`INVALID_HASH` sahte demektir.** Bir imza doğrulanamadığında sonuç bu kodu taşır. Bunu saldırı olarak değerlendirin, loglayın ve siparişi incelemeye işaretleyin.
+- **Ayrıntıları müşteriye göstermeyin.** `INVALID_HASH` ve `FRAUD_SUSPECTED` ayrıntıları müşteriye değil saldırgana yarar. Genel bir mesaj gösterin.
+
+## Bunu handler'a bırakın
+
+Route'u kendiniz yazmak zorunda değilsiniz. [HTTP handler](/docs/concepts/handler) callback route'larını sizin için bağlar ve varsayılan olarak güvenlidir: yalnızca callback'leri ve kart sorgularını açar. İade, iptal ve sorgular bir `authorize` hook'u gerektirir; yani yanlışlıkla internete açık kalmazlar.
+
+Next.js için [Next.js rehberine](/docs/integrations/nextjs) bakın.
+
+## Yalnızca doğrulanmış sonuçlara tepki verin
+
+Her sonucu elle kontrol etmek yerine [ödeme olaylarını](/docs/concepts/events) dinleyin. Bunlar her sağlayıcı ve akış için, sağlayıcı sonucu doğruladıktan sonra yayınlanır:
+
+```typescript
+payment.on('payment.succeeded', async (event) => {
+  await orders.markPaid(event.conversationId, event.paymentId);
+});
+
+payment.on('payment.failed', async (event) => {
+  await orders.markFailed(event.conversationId, event.code);
+});
+```
+
+Böylece sipariş mantığınız URL'nize ne ulaştıysa ona değil, doğrulanmış sonuçlara göre çalışır.
+
+## Kısa bir kontrol listesi
+
+1. Callback'inize bir istek ulaştı diye siparişi asla ödendi işaretlemeyin.
+2. Kimlik bilgilerinizle doğrulayın; sağlayıcı gerektiriyorsa onunla sonlandırın.
+3. Callback gövdesini olduğu gibi iletin.
+4. `INVALID_HASH` değerini sahte olarak ele alın.
+5. Tutarları tarayıcıdan değil, kendi sipariş verinizden sunucuda oluşturun.

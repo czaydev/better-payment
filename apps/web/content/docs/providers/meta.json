@@ -1,7 +1,6 @@
 {
   "title": "Providers",
   "icon": "providers",
-  "defaultOpen": true,
   "pages": [
     "iyzico",
     "paytr",

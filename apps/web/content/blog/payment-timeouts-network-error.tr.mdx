@@ -1,0 +1,53 @@
+---
+title: "Ödeme zaman aşımları: bir tahsilatı asla körlemesine yeniden denemeyin"
+description: "Zaman aşımına uğrayan bir ödeme isteğinin sonucu bilinmez. Yeniden denemenin müşteriden neden iki kez tahsilat yapabileceğini ve Better Payment'in bunu nasıl bildirdiğini öğrenin."
+date: 2026-10-19
+authors: [czaydev]
+tags: [Node.js, Güvenilirlik, Hata yönetimi]
+---
+
+Bir ödeme isteği gönderirsiniz. Sağlayıcı kartı çeker, ardından cevap size ulaşmadan bağlantınız kopar. Kodunuz bir zaman aşımı görür.
+
+Ödemeye ne oldu? **Bilmiyorsunuz.** Tahsilat gerçekleşmiş olabilir, olmamış da olabilir. Zaman aşımını başarısızlık sayıp müşterinin tekrar denemesine izin vermek, insanların iki kez tahsil edilmesinin yoludur.
+
+## Zaman aşımı bir ret değildir
+
+Ret bir cevaptır: sağlayıcı size hayır dedi. Zaman aşımı ise cevabın yokluğudur. İkisi farklı ele alınmalıdır:
+
+- **Ret** durumunda başka bir kartla yeniden denemek güvenlidir.
+- **Zaman aşımı** durumunda önce kontrol etmek gerekir.
+
+Birçok entegrasyon ikisini de "hata" olarak eşler ve müşteriye aynı mesajı gösterir. Hata tam olarak budur.
+
+## Better Payment ne döndürür?
+
+Sağlayıcı cevap vermediğinde sonuç bir başarısızlık değildir. Sağlayıcıdan bağımsız `NETWORK_ERROR` koduyla `pending` döner:
+
+```typescript
+import { PaymentErrorCode } from 'better-payment';
+
+const result = await payment.createPayment(request);
+
+if (result.status === 'pending' && result.code === PaymentErrorCode.NETWORK_ERROR) {
+  // Tahsilat gerçekleşmiş olabilir. Müşterinin tekrar ödeme yapmasına izin vermeyin.
+  await orders.markNeedsCheck(request.conversationId);
+}
+```
+
+Bu kod için önerilen müşteri mesajı "Ödemeniz kontrol ediliyor. Lütfen tekrar ödeme yapmayın." şeklindedir. [localizedErrors eklentisi](/docs/plugins/localized-errors) bu mesajı müşterinin dilinde `errorMessage` alanına yazar.
+
+## Asla otomatik yeniden denenmez
+
+Ödeme, iade ve iptal istekleri **asla otomatik olarak yeniden denenmez**. Zaman aşımından sonra tahsilatı sessizce yeniden deneyen bir kütüphane, çifte çekim yapan bir kütüphanedir. Better Payment kararı, kontrol ettikten sonra size bırakır.
+
+Müşterinin tekrar denemesine izin vermeden önce ödemeyi `getPayment()` ile kontrol edin. Sağlayıcıda ödeme varsa siparişi ona göre işaretleyin. Yoksa yeni bir deneme güvenlidir. [Hızlı başlangıç](/docs/quick-start) sayfası sonuç durumlarını ve aynı uyarıyı listeler.
+
+## Kısa bir kontrol listesi
+
+1. Genel bir "hata" yerine `status` ve `code` üzerinden dallanın.
+2. `NETWORK_ERROR` ile `pending` sonucunu "bilinmiyor" olarak ele alın, asla "başarısız" olarak değil.
+3. Her yeniden denemeden önce ödemeyi kontrol edin.
+4. Sipariş başına tek bir `conversationId` kullanın; böylece yeniden deneme ikinci bir siparişe dönüşmez.
+5. Müşteriye tekrar ödeme yapmaması gerektiğini söyleyen bir mesaj gösterin.
+
+Tüm liste ve önerilen mesajlar için [hata kodlarına](/docs/reference/error-codes) bakın.

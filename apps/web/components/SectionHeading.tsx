@@ -17,7 +17,7 @@ export default function SectionHeading({
 }) {
   return (
     <div className={cn("bp-reveal mb-12 max-w-2xl", className)}>
-      <h2 className="text-[2rem] leading-[1.08] font-extrabold tracking-[-0.03em] text-foreground sm:text-[2.5rem]">
+      <h2 className="text-title-lg text-foreground sm:text-title-xl">
         {line1}
         {line2 && (
           <>
@@ -26,7 +26,7 @@ export default function SectionHeading({
           </>
         )}
       </h2>
-      {lead && <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-muted-foreground">{lead}</p>}
+      {lead && <p className="mt-4 max-w-xl text-body-lg leading-relaxed text-muted-foreground">{lead}</p>}
     </div>
   );
 }

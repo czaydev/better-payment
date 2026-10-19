@@ -1,7 +1,6 @@
 {
   "title": "Payments",
   "icon": "payments",
-  "defaultOpen": true,
   "pages": [
     "pre-authorization",
     "stored-cards",

@@ -1,7 +1,6 @@
 {
   "title": "Banks",
   "icon": "banks",
-  "defaultOpen": true,
   "pages": [
     "akbank",
     "kuveytturk",

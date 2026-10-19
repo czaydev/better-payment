@@ -1,7 +1,6 @@
 {
   "title": "Reference",
   "icon": "reference",
-  "defaultOpen": true,
   "pages": [
     "api",
     "types",

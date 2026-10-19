@@ -16,8 +16,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BUMP_SECTIONS, docsSection, readChangesets } from './docs-changelog.mjs';
+import { creditFor } from './credits.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pkgDir = `${root}packages/better-payment/`;
@@ -115,12 +117,24 @@ for (const file of installationPages)
   replaceIn(`${docsDir}${file}`, `// '${before}'`, `// '${next}'`);
 
 // 4. Docs changelog
-const entries = changesets.map((changeset) => {
-  if (changeset.docs) return changeset.docs;
-  console.warn(`${changeset.file}: ${changeset.error}; using its summary on both docs pages`);
-  const { summary } = changeset;
-  return { section: BUMP_SECTIONS[changeset.bump], en: summary, tr: summary };
-});
+// Contributors are thanked here too, unless the entry already thanks someone by hand
+const entries = await Promise.all(
+  changesets.map(async (changeset) => {
+    let entry;
+    if (changeset.docs) entry = changeset.docs;
+    else {
+      console.warn(`${changeset.file}: ${changeset.error}; using its summary on both docs pages`);
+      const { summary } = changeset;
+      entry = { section: BUMP_SECTIONS[changeset.bump], en: summary, tr: summary };
+    }
+    const credit = /thanks|teşekkür/i.test(`${entry.en} ${entry.tr}`)
+      ? null
+      : await creditFor(basename(changeset.file, '.md'));
+    if (!credit) return entry;
+    const link = `[@${credit.login}](https://github.com/${credit.login})`;
+    return { ...entry, en: `${entry.en} Thanks to ${link}.`, tr: `${entry.tr} Teşekkürler ${link}.` };
+  })
+);
 const referenceDir = `${docsDir}reference/`;
 for (const [file, lang] of [
   ['changelog.mdx', 'en'],
