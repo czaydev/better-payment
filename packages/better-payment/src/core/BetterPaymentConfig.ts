@@ -17,6 +17,8 @@ export enum ProviderType {
   KUVEYTTURK = 'kuveytturk',
   SIPAY = 'sipay',
   ALBARAKA = 'albaraka',
+  /** QNBpay, on Sipay's platform: `sipay({ brand: 'qnbpay' })` or `qnbpay()` */
+  QNBPAY = 'qnbpay',
   /** Payten (Paratika) brands, all created with `paratika({ brand })` */
   PARATIKA = 'paratika',
   VAKIFPAY = 'vakifpay',
@@ -152,6 +154,10 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.ALBARAKA]: {
     sandbox: 'https://epostest.albarakaturk.com.tr',
     production: 'https://epos.albarakaturk.com.tr',
+  },
+  [ProviderType.QNBPAY]: {
+    sandbox: 'https://test.qnbpay.com.tr',
+    production: 'https://portal.qnbpay.com.tr',
   },
   [ProviderType.PARATIKA]: {
     sandbox: 'https://entegrasyon.paratika.com.tr/paratika/api/v2',

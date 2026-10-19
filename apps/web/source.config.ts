@@ -1,4 +1,4 @@
-import { defineDocs, defineConfig, frontmatterSchema } from 'fumadocs-mdx/config';
+import { defineDocs, defineCollections, defineConfig, frontmatterSchema } from 'fumadocs-mdx/config';
 import { z } from 'zod';
 
 export const { docs, meta } = defineDocs({
@@ -10,6 +10,20 @@ export const { docs, meta } = defineDocs({
       since: z.string().optional(),
     }),
   },
+});
+
+/** Blog posts: content/blog/<slug>.mdx, with the Turkish version in <slug>.tr.mdx */
+export const blog = defineCollections({
+  type: 'doc',
+  dir: 'content/blog',
+  schema: frontmatterSchema.extend({
+    date: z.coerce.date(),
+    // Set when a post is edited in a meaningful way; shown as "updated" and used for SEO
+    updated: z.coerce.date().optional(),
+    // GitHub logins of the authors, registered in lib/authors.ts
+    authors: z.array(z.string()).default(['czaydev']),
+    tags: z.array(z.string()).default([]),
+  }),
 });
 
 // Minimal hast shapes, enough for the checkmark plugin below

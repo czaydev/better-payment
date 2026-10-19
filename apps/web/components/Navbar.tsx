@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ChevronRight, Menu, X } from "lucide-react";
+import {
+  AlertTriangle, ArrowUpRight, Bell, BookOpen, Box, Building2, Bug, ChevronDown, ChevronRight, Clock, Code2,
+  CreditCard, Download, FlaskConical, Globe, Layers, Lock, Menu, Package, PenLine, Plug, Puzzle, Rocket, Route, Settings,
+  Shield, ShoppingBasket, Sparkles, Wallet, X, type LucideIcon,
+} from "lucide-react";
 import { GitHubIcon } from "@/components/icons";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -15,18 +19,17 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALE_NAMES, localePath, type Locale } from "@/lib/i18n/config";
 import { switchLocale, switchLocalePath } from "@/lib/i18n/switch";
 import { withBasePath } from "@/lib/base-path";
+import { GITHUB_URL, MENU_KEYS, menus, type MenuIcon, type MenuKey } from "@/lib/nav-menu";
 
 // Homepage sections are reached by scrolling, without a #hash in the address bar
 export const SCROLL_TARGET_KEY = "bp-scroll-to";
 
-function navLinks(t: Dictionary["nav"]) {
-  return [
-    { label: t.features, href: "/", section: "features" },
-    { label: t.providers, href: "/", section: "providers" },
-    { label: t.quickStart, href: "/", section: "quickstart" },
-    { label: t.docs, href: "/docs" },
-  ];
-}
+const icons: Record<MenuIcon, LucideIcon | typeof GitHubIcon> = {
+  layers: Layers, shield: Shield, wallet: Wallet, puzzle: Puzzle, rocket: Rocket, download: Download, globe: Globe,
+  book: BookOpen, card: CreditCard, clock: Clock, sparkles: Sparkles, route: Route, alert: AlertTriangle, plug: Plug,
+  github: GitHubIcon, basket: ShoppingBasket, lock: Lock, bell: Bell, flask: FlaskConical, code: Code2,
+  package: Package, settings: Settings, building: Building2, bug: Bug, box: Box, pen: PenLine,
+};
 
 /** Switches the language and stays on the same page */
 function LanguageSwitch({ lang, label }: { lang: Locale; label: string }) {
@@ -58,46 +61,139 @@ export default function Navbar({
   version,
   lang,
   t,
+  position = "fixed",
 }: {
   version: string;
   lang: Locale;
   t: Dictionary["nav"];
+  /** `sticky` keeps the bar in the page flow (docs), `fixed` floats it over the content (homepage) */
+  position?: "fixed" | "sticky";
 }) {
-  const links = navLinks(t);
-  const pathname = usePathname();
-
-  function go(event: React.MouseEvent, section?: string) {
-    setOpen(false);
-    if (!section) return;
-    if (pathname === localePath(lang, "/")) {
-      event.preventDefault();
-      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" });
-    } else {
-      // The homepage scrolls to it after navigation (see ScrollToSection)
-      sessionStorage.setItem(SCROLL_TARGET_KEY, section);
-    }
-  }
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [active, setActive] = useState<MenuKey | null>(null);
+  const [mobileOpen, setMobileOpen] = useState<MenuKey | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const headerRef = useRef<HTMLElement>(null);
+
+  const menu = t.menu;
+  const href = (path: string) => (path.startsWith("http") ? path : localePath(lang, path));
+
+  const show = useCallback((key: MenuKey) => {
+    clearTimeout(closeTimer.current);
+    setActive(key);
+  }, []);
+  const hideSoon = useCallback(() => {
+    clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setActive(null), 140);
+  }, []);
+  const close = useCallback(() => {
+    clearTimeout(closeTimer.current);
+    setActive(null);
+    setOpen(false);
+  }, []);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", handler);
+    handler();
+    window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && close();
+    const onPointer = (event: PointerEvent) => {
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) setActive(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [close]);
+
+  function renderPanel(key: MenuKey) {
+    const def = menus[key];
+    const copy = menu[key];
+    const Icon = icons[def.icon];
+    const groupCopy = copy.groups as Record<string, string>;
+    const itemCopy = copy.items as Record<string, string>;
+    return (
+      <div className="grid grid-cols-[minmax(280px,340px)_1fr]">
+        {/* Intro */}
+        <div className="border-r border-border py-9 pr-10">
+          <Icon className="mb-4 size-8 text-foreground" strokeWidth={1.5} />
+          <p className="text-title-sm text-foreground">{copy.label}</p>
+          <p className="mt-3 text-body leading-relaxed text-muted-foreground">{copy.desc}</p>
+          <Link
+            href={href(def.href)}
+            onClick={close}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "mt-6 border-primary/60 text-primary hover:border-primary hover:bg-tint",
+            )}
+          >
+            {copy.cta}
+          </Link>
+        </div>
+
+        {/* Groups */}
+        <div
+          className="grid content-start gap-x-8 gap-y-9 py-9 pl-12"
+          style={{ gridTemplateColumns: `repeat(${def.groups.length}, minmax(0, 1fr))` }}
+        >
+          {def.groups.map((group) => (
+            <div key={group.id}>
+              <p className="mb-4 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                {groupCopy[group.id]}
+              </p>
+              <ul className="grid gap-1">
+                {group.items.map((item) => {
+                  const ItemIcon = icons[item.icon];
+                  const external = "external" in item && item.external;
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        href={href(item.href)}
+                        {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                        onClick={close}
+                        className="group/item -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 text-body font-medium text-foreground transition-colors hover:text-primary focus-visible:text-primary focus-visible:outline-none"
+                      >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-tint to-secondary text-primary ring-1 ring-inset ring-primary/10 transition-[transform,box-shadow] duration-200 group-hover/item:-translate-y-px group-hover/item:shadow-[0_6px_14px_-6px_var(--bp-glow)]">
+                          <ItemIcon className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{itemCopy[item.id]}</span>
+                        {external && <ArrowUpRight className="size-3.5 text-muted-foreground transition-colors group-hover/item:text-primary" />}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <header
+      ref={headerRef}
+      onMouseLeave={hideSoon}
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-200",
-        scrolled
-          ? "bg-background/85 backdrop-blur-2xl border-b border-border"
-          : "bg-background/60 backdrop-blur-xl border-b border-transparent",
+        position === "fixed" ? "fixed" : "sticky",
+        "top-0 left-0 right-0 z-50 border-b transition-[background-color,border-color] duration-200",
+        active
+          ? "border-border bg-card"
+          : scrolled || open
+            ? "border-border bg-background"
+          : "border-transparent bg-background/60 backdrop-blur-xl",
       )}
     >
-      <nav className="max-w-6xl mx-auto px-5 sm:px-8 flex items-center justify-between h-14">
+      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[84rem] items-center px-5 sm:px-8">
         {/* Logo */}
-        <Link href={localePath(lang, "/")} className="flex items-center gap-2.5 group">
+        <Link href={localePath(lang, "/")} className="group flex items-center gap-2.5 lg:flex-1">
           <Image
             src={withBasePath("/brand/better-payment-horizontal-color.svg")}
             width={1226}
@@ -114,35 +210,49 @@ export default function Navbar({
             priority
             className="hidden h-6 w-auto dark:block"
           />
-          <Badge
-            variant="secondary"
-            className="text-[10px] px-1.5 py-0 hidden xl:flex font-mono tracking-tight"
-          >
+          <Badge variant="secondary" className="hidden px-1.5 py-0 font-mono text-micro tracking-tight min-[1500px]:flex">
             v{version}
           </Badge>
         </Link>
 
-        {/* Desktop nav */}
-        <div className="hidden lg:flex items-center gap-0.5">
-          {links.map((link) => (
+        {/* Desktop nav, centred like the reference */}
+        <div className="hidden items-center justify-center lg:flex">
+          <div className="flex items-center gap-1">
+            {MENU_KEYS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-expanded={active === key}
+                aria-controls="mega-panel"
+                onMouseEnter={() => show(key)}
+                onFocus={() => show(key)}
+                onClick={() => (active === key ? setActive(null) : show(key))}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-body font-medium whitespace-nowrap transition-colors duration-300 outline-none focus-visible:outline-2 focus-visible:outline-primary",
+                  active === key ? "text-primary" : "text-foreground hover:text-primary",
+                )}
+              >
+                {menu[key].label}
+                <ChevronDown className={cn("size-4 transition-transform duration-200", active === key && "rotate-180")} />
+              </button>
+            ))}
             <Link
-              key={link.label}
-              href={localePath(lang, link.href)}
-              onClick={(event) => go(event, link.section)}
-              className="whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60 font-medium"
+              href={localePath(lang, "/docs")}
+              onMouseEnter={hideSoon}
+              className="rounded-lg px-3.5 py-2 text-body font-medium whitespace-nowrap text-foreground transition-colors duration-300 hover:text-primary"
             >
-              {link.label}
+              {t.docs}
             </Link>
-          ))}
+          </div>
         </div>
 
         {/* Desktop actions */}
-        <div className="hidden lg:flex items-center gap-1.5">
+        <div className="hidden flex-1 items-center justify-end gap-1.5 pl-6 lg:flex" onMouseEnter={hideSoon}>
           <ThemeToggle label={t.theme} />
           <LanguageSwitch lang={lang} label={t.language} />
           <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
           <a
-            href="https://github.com/czaydev/better-payment"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
             className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -150,7 +260,7 @@ export default function Navbar({
             <GitHubIcon data-icon="brand" />
             GitHub
           </a>
-          <Link href={localePath(lang, "/docs")} className={buttonVariants({ size: "sm" })}>
+          <Link href={localePath(lang, "/docs")} className={cn(buttonVariants({ size: "sm" }), "rounded-full px-4")}>
             {t.getStarted}
             <ChevronRight data-icon="chevron" />
           </Link>
@@ -159,36 +269,90 @@ export default function Navbar({
         {/* Mobile menu toggle */}
         <button
           aria-label={t.openMenu}
-          className="lg:hidden p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/60"
+          aria-expanded={open}
+          className="ml-auto rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground lg:hidden"
           onClick={() => setOpen(!open)}
         >
-          {open ? (
-            <X className="w-4.5 h-4.5" />
-          ) : (
-            <Menu className="w-4.5 h-4.5" />
-          )}
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </nav>
 
+      {/* Desktop mega panel: solid surface, dimmed page underneath */}
+      <div
+        id="mega-panel"
+        onMouseEnter={() => active && show(active)}
+        className={cn(
+          "absolute inset-x-0 top-full hidden border-b border-border bg-card shadow-[0_32px_64px_-32px_var(--bp-shadow)] transition-[opacity,translate,visibility] duration-(--bp-d-sm) ease-brand lg:block",
+          active ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
+        )}
+      >
+        <div className="mx-auto max-w-[84rem] px-5 sm:px-8">{active && renderPanel(active)}</div>
+      </div>
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none fixed inset-x-0 top-16 bottom-0 -z-10 hidden bg-background/30 backdrop-blur-md transition-opacity duration-(--bp-d-sm) lg:block",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+
       {/* Mobile menu */}
       {open && (
-        <div className="lg:hidden border-t border-border bg-background/95 backdrop-blur-2xl px-5 py-3 flex flex-col gap-0.5">
-          {links.map((link) => (
-            <Link
-              key={link.label}
-              href={localePath(lang, link.href)}
-              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent/60 transition-colors font-medium"
-              onClick={(event) => go(event, link.section)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Separator className="my-2.5" />
-          <div className="flex gap-2 pb-1">
+        <div className="flex max-h-[calc(100svh-4rem)] flex-col gap-0.5 overflow-y-auto border-t border-border bg-background px-5 py-3 lg:hidden">
+          {MENU_KEYS.map((key) => {
+            const expanded = mobileOpen === key;
+            const groupCopy = menu[key].groups as Record<string, string>;
+            const itemCopy = menu[key].items as Record<string, string>;
+            return (
+              <div key={key} className="border-b border-border/70 last:border-0">
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => setMobileOpen(expanded ? null : key)}
+                  className="flex w-full items-center justify-between px-1 py-3.5 text-body font-semibold text-foreground"
+                >
+                  {menu[key].label}
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-180")} />
+                </button>
+                {expanded && (
+                  <div className="grid gap-4 pb-4">
+                    {menus[key].groups.map((group) => (
+                      <div key={group.id}>
+                        <p className="px-1 pb-1.5 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                          {groupCopy[group.id]}
+                        </p>
+                        {group.items.map((item) => {
+                          const ItemIcon = icons[item.icon];
+                          return (
+                            <Link
+                              key={item.id}
+                              href={href(item.href)}
+                              onClick={close}
+                              className="flex items-center gap-3 rounded-lg px-1 py-2 text-sm font-medium text-foreground hover:text-primary"
+                            >
+                              <span className="flex size-7 items-center justify-center rounded-md bg-linear-to-br from-tint to-secondary text-primary">
+                                <ItemIcon className="size-3.5" />
+                              </span>
+                              {itemCopy[item.id]}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <Link href={localePath(lang, "/docs")} onClick={close} className="px-1 py-3.5 text-body font-semibold text-foreground">
+            {t.docs}
+          </Link>
+          <Separator className="my-1.5" />
+          <div className="flex gap-2 pt-2 pb-1">
             <ThemeToggle label={t.theme} className="h-9 shrink-0" />
             <LanguageSwitch lang={lang} label={t.language} />
             <a
-              href="https://github.com/czaydev/better-payment"
+              href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")}
@@ -196,11 +360,7 @@ export default function Navbar({
               <GitHubIcon data-icon="brand" />
               GitHub
             </a>
-            <Link
-              href={localePath(lang, "/docs")}
-              className={cn(buttonVariants({ size: "sm" }), "flex-1")}
-              onClick={() => setOpen(false)}
-            >
+            <Link href={localePath(lang, "/docs")} className={cn(buttonVariants({ size: "sm" }), "flex-1")} onClick={close}>
               {t.getStarted}
               <ChevronRight data-icon="chevron" />
             </Link>
