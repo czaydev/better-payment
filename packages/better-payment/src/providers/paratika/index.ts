@@ -15,7 +15,6 @@ import {
   PaymentRequest,
   PaymentResponse,
   ThreeDSPaymentRequest,
-  ThreeDSInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -40,6 +39,7 @@ import type {
   ParatikaConfig,
   Paratika3DCallbackData,
   ParatikaCompleteContext,
+  ParatikaThreeDSInitResponse,
   ParatikaResponse,
   ParatikaTransaction,
 } from './types';
@@ -238,7 +238,7 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
    * order, then the customer's browser posts the card straight to Paratika,
    * which runs 3D Secure and POSTs the result to callbackUrl.
    */
-  async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
+  async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ParatikaThreeDSInitResponse> {
     return this.payThreeDS(request, 'sale3d');
   }
 
@@ -246,16 +246,17 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
    * 3D pre-authorization: the same payment session, but the card is posted to
    * `/post/auth3d/{token}`, which only runs 3D authentication. The callback
    * carries an auth3DToken, and completeThreeDSPayment() blocks the amount with
-   * `PREAUTH`. Capture it later with capture().
+   * `PREAUTH`. Keep the returned `sessionToken` with the order: completing needs
+   * it. Capture it later with capture().
    */
-  async initThreeDSAuthorize(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
+  async initThreeDSAuthorize(request: ThreeDSPaymentRequest): Promise<ParatikaThreeDSInitResponse> {
     return this.payThreeDS(request, 'auth3d');
   }
 
   private async payThreeDS(
     request: ThreeDSPaymentRequest,
     endpoint: 'sale3d' | 'auth3d'
-  ): Promise<ThreeDSInitResponse> {
+  ): Promise<ParatikaThreeDSInitResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
       this.validatePayment(request, {
@@ -310,10 +311,11 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
         status: PaymentStatus.PENDING,
         threeDSHtmlContent: html,
         conversationId: orderId,
+        sessionToken: session.sessionToken,
         rawResponse: { responseCode: session.responseCode },
       });
     } catch (error) {
-      return this.failure<ThreeDSInitResponse>(error, '3DS initialization failed', {
+      return this.failure<ParatikaThreeDSInitResponse>(error, '3DS initialization failed', {
         conversationId: orderId,
       });
     }
@@ -338,9 +340,7 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
   ): Promise<PaymentResponse> {
     const data = callbackData ?? {};
     const expectedOrderId = context.orderId || undefined;
-    if (data.auth3DToken !== undefined) {
-      return this.completeThreeDSAuthorize(data, expectedOrderId);
-    }
+    const preAuth = data.auth3DToken !== undefined;
     const untrusted = (errorMessage: string, rawResponse: unknown): PaymentResponse =>
       this.withErrorCode({
         status: PaymentStatus.FAILURE,
@@ -349,11 +349,26 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
         rawResponse,
       });
 
-    if (this.config.secretKey && !(await verifyParatikaCallback(data, this.config.secretKey))) {
+    // One signature policy for both flows: with secretKey, a sale callback must
+    // carry a valid sdSha512. Paratika documents no hash for the /post/auth3d
+    // callback, so a pre-authorization callback is checked when it carries one
+    // and is otherwise bound by its session (below).
+    if (
+      this.config.secretKey &&
+      (!preAuth || data.sdSha512 !== undefined) &&
+      !(await verifyParatikaCallback(data, this.config.secretKey))
+    ) {
       return untrusted('Invalid 3D Secure callback hash', data);
     }
-    if (expectedOrderId !== undefined && data.merchantPaymentId !== expectedOrderId) {
+    if (
+      expectedOrderId !== undefined &&
+      (!preAuth || data.merchantPaymentId !== undefined) &&
+      data.merchantPaymentId !== expectedOrderId
+    ) {
       return untrusted('3D Secure callback is for another order', data);
+    }
+    if (preAuth) {
+      return this.completeThreeDSAuthorize(data, expectedOrderId, context.sessionToken);
     }
     // The order a pending result may carry: never an unsigned callback's own
     const trustedOrderId =
@@ -431,15 +446,17 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
   }
 
   /**
-   * After `/post/auth3d`: when the authentication succeeded and `mdStatus` is
-   * accepted, the amount is blocked with `PREAUTH` on the same session; the
-   * session your server created fixed the order and amount, and the bank's
-   * answer decides. A failure carries no ids, and a timeout only the order id
-   * from your records.
+   * After `/post/auth3d`: the callback must name the session your server opened
+   * for this order (`context.sessionToken`, required), checked before anything
+   * is sent. When the authentication succeeded and `mdStatus` is accepted, the
+   * amount is blocked with `PREAUTH` on that session, which fixed the order and
+   * amount, and the bank's answer decides. A failure carries no ids, and a
+   * timeout only the order id from your records.
    */
   private async completeThreeDSAuthorize(
     data: Paratika3DCallbackData,
-    expectedOrderId: string | undefined
+    expectedOrderId: string | undefined,
+    sessionToken: string | undefined
   ): Promise<PaymentResponse> {
     const accepted = this.config.acceptedMdStatuses ?? ['1'];
     if (data.responseCode !== '00' || !data.mdStatus || !accepted.includes(data.mdStatus)) {
@@ -455,15 +472,33 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
       });
     }
 
+    if (!sessionToken) {
+      return this.withErrorCode({
+        status: PaymentStatus.FAILURE,
+        errorCode: 'VALIDATION_ERROR',
+        errorMessage:
+          'A 3D pre-authorization needs the session from your records: ' +
+          'completeThreeDSPayment(callbackBody, { orderId, sessionToken })',
+        rawResponse: data,
+      });
+    }
+    if (data.sessionToken !== sessionToken) {
+      return this.withErrorCode({
+        status: PaymentStatus.FAILURE,
+        errorCode: 'INVALID_HASH',
+        errorMessage: '3D Secure callback is for another payment session',
+        rawResponse: data,
+      });
+    }
     let reached = false;
     try {
-      if (!data.sessionToken || !data.auth3DToken) {
-        throw new ValidationError('3D Secure callback is missing sessionToken or auth3DToken');
+      if (!data.auth3DToken) {
+        throw new ValidationError('3D Secure callback is missing auth3DToken');
       }
       reached = true;
       const response = await this.api({
         ACTION: 'PREAUTH',
-        SESSIONTOKEN: data.sessionToken,
+        SESSIONTOKEN: sessionToken,
         AUTH3DTOKEN: data.auth3DToken,
       });
       const approved = isParatikaApproved(response) && !!response.pgTranId;
@@ -477,7 +512,7 @@ export class Paratika extends PaymentProvider<ParatikaConfig> {
       return this.withErrorCode({
         status: PaymentStatus.SUCCESS,
         paymentId: response.pgTranId,
-        conversationId: response.merchantPaymentId || expectedOrderId,
+        conversationId: expectedOrderId ?? (response.merchantPaymentId || undefined),
         rawResponse: { callback: data, payment: response },
       });
     } catch (error) {

@@ -174,6 +174,7 @@ export type {
   ParatikaConfig,
   Paratika3DCallbackData,
   ParatikaCompleteContext,
+  ParatikaThreeDSInitResponse,
 } from './providers/paratika/types';
 export type { ParatikaBrand } from './providers/paratika/utils';
 export { Est, est } from './providers/est';

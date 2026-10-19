@@ -377,6 +377,8 @@ describe('Paratika provider', () => {
   });
 
   describe('3D pre-authorization', () => {
+    // The /post/auth3d callback as Paratika documents it carries no hash and no
+    // order id; merchantPaymentId is added here to cover callbacks that do
     const auth3dCallback = {
       sessionToken: 'TOKEN123',
       auth3DToken: 'AUTH3DTOKEN',
@@ -386,8 +388,9 @@ describe('Paratika provider', () => {
       mdStatus: '1',
       mdErrorMsg: 'Authenticated',
     };
+    const trusted = { orderId: 'ORDER1', sessionToken: 'TOKEN123' };
 
-    it('initThreeDSAuthorize() posts the card to /post/auth3d/{token}', async () => {
+    it('initThreeDSAuthorize() posts the card to /post/auth3d/{token} and returns the session', async () => {
       post.mockResolvedValue({ data: paratikaApproved({ sessionToken: 'TOKEN123' }) });
       const result = await provider.initThreeDSAuthorize({
         ...mockThreeDSPaymentRequest,
@@ -397,12 +400,13 @@ describe('Paratika provider', () => {
       expect(result.threeDSHtmlContent).toContain(
         `action="${PARATIKA_BASE_URL}/post/auth3d/TOKEN123"`
       );
+      expect(result.sessionToken).toBe('TOKEN123');
     });
 
-    it('blocks the amount with PREAUTH on the session after authentication', async () => {
+    it('blocks the amount with PREAUTH on your session after authentication', async () => {
       post.mockResolvedValue({ data: paratikaApproved({ pgTranId: 'P1' }) });
 
-      const result = await provider.completeThreeDSPayment(auth3dCallback);
+      const result = await provider.completeThreeDSPayment(auth3dCallback, trusted);
 
       expect(sent()).toMatchObject({
         ACTION: 'PREAUTH',
@@ -415,42 +419,104 @@ describe('Paratika provider', () => {
       expect(result.conversationId).toBe('ORDER1');
     });
 
-    it('fails without ids when authentication failed or mdStatus is not accepted', async () => {
-      const failed = await provider.completeThreeDSPayment({
-        ...auth3dCallback,
-        responseCode: '99',
-        errorCode: 'ERR30002',
+    it('needs the session from your records, before PREAUTH', async () => {
+      for (const context of [{}, { orderId: 'ORDER1' }]) {
+        const result = await provider.completeThreeDSPayment(auth3dCallback, context);
+        expect(result.errorCode).toBe('VALIDATION_ERROR');
+        expect(result.paymentId).toBeUndefined();
+      }
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    it('rejects a callback for another order than yours, before PREAUTH', async () => {
+      const result = await provider.completeThreeDSPayment(auth3dCallback, {
+        orderId: 'ORDER2',
+        sessionToken: 'TOKEN123',
       });
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
+      expect(result.paymentId).toBeUndefined();
+    });
+
+    it('rejects a callback for another session, before PREAUTH', async () => {
+      const { merchantPaymentId: _omit, ...documented } = auth3dCallback;
+      const result = await provider.completeThreeDSPayment(
+        { ...documented, sessionToken: 'SOMEONE_ELSES' },
+        trusted
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
+    });
+
+    it('checks sdSha512 when a pre-authorization callback carries one', async () => {
+      const result = await provider.completeThreeDSPayment(
+        { ...auth3dCallback, sdSha512: 'FORGED' },
+        trusted
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(result.errorCode).toBe('INVALID_HASH');
+    });
+
+    // The default handler passes only the HTTP body: it has no session from your
+    // records, so it cannot block an amount, whatever the body says
+    it('does not pre-authorize through the default handler', async () => {
+      const payment = betterPayment({
+        mode: 'sandbox',
+        providers: { paratika: paratika({ ...PARATIKA_TEST, baseUrl: PARATIKA_BASE_URL }) },
+      });
+      (payment.use('paratika') as any).client.post = post;
+      post.mockResolvedValue({ data: paratikaApproved({ pgTranId: 'P1' }) });
+      const onCallback = vi.fn();
+      await new BetterPaymentHandler(payment, { onCallback }).handle({
+        method: 'POST',
+        url: '/api/pay/paratika/callback',
+        headers: { 'content-type': 'application/json' },
+        body: { ...auth3dCallback, orderId: 'ORDER1', sessionToken: 'TOKEN123' },
+      });
+      expect(post).not.toHaveBeenCalled();
+      expect(onCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: PaymentStatus.SUCCESS }),
+        expect.anything()
+      );
+    });
+
+    it('fails without ids when authentication failed or mdStatus is not accepted', async () => {
+      const failed = await provider.completeThreeDSPayment(
+        { ...auth3dCallback, responseCode: '99', errorCode: 'ERR30002' },
+        trusted
+      );
       expect(failed.code).toBe(PaymentErrorCode.THREEDS_FAILED);
 
-      const halfSecure = await provider.completeThreeDSPayment({
-        ...auth3dCallback,
-        mdStatus: '2',
-      });
+      const halfSecure = await provider.completeThreeDSPayment(
+        { ...auth3dCallback, mdStatus: '2' },
+        trusted
+      );
       expect(halfSecure.errorCode).toBe('MD_STATUS_2');
       expect(halfSecure.paymentId).toBeUndefined();
       expect(post).not.toHaveBeenCalled();
 
       post.mockResolvedValue({ data: paratikaApproved({ pgTranId: 'P1' }) });
-      const lenient = await create({ acceptedMdStatuses: ['1', '2'] }).completeThreeDSPayment({
-        ...auth3dCallback,
-        mdStatus: '2',
-      });
+      const lenient = await create({ acceptedMdStatuses: ['1', '2'] }).completeThreeDSPayment(
+        { ...auth3dCallback, mdStatus: '2' },
+        trusted
+      );
       expect(lenient.status).toBe(PaymentStatus.SUCCESS);
     });
 
     it('keeps the order id on a PREAUTH timeout only when it came from your records', async () => {
       post.mockRejectedValue(timeout());
-      const result = await provider.completeThreeDSPayment(auth3dCallback);
-      expect(result.status).toBe(PaymentStatus.PENDING);
-      expect(result.conversationId).toBeUndefined();
-      const trusted = await provider.completeThreeDSPayment(auth3dCallback, { orderId: 'ORDER1' });
-      expect(trusted.conversationId).toBe('ORDER1');
+      const withoutOrder = await provider.completeThreeDSPayment(auth3dCallback, {
+        sessionToken: 'TOKEN123',
+      });
+      expect(withoutOrder.status).toBe(PaymentStatus.PENDING);
+      expect(withoutOrder.conversationId).toBeUndefined();
+      const withOrder = await provider.completeThreeDSPayment(auth3dCallback, trusted);
+      expect(withOrder.conversationId).toBe('ORDER1');
     });
 
     it('fails without ids when PREAUTH is declined', async () => {
       post.mockResolvedValue({ data: paratikaDeclined() });
-      const result = await provider.completeThreeDSPayment(auth3dCallback);
+      const result = await provider.completeThreeDSPayment(auth3dCallback, trusted);
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.paymentId).toBeUndefined();
       expect(result.conversationId).toBeUndefined();

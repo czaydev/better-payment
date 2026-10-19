@@ -89,8 +89,12 @@ cost commission rate of your account.
 
 ```typescript
 const init = await payment.vakifpay.initThreeDSAuthorize({ ...paymentRequest, conversationId: 'ORDER126', callbackUrl });
-// In the callback route: blocks the amount with PREAUTH
-const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+// keep init.sessionToken with ORDER126, server side
+// In your own callback route: blocks the amount with PREAUTH on that session
+const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody, {
+  orderId: 'ORDER126',
+  sessionToken: order.sessionToken, // from your records (required)
+});
 await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
 ```
 
@@ -99,3 +103,11 @@ which only runs 3D authentication. The callback carries an `auth3DToken`; when t
 succeeded and `mdStatus` is accepted (only `1` by default; see `acceptedMdStatuses`),
 `completeThreeDSPayment()` blocks the amount with `PREAUTH` on that session, and the bank's answer
 decides.
+
+Paratika documents no hash and no order id for this callback, so the session your server opened is
+what binds it: pass the `sessionToken` that `initThreeDSAuthorize()` returned, from your records, in
+the second argument (never read from the callback body). Without it the call fails, and a callback
+for another session, or naming another order than your `orderId`, is rejected as `INVALID_HASH`
+before `PREAUTH` is sent. With `secretKey`, a callback that does carry `sdSha512` must verify, as
+the sale callback always must. The default handler route passes only the body, so complete
+pre-authorizations in your own route.

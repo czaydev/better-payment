@@ -72,9 +72,15 @@ await payment.vakifpay.installmentInfo({ binNumber: '450803', price: '100.00' })
 
 ```typescript
 const init = await payment.vakifpay.initThreeDSAuthorize({ ...paymentRequest, conversationId: 'ORDER126', callbackUrl });
-// In the callback route: blocks the amount with PREAUTH
-const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody);
+// keep init.sessionToken with ORDER126, server side
+// In your own callback route: blocks the amount with PREAUTH on that session
+const auth = await payment.vakifpay.completeThreeDSPayment(callbackBody, {
+  orderId: 'ORDER126',
+  sessionToken: order.sessionToken, // from your records (required)
+});
 await payment.vakifpay.capture({ paymentId: auth.paymentId!, amount: '60.00', ip: '1.2.3.4' });
 ```
 
 `initThreeDSAuthorize()` aynı ödeme oturumunu kullanır, ama kart yalnızca 3D doğrulama yapan `/post/auth3d/{token}` adresine gider. Callback bir `auth3DToken` taşır; doğrulama başarılıysa ve `mdStatus` kabul edilen bir değerse (varsayılan olarak yalnızca `1`; bkz. `acceptedMdStatuses`), `completeThreeDSPayment()` aynı oturumla `PREAUTH` çağırarak tutarı bloke eder ve sonucu bankanın cevabı belirler.
+
+Paratika bu callback için hash ya da sipariş numarası belgelemiyor; bu yüzden onu bağlayan, sunucunuzun açtığı oturumdur. `initThreeDSAuthorize()`'ın döndürdüğü `sessionToken` değerini kendi kayıtlarınızdan, ikinci argümanla verin (callback gövdesinden asla okunmaz). Verilmezse çağrı başarısız olur; başka bir oturuma ait ya da `orderId` değerinizden farklı bir sipariş bildiren callback, `PREAUTH` gönderilmeden `INVALID_HASH` olarak reddedilir. `secretKey` verilmişse, `sdSha512` taşıyan bir callback de doğrulanmalıdır; satış callback'i ise her zaman doğrulanır. Varsayılan handler rotası yalnızca gövdeyi iletir; ön provizyonları kendi rotanızda tamamlayın.

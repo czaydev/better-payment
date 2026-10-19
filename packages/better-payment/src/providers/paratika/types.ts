@@ -1,4 +1,5 @@
 import type { PaymentProviderConfig } from '../../core/PaymentProvider';
+import type { ThreeDSInitResponse } from '../../types';
 import type { ParatikaBrand } from './utils';
 
 /**
@@ -55,6 +56,18 @@ export interface Paratika3DCallbackData {
 export interface ParatikaCompleteContext {
   /** The merchantPaymentId you started; a callback for another order is rejected */
   orderId?: string;
+  /**
+   * The `sessionToken` initThreeDSAuthorize() returned for this order. Required
+   * to complete a 3D pre-authorization: its callback is not signed and carries
+   * no order id, so the session your server opened is what binds it.
+   */
+  sessionToken?: string;
+}
+
+/** initThreeDSPayment() / initThreeDSAuthorize() result, with the payment session */
+export interface ParatikaThreeDSInitResponse extends ThreeDSInitResponse {
+  /** Keep it with the order: completeThreeDSPayment() needs it for a 3D pre-authorization */
+  sessionToken?: string;
 }
 
 /** Common fields of an API answer */
