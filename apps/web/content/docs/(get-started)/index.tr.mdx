@@ -31,6 +31,7 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
 | QNBpay ⁵ | ✅ | ✅ paySmart3D | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Lemon Squeezy ⁶ | — | ✅ hosted checkout | ✅ | ✅ | ✅ | — | — |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
 | Denizbank | ✅ | ✅ 3D Model | ✅ | ✅ | — | — | — |
@@ -44,6 +45,7 @@ Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve h
 ³ Kuveyt Türk'te iptal aynı gün, gün sonundan önce yapılır; sonrasında `refund()` kullanın.
 ⁴ Sipay'de iptal (void) uç noktası yoktur: `cancel()` ödemenin kalanını iade eder, Sipay bunu aynı gün içinde iptal olarak işler. 3D'siz ödeme için hesabınızın Sipay tarafından onaylanması da gerekir.
 ⁵ QNBpay, Sipay'in altyapısında çalışır (`qnbpay()`); bu yüzden Sipay notları geçerlidir. Henüz bir test üye işyeriyle doğrulanmadı.
+⁶ Lemon Squeezy bir merchant of record'dır (kayıtlı satıcı): müşteri onun ödeme sayfasında öder ve sonuç imzalı bir webhook olarak gelir. Türkiye'deki işletmeler USD olarak ödeme alabilir.
 
 ## Kısa örnek [#quick-example]
 

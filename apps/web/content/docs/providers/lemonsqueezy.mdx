@@ -1,0 +1,125 @@
+---
+title: Lemon Squeezy
+description: Lemon Squeezy payment integration reference.
+since: 0.12.0
+---
+
+Uses Lemon Squeezy's REST API ([docs.lemonsqueezy.com](https://docs.lemonsqueezy.com/api)). Lemon
+Squeezy is a **merchant of record**: it sells on your behalf, collects the card on its own checkout
+and handles sales tax and invoices, then pays you out. Businesses in Türkiye can receive bank
+payouts (in USD), which makes it an option for selling software and digital products abroad.
+
+The card never reaches your server: the customer pays on Lemon Squeezy's checkout, as a page or as
+an overlay on yours, and the result arrives as a signed webhook. Requests use your API key
+(`Authorization: Bearer`); a test-mode key creates test-mode checkouts.
+
+<Callout type="warn">
+  Not verified against a live store yet: the unit tests follow Lemon Squeezy's documentation, and the opt-in sandbox test creates test-mode checkouts. Try a test-mode purchase end to end before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, lemonSqueezy } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    lemonsqueezy: lemonSqueezy({
+      apiKey: process.env.LEMONSQUEEZY_API_KEY!,
+      storeId: process.env.LEMONSQUEEZY_STORE_ID!,
+      variantId: process.env.LEMONSQUEEZY_VARIANT_ID!, // the product variant every checkout uses
+      webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET!,
+      currency: 'USD', // your store's currency (default USD)
+      // embed?: boolean (overlay checkout with Lemon.js)
+    }),
+  },
+});
+```
+
+Create one product (for example "Order payment") in your store and use its variant: each checkout
+sets its own price on it (`custom_price`), so you don't need a product per order. Add a webhook in
+**Settings → Webhooks** with the `order_created` event (and `order_refunded` if you like) and a
+signing secret.
+
+`paymentId` is Lemon Squeezy's order id; `conversationId` is your order id, kept in the checkout's
+custom data. Lemon Squeezy reads every price in your store's currency: set `currency` to it
+(default USD). A payment in another currency is rejected, so an amount meant in TRY is never
+charged in dollars.
+
+## Checkout
+
+```typescript
+const init = await payment.lemonsqueezy.initThreeDSPayment({
+  ...paymentRequest, // no paymentCard needed
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/thanks', // where the customer returns after paying
+});
+// init.redirectUrl is the checkout; init.threeDSHtmlContent sends the browser there
+```
+
+With `embed: true`, open the checkout as an overlay on your page with Lemon.js instead:
+
+```html
+<script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
+<script>
+  // once lemon.js has loaded
+  LemonSqueezy.Url.Open(checkoutUrl); // init.redirectUrl
+</script>
+```
+
+## Webhook
+
+Lemon Squeezy POSTs the result to your webhook URL with an `X-Signature` header: the hex
+HMAC-SHA256 of the raw body with your signing secret. Point the webhook at the handler's callback
+route, as with PayTR's notification URL, or complete the payment in your own route:
+
+```typescript
+// With the handler: set the webhook URL to https://yoursite.com/api/pay/lemonsqueezy/callback
+const handler = new BetterPaymentHandler(payment, {
+  onCallback: async (result) => {
+    // result.conversationId: your order id; result.paymentId: Lemon Squeezy's order id
+  },
+});
+```
+
+```typescript
+// Or in your own webhook route (read the body as text, before any JSON parsing)
+const rawBody = await request.text();
+const result = await payment.lemonsqueezy.completeThreeDSPayment(JSON.parse(rawBody), {
+  rawBody,
+  signature: request.headers.get('x-signature') ?? undefined,
+  orderId: order.id,   // optional, from your records
+  amount: order.total, // optional, checked against the order
+});
+```
+
+- the signature must verify over the raw body; anything else is `INVALID_HASH`, and only the signed
+  body is used, never the parsed `callbackData`;
+- your order id comes from the signed event's custom data, and must match `orderId` when you pass it;
+- the order is then read from Lemon Squeezy: it must belong to your store and, when you pass
+  `amount`, have that total. Its status decides: `paid` is `success`, `refunded` is `cancelled`,
+  `failed` and `fraudulent` are `failure`, `pending` is `pending`.
+
+The handler route passes the raw body and the `X-Signature` header to the provider, so it needs
+the body unparsed: the adapters read it as text, but a JSON body parser placed before the handler
+(for example `express.json()`) loses the raw bytes, and the route then answers `400`. It
+acknowledges every signed delivery with `200` (Lemon Squeezy re-sends a webhook until it gets a
+2xx), answers `400` to a bad signature and `503` when the order could not be read, so Lemon
+Squeezy retries. Only your own route can pass `orderId` and `amount` from your records.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.lemonsqueezy.refund({ paymentId: '1001', price: '5.00', currency: 'USD', ip: '1.2.3.4' }); // partial
+await payment.lemonsqueezy.cancel({ paymentId: '1001', ip: '1.2.3.4' });                                  // full refund
+const status = await payment.lemonsqueezy.getPayment('1001');
+// status: 'success' (also after a partial refund), 'cancelled' (refunded), 'failure', 'pending'
+```
+
+Lemon Squeezy has no void, so `cancel()` refunds the whole order.
+
+## Not supported
+
+Lemon Squeezy collects the card itself, so `createPayment()` (a direct card payment),
+pre-authorization, saved cards, BIN and installment queries throw `NOT_SUPPORTED`. Subscriptions
+and license keys are not covered by this provider.

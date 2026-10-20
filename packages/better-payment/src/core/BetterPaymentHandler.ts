@@ -24,6 +24,7 @@ import type {
 } from '../types';
 import { Iyzico } from '../providers/iyzico';
 import { PayTR } from '../providers/paytr';
+import { LemonSqueezy } from '../providers/lemonsqueezy';
 
 /**
  * HTTP Request interface for framework-agnostic handling
@@ -839,7 +840,7 @@ export class BetterPaymentHandler {
    * redirected with `callbackRedirect`.
    */
   private async handleCallback(ctx: CallbackContext): Promise<BetterPaymentResponse> {
-    const body = this.requireBody(ctx);
+    const body = this.lemonSqueezyDelivery(ctx) ?? this.requireBody(ctx);
     // Events are emitted in finishCallback, next to onCallback, so that a failing
     // listener is retried with the stored result instead of calling the provider again
     const complete = async () =>
@@ -895,6 +896,30 @@ export class BetterPaymentHandler {
     }
   }
 
+  /**
+   * A Lemon Squeezy webhook is signed over its raw bytes (`X-Signature`), so the
+   * provider gets the raw body and the header instead of the parsed body. The
+   * signature is checked against your webhook secret, so these values need no
+   * trust; the order from your records stays a separate argument.
+   */
+  private lemonSqueezyDelivery(
+    ctx: CallbackContext
+  ): { rawBody: string; signature: string | undefined } | undefined {
+    if (
+      ctx.action !== 'callback' ||
+      !(this.core.rawProvider(ctx.provider) instanceof LemonSqueezy)
+    ) {
+      return undefined;
+    }
+    if (typeof ctx.request.body !== 'string') {
+      throw new HttpError(
+        400,
+        'Lemon Squeezy webhooks need the raw request body: do not parse it before the handler'
+      );
+    }
+    return { rawBody: ctx.request.body, signature: this.header(ctx.request, 'x-signature') };
+  }
+
   /** Runs onCallback and builds the response for a provider callback result */
   private async finishCallback(
     ctx: CallbackContext,
@@ -916,6 +941,13 @@ export class BetterPaymentHandler {
         };
       }
       return { status: 200, headers: { 'Content-Type': 'text/plain' }, body: 'OK' };
+    }
+
+    // Lemon Squeezy re-sends a webhook until it gets a 2xx: acknowledge every signed
+    // delivery, and ask for a retry only when the order could not be read
+    if (this.core.rawProvider(ctx.provider) instanceof LemonSqueezy && ctx.action === 'callback') {
+      const status = invalidSignature ? 400 : result?.errorCode === NETWORK_ERROR_CODE ? 503 : 200;
+      return this.jsonResponse(status, this.publicResult(result));
     }
 
     if (this.options.callbackRedirect) {

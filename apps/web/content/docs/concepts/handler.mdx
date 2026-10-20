@@ -110,6 +110,7 @@ Paths are relative to `basePath` (default `/api/pay`).
 | `success` / `pending` result | 200 | provider result |
 | `failure` result | 422 | provider result (`errorCode`, `errorMessage`) |
 | PayTR notification (`/paytr/callback`) | 200 `text/plain` | `OK` (400 when the hash is invalid) |
+| Lemon Squeezy webhook (`/lemonsqueezy/callback`) | 200 for every signed delivery, 400 when the signature is invalid or the body was parsed before the handler, 503 when the order could not be read | provider result |
 | `callbackRedirect` returned a URL | 303 | `Location` header |
 | Invalid input / wrong method / not enabled | 400 / 405 / 404 | `{ error, message }` |
 | `authorize` rejected | 403 | `{ error, message }` |
