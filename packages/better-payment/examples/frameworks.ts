@@ -13,6 +13,7 @@ import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
 import { toReactRouterHandler } from 'better-payment/react-router';
+import { toH3Handler } from 'better-payment/nuxt';
 import { Elysia } from 'elysia';
 
 const createPayment = () =>
@@ -31,6 +32,9 @@ export const { GET, POST } = toNextJsHandler(getBetterPayment);
 
 // React Router v7 / Remix v2: app/routes/api.pay.$.ts (a splat resource route)
 export const { loader, action } = toReactRouterHandler(getBetterPayment);
+
+// Nuxt/Nitro: server/api/pay/[...path].ts
+export const nuxtHandler = toH3Handler(getBetterPayment);
 
 // Express: no body parser needed for the payment routes
 const expressApp = express();

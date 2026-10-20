@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import express from 'express';
 import Fastify from 'fastify';
 import { Hono } from 'hono';
+import { H3 } from 'h3';
 import { Elysia } from 'elysia';
 import {
   betterPayment,
@@ -20,6 +21,7 @@ import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
 import { toReactRouterHandler } from 'better-payment/react-router';
+import { toH3Handler } from 'better-payment/nuxt';
 import { mockPaymentRequest } from '../../fixtures/payment-data';
 
 const PAYTR = { merchantId: '123456', merchantKey: 'KEY', merchantSalt: 'SALT' };
@@ -93,6 +95,21 @@ const adapters: Record<string, () => Promise<Send>> = {
     return async (method, ...rest) =>
       fromResponse(
         await (method === 'GET' ? loader : action)({ request: webRequest(method, ...rest) })
+      );
+  },
+  'Nuxt/Nitro h3 v2 (toH3Handler, lazy)': async () => {
+    let payment: BetterPayment | undefined;
+    const app = new H3().all(
+      '/api/pay/**',
+      toH3Handler(() => (payment ??= createPayment()))
+    );
+    return async (method, path, body, contentType) =>
+      fromResponse(
+        await app.request(`http://localhost${path}`, {
+          method,
+          body,
+          headers: contentType ? { 'content-type': contentType } : {},
+        })
       );
   },
   Hono: async () => {
@@ -271,5 +288,16 @@ describe('body size limit', () => {
     );
     const res = await send('POST', '/api/pay/paytr/callback', 'a=' + 'x'.repeat(4096), FORM);
     expect(res.status).toBe(413);
+  });
+});
+
+describe('Nuxt/Nitro h3 compatibility', () => {
+  it('accepts the h3 v1 web request shape', async () => {
+    const response = await toH3Handler(createPayment())({
+      web: { request: webRequest('GET', '/api/pay/health') },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'ok' });
   });
 });

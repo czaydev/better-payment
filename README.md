@@ -233,6 +233,7 @@ export const { GET, POST } = toNextJsHandler(getBetterPayment);
 // Hono:     app.all('/api/pay/*', toHonoHandler(payment))               — better-payment/hono
 // Elysia:   app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' }) — better-payment/elysia
 // React Router / Remix: export const { loader, action } = toReactRouterHandler(getBetterPayment) — better-payment/react-router
+// Nuxt/Nitro: export default toH3Handler(getBetterPayment)              — better-payment/nuxt
 // Workers, Deno, Bun: toFetchHandler(payment)                            — better-payment
 ```
 

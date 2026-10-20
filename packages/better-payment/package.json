@@ -55,6 +55,11 @@
       "types": "./dist/react-router/index.d.ts",
       "import": "./dist/react-router/index.mjs",
       "require": "./dist/react-router/index.js"
+    },
+    "./nuxt": {
+      "types": "./dist/nuxt/index.d.ts",
+      "import": "./dist/nuxt/index.mjs",
+      "require": "./dist/nuxt/index.js"
     }
   },
   "sideEffects": false,
@@ -107,6 +112,8 @@
     "nextjs",
     "react-router",
     "remix",
+    "nuxt",
+    "nitro",
     "edge",
     "cloudflare-workers",
     "deno"
@@ -125,6 +132,14 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "peerDependencies": {
+    "h3": "^1.15.0 || ^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "h3": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@commitlint/cli": "^18.6.1",
     "@commitlint/config-conventional": "^18.6.3",
@@ -140,6 +155,7 @@
     "express": "^5.3.0",
     "fastify": "^5.12.5",
     "hono": "^4.13.13",
+    "h3": "^2.0.5",
     "husky": "^8.0.3",
     "lint-staged": "^15.5.2",
     "prettier": "^3.9.10",
