@@ -6,12 +6,11 @@ import {
   DocsDescription,
 } from "fumadocs-ui/layouts/docs/page";
 import { Callout } from "fumadocs-ui/components/callout";
-import { flattenTree } from "fumadocs-core/page-tree";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import { getMDXComponents } from "@/lib/mdx-components";
-import { alternates, isLocale, localePath, type Locale } from "@/lib/i18n/config";
+import { alternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { Since } from "@/components/docs/Since";
 import { IS_PRERELEASE, PACKAGE_VERSION, releaseStatus } from "@/lib/release";
@@ -21,21 +20,6 @@ import { IS_BETA_DOCS } from "@/lib/base-path";
 function isFallback(page: { path: string }, lang: string): boolean {
   const translated = /\.([a-z]{2})\.mdx?$/.exec(page.path)?.[1];
   return lang === "en" ? translated !== undefined : translated !== lang;
-}
-
-/**
- * Previous/next links. The EST banks share one page but have an entry each in the sidebar, so on
- * that page the links skip its other entries. Other pages keep Fumadocs' default.
- */
-function footerItems(lang: Locale, url: string) {
-  const list = flattenTree(source.getPageTree(lang).children);
-  const first = list.findIndex((item) => item.url === url);
-  let last = first;
-  while (first !== -1 && list[last + 1]?.url === url) last++;
-  if (last === first) return undefined;
-  // Client props: plain fields only (tree nodes carry symbol keys)
-  const link = (item?: (typeof list)[number]) => item && { name: item.name, description: item.description, url: item.url };
-  return { previous: link(list[first - 1]), next: link(list[last + 1]) };
 }
 
 export default async function Page({ params }: PageProps<"/[lang]/docs/[[...slug]]">) {
@@ -56,7 +40,6 @@ export default async function Page({ params }: PageProps<"/[lang]/docs/[[...slug
       className="scroll-mt-20 focus:outline-none"
       toc={page.data.toc}
       full={page.data.full}
-      footer={{ items: footerItems(lang, page.url) }}
     >
       <DocsTitle>{page.data.title}</DocsTitle>
       {page.data.since && <Since version={page.data.since} lang={lang} />}

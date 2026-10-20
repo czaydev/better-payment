@@ -1,0 +1,123 @@
+---
+title: Şekerbank (EST)
+description: Şekerbank sanal POS (EST / NestPay) entegrasyon referansı.
+---
+
+Şekerbank'ın sanal POS'u EST (Asseco NestPay) altyapısında çalışır. Better Payment bu altyapıya `est` sağlayıcısı ve `bank: 'sekerbank'` ile bağlanır; `bank` Şekerbank'ın canlı ortam adresini seçer. 3D Secure istekleri ve callback'leri hash sürüm 3 ile imzalanır: `base64(SHA-512(alan adına göre sıralanmış değerler ve sonunda mağaza anahtarı, "|" ile birleştirilmiş))`.
+
+<Callout type="info">
+  Şekerbank, İş Bankası ile aynı EST altyapısını kullanır; bu altyapı ortak EST test ortamında uçtan uca doğrulandı (3D'siz satış, iptal, iade, sipariş durumu ve dört 3D modelinin tamamı). Şekerbank'ın canlı ortam adresi test edilmedi; canlıya geçmeden önce küçük bir tutarla deneyin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, est } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    sekerbank: est({
+      bank: 'sekerbank',
+      clientId: process.env.SEKERBANK_CLIENT_ID!,
+      username: process.env.SEKERBANK_API_USER!,
+      password: process.env.SEKERBANK_API_PASSWORD!,
+      storeKey: process.env.SEKERBANK_STORE_KEY!,
+      // storeType?: '3d' | '3d_pay' | '3d_pay_hosting' | '3d_host' (default '3d')
+      // department?: number (BOLUM, when the bank assigned one)
+      // acceptedMdStatuses?: string[] (default ['1'], see below)
+      // baseUrl: defaults from mode (shared EST test host / sanalpos.sekerbank.com.tr)
+    }),
+  },
+});
+```
+
+`clientId` Şekerbank mağaza numaranızdır. `username` ve `password` API kullanıcısına (XML API), `storeKey` ise 3D Secure mağaza anahtarına aittir; hepsi Şekerbank'ın üye işyeri panelinden alınır. `storeType`, Şekerbank'ın mağazanız için tanımladığı 3D modeliyle aynı olmalıdır.
+
+```bash
+SEKERBANK_CLIENT_ID=your-store-number
+SEKERBANK_API_USER=your-api-user
+SEKERBANK_API_PASSWORD=your-api-password
+SEKERBANK_STORE_KEY=your-3d-store-key
+```
+
+`paymentId` sipariş numaranızdır: verdiğiniz `conversationId` ya da üretilen bir numara.
+
+### Adresler [#hosts]
+
+| Mod | Adres |
+| --- | ----- |
+| `sandbox` | `https://entegrasyon.asseco-see.com.tr` (tüm EST bankalarında ortak) |
+| `production` | `https://sanalpos.sekerbank.com.tr` |
+
+```typescript
+const payment = betterPayment({
+  mode: 'sandbox', // shared EST test host
+  providers: {
+    sekerbank: est({ bank: 'sekerbank', clientId, username, password, storeKey }),
+  },
+});
+```
+
+Tüm EST bankaları aynı test adresini kullanır; sandbox istekleri, Şekerbank tarafından verilen test mağazası bilgileriyle Asseco'nun test ortamına gider. `baseUrl` değerini yalnızca Şekerbank size farklı bir adres verdiyse girin.
+
+## Doğrudan ödeme (3D'siz) [#direct-payment-non-3d]
+
+```typescript
+const result = await payment.sekerbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML API Auth; success when ProcReturnCode is 00 and Response is Approved
+```
+
+## 3D Secure [#3d-secure]
+
+```typescript
+const init = await payment.sekerbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/sekerbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits a signed form to the Şekerbank 3D gate
+```
+
+`3d_pay_hosting` ve `3d_host` modellerinde kart bilgisi Şekerbank'ın kendi sayfasında alınır, bu yüzden istekte `paymentCard` gerekmez. Şekerbank sonucu `callbackUrl` adresine POST eder:
+
+```typescript
+const result = await payment.sekerbank.completeThreeDSPayment(callbackBody);
+```
+
+Hash, dönen tüm alanların değerlerini kapsar ama alan adlarını kapsamaz; bu yüzden geçerli bir hash tek başına hangi değerin sipariş numarası olduğunu kanıtlamaz. Sonuç Şekerbank ile doğrulanır:
+
+- hash'i geçersiz ya da başka bir `clientid` için gelen callback `INVALID_HASH` olarak reddedilir;
+- `3d` / `3d_host`: Şekerbank yalnızca kartı doğrular. `mdStatus` kabul edilen bir değerse kart XML API `Auth` ile (`md` kullanılarak) tahsil edilir ve sonucu Şekerbank'ın cevabı belirler;
+- `3d_pay` / `3d_pay_hosting`: kartı Şekerbank tahsil eder. Onaylı bir callback sipariş durumu sorgusuyla kontrol edilir; Şekerbank'ın doğrulamadığı bir ödeme `INVALID_HASH` olarak reddedilir.
+
+`paymentId` ve `conversationId` yalnızca Şekerbank'ın doğruladığı bir ödemede doldurulur; bu yüzden başarısız bir sonuç hiçbir zaman callback'ten alınan bir sipariş numarası taşımaz.
+
+### mdStatus [#mdstatus]
+
+`mdStatus` `1`, kartın tam olarak doğrulandığı anlamına gelir. `2`, `3` ve `4` yarım güvenlidir: kart ya da bankası 3D Secure'a kayıtlı değildir veya yalnızca bir deneme yapılmıştır. `3d` ve `3d_host` modellerinde varsayılan olarak yalnızca `1` tahsil edilir; diğer değerler `MD_STATUS_<değer>` ile başarısız olur. Yarım güvenli ödemeleri de tahsil etmek için bunları `acceptedMdStatuses` içinde listeleyin (örneğin `['1', '2', '3', '4']`). Bu durumda ters ibraz (chargeback) sorumluluğu sizde kalabilir. `3d_pay` ve `3d_pay_hosting` modellerinde kararı Şekerbank verir.
+
+## İade, iptal ve durum sorgusu [#refund-cancel--status]
+
+```typescript
+await payment.sekerbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Credit
+await payment.sekerbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                                  // Void
+const status = await payment.sekerbank.getPayment('ORDER123');                                             // ORDERSTATUS
+// status: 'success' (captured sale), 'cancelled' (voided or refunded),
+// 'failure' (declined or unknown order), 'pending' (anything else)
+```
+
+## Tarayıcı client'ı [#browser-client]
+
+`better-payment/client` içinde `client.sekerbank` özelliği yoktur. Sağlayıcıya `providers` içindeki anahtarıyla ulaşın:
+
+```typescript
+const result = await client.use('sekerbank').initThreeDSPayment(request);
+```
+
+<Callout type="info">
+  EST için BIN ve taksit sorgusu desteklenmez: `binCheck()` ve `installmentInfo()` `NOT_SUPPORTED` fırlatır. Ödeme isteğinde `installment` gönderin ve `paidPrice` değerini Şekerbank ile anlaştığınız oranlardan hesaplayın.
+</Callout>
+
+## Diğer EST bankaları [#other-est-banks]
+
+Aynı sağlayıcı [Halkbank (EST)](/docs/banks/halkbank), [İş Bankası (EST)](/docs/banks/isbank), [TEB (EST)](/docs/banks/teb) ve [Ziraat Bankası (EST)](/docs/banks/ziraat) için de çalışır. Birden fazlasını aynı uygulamada kullanmak için [EST (NestPay)](/docs/banks/est) sayfasına bakın.

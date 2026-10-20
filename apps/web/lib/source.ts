@@ -84,37 +84,9 @@ function releaseBadgesPlugin(): LoaderPlugin {
   };
 }
 
-/** The banks on the shared EST page, listed in the sidebar one by one (alphabetical, like the navbar) */
-const EST_BANKS = ["Halkbank", "İş Bankası", "Şekerbank", "TEB", "Ziraat Bankası"];
-
-/**
- * EST is one page, but the sidebar shows each of its banks as its own entry ("Halkbank (EST)"),
- * all linking to that page.
- */
-function estBanksPlugin(): LoaderPlugin {
-  return {
-    name: "better-payment:est-banks",
-    transformPageTree: {
-      folder(node) {
-        node.children = node.children.flatMap((child) =>
-          child.type === "page" && /\/docs\/banks\/est$/.test(child.url)
-            ? EST_BANKS.map((bank) => ({
-                // String keys only: Fumadocs' internal symbol keys can't reach client components
-                ...Object.fromEntries(Object.entries(child)),
-                $id: `${child.$id}:${bank}`,
-                name: `${bank} (EST)`,
-              }) as typeof child)
-            : [child],
-        );
-        return node;
-      },
-    },
-  };
-}
-
 export const source = loader({
   baseUrl: "/docs",
   i18n,
   source: toFumadocsSource(docs, meta),
-  plugins: [brandIconsPlugin(), releaseBadgesPlugin(), estBanksPlugin()],
+  plugins: [brandIconsPlugin(), releaseBadgesPlugin()],
 });

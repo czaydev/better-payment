@@ -3,7 +3,11 @@
   "icon": "banks",
   "pages": [
     "akbank",
+    "halkbank",
+    "isbank",
     "kuveytturk",
-    "est"
+    "sekerbank",
+    "teb",
+    "ziraat"
   ]
 }
