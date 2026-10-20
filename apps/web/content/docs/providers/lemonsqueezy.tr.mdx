@@ -1,0 +1,102 @@
+---
+title: Lemon Squeezy
+description: Lemon Squeezy ödeme entegrasyonu referansı.
+since: 0.12.0
+---
+
+Lemon Squeezy'nin REST API'sini ([docs.lemonsqueezy.com](https://docs.lemonsqueezy.com/api)) kullanır. Lemon Squeezy bir **merchant of record**'dır (kayıtlı satıcı): sizin adınıza satış yapar, kartı kendi ödeme sayfasında alır, satış vergisi ve faturayı üstlenir, sonra size ödeme yapar. Türkiye'deki işletmeler banka hesabına (USD olarak) ödeme alabilir; bu da yurt dışına yazılım ve dijital ürün satmak için bir seçenek sunar.
+
+Kart hiçbir zaman sunucunuza gelmez: müşteri Lemon Squeezy'nin ödeme sayfasında, ayrı bir sayfada ya da sizin sayfanızın üzerinde açılan bir pencerede öder ve sonuç imzalı bir webhook olarak gelir. İstekler API anahtarınızı (`Authorization: Bearer`) kullanır; test modu anahtarı test modunda ödeme sayfası oluşturur.
+
+<Callout type="warn">
+  Henüz canlı bir mağazayla doğrulanmadı: birim testleri Lemon Squeezy'nin dokümanını izler, isteğe bağlı sandbox testi test modunda ödeme sayfası oluşturur. Canlıya geçmeden önce test modunda baştan sona bir satın alma deneyin.
+</Callout>
+
+## Yapılandırma [#configuration]
+
+```typescript
+import { betterPayment, lemonSqueezy } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    lemonsqueezy: lemonSqueezy({
+      apiKey: process.env.LEMONSQUEEZY_API_KEY!,
+      storeId: process.env.LEMONSQUEEZY_STORE_ID!,
+      variantId: process.env.LEMONSQUEEZY_VARIANT_ID!, // the product variant every checkout uses
+      webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET!,
+      currency: 'USD', // your store's currency (default USD)
+      // embed?: boolean (overlay checkout with Lemon.js)
+    }),
+  },
+});
+```
+
+Mağazanızda tek bir ürün (örneğin "Sipariş ödemesi") oluşturup onun varyantını kullanın: her ödeme sayfası bu varyanta kendi fiyatını verir (`custom_price`), bu yüzden her sipariş için ayrı ürün gerekmez. **Settings → Webhooks** altında `order_created` olayıyla (isterseniz `order_refunded` ile de) ve bir imza anahtarıyla bir webhook ekleyin.
+
+`paymentId` Lemon Squeezy'nin sipariş numarasıdır; `conversationId` ise ödeme sayfasının özel verisinde tutulan sizin sipariş numaranızdır. Lemon Squeezy her fiyatı mağazanızın para biriminde okur: `currency` değerini mağazanızın para birimine ayarlayın (varsayılan USD); başka bir para birimiyle gelen ödeme reddedilir, böylece örneğin TL tutarı yanlışlıkla dolar olarak çekilmez.
+
+## Ödeme sayfası [#checkout]
+
+```typescript
+const init = await payment.lemonsqueezy.initThreeDSPayment({
+  ...paymentRequest, // no paymentCard needed
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/thanks', // where the customer returns after paying
+});
+// init.redirectUrl is the checkout; init.threeDSHtmlContent sends the browser there
+```
+
+`embed: true` ile ödeme sayfasını Lemon.js kullanarak sayfanızın üzerinde bir pencere olarak açın:
+
+```html
+<script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
+<script>
+  // once lemon.js has loaded
+  LemonSqueezy.Url.Open(checkoutUrl); // init.redirectUrl
+</script>
+```
+
+## Webhook [#webhook]
+
+Lemon Squeezy sonucu webhook adresinize `X-Signature` başlığıyla POST eder: ham gövdenin, imza anahtarınızla hesaplanan hex HMAC-SHA256 değeri. Webhook adresini, PayTR'nin bildirim adresinde olduğu gibi handler'ın callback rotasına yönlendirin ya da ödemeyi kendi rotanızda tamamlayın:
+
+```typescript
+// With the handler: set the webhook URL to https://yoursite.com/api/pay/lemonsqueezy/callback
+const handler = new BetterPaymentHandler(payment, {
+  onCallback: async (result) => {
+    // result.conversationId: your order id; result.paymentId: Lemon Squeezy's order id
+  },
+});
+```
+
+```typescript
+// Or in your own webhook route (read the body as text, before any JSON parsing)
+const rawBody = await request.text();
+const result = await payment.lemonsqueezy.completeThreeDSPayment(JSON.parse(rawBody), {
+  rawBody,
+  signature: request.headers.get('x-signature') ?? undefined,
+  orderId: order.id,   // optional, from your records
+  amount: order.total, // optional, checked against the order
+});
+```
+
+- imza ham gövde üzerinden doğrulanmalıdır; aksi `INVALID_HASH` olur ve yalnızca imzalı gövde kullanılır, ayrıştırılmış `callbackData` asla kullanılmaz;
+- sipariş numaranız imzalı olayın özel verisinden gelir ve `orderId` verdiyseniz onunla aynı olmalıdır;
+- ardından sipariş Lemon Squeezy'den okunur: sizin mağazanıza ait olmalı ve `amount` verdiyseniz o tutarda olmalıdır. Sonucu durumu belirler: `paid` `success`, `refunded` `cancelled`, `failed` ve `fraudulent` `failure`, `pending` ise `pending` olur.
+
+Handler rotası ham gövdeyi ve `X-Signature` başlığını sağlayıcıya iletir; bu yüzden gövdenin ayrıştırılmamış olması gerekir. Adaptörler gövdeyi metin olarak okur, ama handler'dan önce konan bir JSON ayrıştırıcı (örneğin `express.json()`) ham baytları kaybettirir ve rota bu durumda `400` döner. İmzası geçerli her bildirimi `200` ile onaylar (Lemon Squeezy 2xx alana kadar webhook'u yeniden gönderir); geçersiz imzaya `400`, sipariş okunamadığında ise Lemon Squeezy yeniden denesin diye `503` döner. Kendi kayıtlarınızdaki `orderId` ve `amount` değerlerini yalnızca kendi rotanız verebilir.
+
+## İade, iptal ve durum [#refund-cancel--status]
+
+```typescript
+await payment.lemonsqueezy.refund({ paymentId: '1001', price: '5.00', currency: 'USD', ip: '1.2.3.4' }); // partial
+await payment.lemonsqueezy.cancel({ paymentId: '1001', ip: '1.2.3.4' });                                  // full refund
+const status = await payment.lemonsqueezy.getPayment('1001');
+// status: 'success' (also after a partial refund), 'cancelled' (refunded), 'failure', 'pending'
+```
+
+Lemon Squeezy'de iptal (void) yoktur; bu yüzden `cancel()` siparişin tamamını iade eder.
+
+## Desteklenmeyenler [#not-supported]
+
+Kartı Lemon Squeezy'nin kendisi aldığı için `createPayment()` (doğrudan kartlı ödeme), ön provizyon, kayıtlı kartlar, BIN ve taksit sorguları `NOT_SUPPORTED` fırlatır. Abonelikler ve lisans anahtarları bu sağlayıcının kapsamında değildir.

@@ -141,6 +141,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | QNBpay ³    | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| Lemon Squeezy ⁴ | —                   | ✓ hosted checkout           |   ✓    | ✓ (refund)      |   ✓    |  —  | —                 |
 | Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
@@ -154,6 +155,7 @@ this id to `refund`, `cancel` and `getPayment`.
 Halkbank Macedonia, with `est({ bank })`.
 ² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
 ³ QNBpay runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })`. Not verified with a test merchant yet.
+⁴ Lemon Squeezy is a merchant of record: the customer pays on its checkout (a page or an overlay), and the result arrives as a signed webhook. Businesses in Türkiye can receive payouts in USD.
 
 ### 3D Secure completion
 
@@ -168,6 +170,11 @@ Halkbank Macedonia, with `est({ bank })`.
 - **Sipay:** Sipay POSTs to your `callbackUrl` (or `failUrl`). The callback's
   `hash_key` is decrypted with your app secret; its signed status, invoice id and
   order id decide the result, and the other fields are not trusted.
+- **Lemon Squeezy:** the customer pays on Lemon Squeezy's checkout; the result arrives as a
+  webhook signed with `X-Signature` (HMAC-SHA256 of the raw body). Point it at
+  `/api/pay/lemonsqueezy/callback` (the handler needs the raw body), or call
+  `completeThreeDSPayment(event, { rawBody, signature })` in your own route; the order is
+  then read from Lemon Squeezy.
 - **EST:** the bank POSTs to your `callbackUrl`. The hash (ver3) is verified, then the
   result is confirmed with the bank: `3d` and `3d_host` only authenticate the card and
   charge it with the XML API, `3d_pay` / `3d_pay_hosting` are checked with an order

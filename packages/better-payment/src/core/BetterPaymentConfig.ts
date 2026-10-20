@@ -19,6 +19,7 @@ export enum ProviderType {
   ALBARAKA = 'albaraka',
   /** QNBpay, on Sipay's platform: `sipay({ brand: 'qnbpay' })` or `qnbpay()` */
   QNBPAY = 'qnbpay',
+  LEMONSQUEEZY = 'lemonsqueezy',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -154,6 +155,11 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.QNBPAY]: {
     sandbox: 'https://test.qnbpay.com.tr',
     production: 'https://portal.qnbpay.com.tr',
+  },
+  [ProviderType.LEMONSQUEEZY]: {
+    // One host; the API key selects test or live mode
+    sandbox: 'https://api.lemonsqueezy.com',
+    production: 'https://api.lemonsqueezy.com',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {

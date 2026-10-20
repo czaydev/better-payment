@@ -105,6 +105,7 @@ Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 | `success` / `pending` sonucu | 200 | sağlayıcı sonucu |
 | `failure` sonucu | 422 | sağlayıcı sonucu (`errorCode`, `errorMessage`) |
 | PayTR bildirimi (`/paytr/callback`) | 200 `text/plain` | `OK` (hash geçersizse 400) |
+| Lemon Squeezy webhook'u (`/lemonsqueezy/callback`) | imzası geçerli her bildirimde 200; imza geçersizse ya da gövde handler'dan önce ayrıştırıldıysa 400; sipariş okunamadıysa 503 | sağlayıcı sonucu |
 | `callbackRedirect` bir URL döndürdü | 303 | `Location` başlığı |
 | Geçersiz girdi / yanlış metot / etkin değil | 400 / 405 / 404 | `{ error, message }` |
 | `authorize` reddetti | 403 | `{ error, message }` |
