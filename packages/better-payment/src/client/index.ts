@@ -335,6 +335,7 @@ export class BetterPaymentClient {
   readonly yapikredi: ProviderClient;
   readonly qnb: ProviderClient;
   readonly qnbpay: ProviderClient;
+  readonly garanti: ProviderClient;
   /** The in-memory test provider (`MockProvider` from `better-payment/testing`) */
   readonly mock: ProviderClient;
 
@@ -352,6 +353,7 @@ export class BetterPaymentClient {
     this.yapikredi = new ProviderClient(ProviderType.YAPIKREDI, config);
     this.qnb = new ProviderClient(ProviderType.QNB, config);
     this.qnbpay = new ProviderClient(ProviderType.QNBPAY, config);
+    this.garanti = new ProviderClient(ProviderType.GARANTI, config);
     this.mock = new ProviderClient(ProviderType.MOCK, config);
   }
 

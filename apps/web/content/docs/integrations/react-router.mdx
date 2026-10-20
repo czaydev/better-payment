@@ -1,0 +1,79 @@
+---
+title: React Router
+description: Serve Better Payment from a React Router v7 (or Remix v2) resource route.
+---
+
+<Since version="0.8.0" />
+
+`better-payment/react-router` returns a `loader` and an `action` for a splat resource route. It works with React Router v7 in framework mode and with Remix v2.
+
+## 1. Create the payment instance
+
+```typescript
+// app/lib/payment.server.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+const createPayment = () =>
+  betterPayment({
+    mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+    providers: {
+      iyzico: iyzico({
+        apiKey: process.env.IYZICO_API_KEY!,
+        secretKey: process.env.IYZICO_SECRET_KEY!,
+      }),
+    },
+    handler: {
+      onCallback: async (result) => markOrder(result.paymentId, result.status),
+      callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+    },
+  });
+
+let instance: ReturnType<typeof createPayment> | undefined;
+
+export const getBetterPayment = () => (instance ??= createPayment());
+```
+
+The `.server.ts` suffix keeps the module and your keys out of the browser bundle. Creating the instance in a function means the build does not need the environment variables.
+
+## 2. Add the resource route
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+The route has no default export, so it is a resource route: GET requests go to `loader`, POST requests (bank callbacks included) go to `action`. `api.pay.$.ts` matches everything under `/api/pay`.
+
+With `routes.ts` config, register the file explicitly:
+
+```typescript
+// app/routes.ts
+import { type RouteConfig, route } from '@react-router/dev/routes';
+
+export default [
+  route('api/pay/*', 'routes/api.pay.$.ts'),
+] satisfies RouteConfig;
+```
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.

@@ -1,0 +1,71 @@
+---
+title: Fastify
+description: Better Payment'i bir Fastify plugin'i olarak kaydedin.
+---
+
+`better-payment/fastify`, tüm ödeme route'larını kaydettiğiniz prefix altında sunan bir Fastify plugin'i döndürür.
+
+## 1. Ödeme örneğini oluşturun [#1-create-the-payment-instance]
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+Tüm seçenekler için [yapılandırma](/docs/concepts/configuration), `allowedActions`, `transformRequest` ve diğer handler kancaları için [handler](/docs/concepts/handler) sayfasına bakın.
+
+## 2. Plugin'i kaydedin [#2-register-the-plugin]
+
+```typescript
+// server.ts
+import Fastify from 'fastify';
+import { toFastifyPlugin } from 'better-payment/fastify';
+import { payment } from './payment';
+
+const app = Fastify();
+await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
+
+await app.listen({ port: 3000 });
+```
+
+`prefix` olarak handler'ın `basePath`'ini (varsayılan `/api/pay`) kullanın.
+
+Fastify, `application/x-www-form-urlencoded` gövdeleri varsayılan olarak reddeder (415); oysa iyzico, Param, Akbank ve PayTR callback'lerini bu formatta gönderir. Plugin bu formatı yalnızca kendi route'ları için kabul eder; diğer route'larınız Fastify'ın varsayılanlarıyla kalır.
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.
+
+## İstek gövdesi boyutu [#request-body-size]
+
+Fastify kendi `bodyLimit` ayarını uygular (varsayılan 1 MiB). Banka callback'leri birkaç kB'tır.

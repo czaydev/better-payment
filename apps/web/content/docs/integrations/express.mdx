@@ -1,0 +1,75 @@
+---
+title: Express
+description: Mount the Better Payment handler in an Express 4 or 5 app.
+---
+
+`better-payment/express` turns the payment handler into Express middleware. It has no dependencies and works with Express 4 and 5.
+
+## 1. Create the payment instance
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+See [configuration](/docs/concepts/configuration) for every option and [handler](/docs/concepts/handler) for `allowedActions`, `transformRequest` and the other handler hooks.
+
+## 2. Mount the handler
+
+```typescript
+// server.ts
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+
+app.listen(3000);
+```
+
+You don't need `express.json()` or `express.urlencoded()` for the payment routes, because the adapter reads the raw body. If a body parser runs first, its result is used. Unexpected errors are passed to `next(error)`.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.
+
+## Request body size
+
+<Since version="0.8.1" />
+
+The adapter reads at most 1 MiB of a request body and answers `413` for larger ones. Bank callbacks are a few kB. Change the limit with `maxBodySize` (in bytes):
+
+```typescript
+app.all('/api/pay/*path', toExpressHandler(payment, { maxBodySize: 64 * 1024 }));
+```

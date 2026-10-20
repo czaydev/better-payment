@@ -1,0 +1,62 @@
+---
+title: Bun
+description: Serve Better Payment with Bun.serve.
+---
+
+`toFetchHandler` turns the payment handler into the `fetch` function that `Bun.serve` expects. Bun reads `.env` files on its own, so the keys need no extra setup.
+
+## 1. Create the server
+
+```typescript
+// server.ts
+import { betterPayment, iyzico, toFetchHandler } from 'better-payment';
+
+const payment = betterPayment({
+  mode: Bun.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: Bun.env.IYZICO_API_KEY!,
+      secretKey: Bun.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+});
+
+const pay = toFetchHandler(payment);
+
+Bun.serve({
+  port: 3000,
+  fetch(request) {
+    if (new URL(request.url).pathname.startsWith('/api/pay/')) return pay(request);
+    return new Response('Not found', { status: 404 });
+  },
+});
+```
+
+Requests outside the handler's `basePath` (default `/api/pay`) go to the rest of your app. With [Elysia](/docs/integrations/elysia) or [Hono](/docs/integrations/hono) on Bun, use their adapters instead.
+
+## 2. Run it
+
+```bash
+bun add better-payment
+bun run server.ts
+```
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.

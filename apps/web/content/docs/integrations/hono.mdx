@@ -1,0 +1,76 @@
+---
+title: Hono
+description: Mount the Better Payment handler in a Hono app on Node.js, Bun, Deno or Cloudflare Workers.
+---
+
+`better-payment/hono` mounts the payment handler on a Hono route. Hono and Better Payment both use web-standard APIs, so the same app runs on Node.js, Bun, Deno and Cloudflare Workers.
+
+## 1. Create the payment instance
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+See [configuration](/docs/concepts/configuration) for every option and [handler](/docs/concepts/handler) for `allowedActions`, `transformRequest` and the other handler hooks.
+
+On Cloudflare Workers, `process.env` is not available by default: create the instance inside the request with the Worker's `env`, as on the [Cloudflare Workers](/docs/integrations/cloudflare-workers) page.
+
+## 2. Mount the handler
+
+```typescript
+// app.ts
+import { Hono } from 'hono';
+import { toHonoHandler } from 'better-payment/hono';
+import { payment } from './payment';
+
+export const app = new Hono();
+app.all('/api/pay/*', toHonoHandler(payment));
+```
+
+The adapter passes the raw request to the handler, so form-urlencoded bank callbacks keep their original fields for signature checks.
+
+Start the app the way your runtime expects:
+
+```typescript
+// Node.js
+import { serve } from '@hono/node-server';
+serve(app);
+
+// Bun, Deno and Cloudflare Workers
+export default app;
+```
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.

@@ -180,7 +180,7 @@ pnpm --filter web docs:check      # generated pages and public API destinations
 
 Generation rejects unknown MDX components or executable expressions instead of dropping content. Add an explicit conversion and a test in `apps/web/scripts/docs-content.mjs` when introducing a docs component. Code blocks are kept as code, never evaluated.
 
-**Error message languages** (`localizedErrors`) are one file per language in `packages/better-payment/src/plugins/localized-errors/`. Write messages that read naturally for customers. Never shorten them to fit the bundle size check (`pnpm --filter better-payment size`): if a new language goes over the budget, say so in the pull request and a maintainer raises it.
+**Error message languages** (the `i18n` plugin) are one file per language in `packages/better-payment/src/plugins/i18n/locales/`. Write messages that read naturally for customers. Never shorten them to fit the bundle size check (`pnpm --filter better-payment size`): if a new language goes over the budget, say so in the pull request and a maintainer raises it.
 
 ## Releases
 

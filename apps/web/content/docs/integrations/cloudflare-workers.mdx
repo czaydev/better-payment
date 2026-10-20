@@ -1,0 +1,63 @@
+---
+title: Cloudflare Workers
+description: Run Better Payment in a Cloudflare Worker with toFetchHandler.
+---
+
+Better Payment only uses `fetch` and WebCrypto, so it runs in a Worker without the `nodejs_compat` flag. `toFetchHandler` turns the payment handler into a Worker `fetch` function.
+
+## 1. Add your keys as secrets
+
+```bash
+npx wrangler secret put IYZICO_API_KEY
+npx wrangler secret put IYZICO_SECRET_KEY
+```
+
+## 2. Create the Worker
+
+```typescript
+// src/index.ts
+import { betterPayment, iyzico, toFetchHandler } from 'better-payment';
+
+interface Env {
+  IYZICO_API_KEY: string;
+  IYZICO_SECRET_KEY: string;
+}
+
+export default {
+  fetch(request: Request, env: Env): Promise<Response> {
+    const payment = betterPayment({
+      mode: 'sandbox',
+      providers: {
+        iyzico: iyzico({ apiKey: env.IYZICO_API_KEY, secretKey: env.IYZICO_SECRET_KEY }),
+      },
+    });
+    return toFetchHandler(payment)(request);
+  },
+};
+```
+
+Workers pass secrets in `env`, not `process.env`, so the instance is created inside `fetch`. Creating it is cheap: it only reads the configuration.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.
+
+## Idempotency
+
+The default idempotency store keeps duplicate-callback and `Idempotency-Key` records in memory, and every isolate has its own memory. Pass a [shared store](/docs/concepts/handler#duplicate-callbacks-and-idempotency-key) in production. See [edge runtimes](/docs/integrations/edge#idempotency-on-edge-and-serverless) for options. On Workers, Durable Objects or D1 can implement the atomic `setIfAbsent`; Workers KV cannot, because it is eventually consistent.

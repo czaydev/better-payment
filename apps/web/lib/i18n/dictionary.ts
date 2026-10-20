@@ -46,7 +46,8 @@ const en = {
         groups: { gateways: "Payment gateways", banks: "Bank virtual POS", more: "Go further" },
         items: {
           iyzico: "iyzico", paytr: "PayTR", sipay: "Sipay", parampos: "Parampos",
-          akbank: "Akbank", est: "EST / NestPay banks", kuveytturk: "Kuveyt Türk",
+          akbank: "Akbank", halkbank: "Halkbank (EST)", isbank: "İş Bankası (EST)", kuveytturk: "Kuveyt Türk",
+          sekerbank: "Şekerbank (EST)", teb: "TEB (EST)", ziraat: "Ziraat Bankası (EST)",
           customProviders: "Add your own provider", testCards: "Sandbox test cards",
         },
       },
@@ -408,7 +409,8 @@ const tr: Dictionary = {
         groups: { gateways: "Ödeme altyapıları", banks: "Banka sanal POS", more: "Daha fazlası" },
         items: {
           iyzico: "iyzico", paytr: "PayTR", sipay: "Sipay", parampos: "Parampos",
-          akbank: "Akbank", est: "EST / NestPay bankaları", kuveytturk: "Kuveyt Türk",
+          akbank: "Akbank", halkbank: "Halkbank (EST)", isbank: "İş Bankası (EST)", kuveytturk: "Kuveyt Türk",
+          sekerbank: "Şekerbank (EST)", teb: "TEB (EST)", ziraat: "Ziraat Bankası (EST)",
           customProviders: "Kendi sağlayıcınızı ekleyin", testCards: "Sandbox test kartları",
         },
       },

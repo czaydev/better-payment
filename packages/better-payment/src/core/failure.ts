@@ -15,7 +15,7 @@ export interface FailureResult {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }

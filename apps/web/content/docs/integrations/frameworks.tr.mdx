@@ -1,88 +1,27 @@
 ---
-title: Express, Fastify, Hono
-description: Ödeme handler'ını Express, Fastify, Hono, Elysia, React Router veya düz bir Node.js sunucusuna bağlayın.
+title: Genel bakış
+description: Next.js, React Router, Express, Fastify, Hono, Elysia, Node.js ve edge ortamları için framework adapter'ları.
 ---
 
-Her adapter ayrı bir import'tur ve hiç bağımlılığı yoktur; yalnızca kullandığınız yüklenir. Next.js için [Next.js rehberine](/docs/integrations/nextjs), Workers, Deno ve Bun için [edge ortamlarına](/docs/integrations/edge) bakın.
+Her adapter ayrı bir import'tur ve hiç bağımlılığı yoktur; yalnızca kullandığınız yüklenir.
+
+| Framework | Import | Fonksiyon |
+| --- | --- | --- |
+| [Next.js](/docs/integrations/nextjs) | `better-payment/next` | `toNextJsHandler` |
+| [React Router](/docs/integrations/react-router) | `better-payment/react-router` | `toReactRouterHandler` |
+| [Express](/docs/integrations/express) | `better-payment/express` | `toExpressHandler` |
+| [Fastify](/docs/integrations/fastify) | `better-payment/fastify` | `toFastifyPlugin` |
+| [Hono](/docs/integrations/hono) | `better-payment/hono` | `toHonoHandler` |
+| [Elysia](/docs/integrations/elysia) | `better-payment/elysia` | `toElysiaHandler` |
+| [Node.js](/docs/integrations/node) | `better-payment/express` | `toNodeHandler` |
+| [Cloudflare Workers](/docs/integrations/cloudflare-workers), [Deno](/docs/integrations/deno), [Bun](/docs/integrations/bun) | `better-payment` | `toFetchHandler` |
 
 Tüm adapter'lar:
 - JSON ve form-urlencoded gövdeleri (banka callback'leri) handler'a geçirir
 - PayTR'nin `OK` yanıtını düz metin olarak gönderir
 - yönlendirmelerin (`callbackRedirect`) `Location` başlığını korur
 
-Onları handler'ın `basePath`'i altına bağlayın (varsayılan `/api/pay`).
-
-## Express
-
-```typescript
-import express from 'express';
-import { toExpressHandler } from 'better-payment/express';
-import { payment } from './payment';
-
-const app = express();
-app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
-```
-
-Adapter ham gövdeyi kendisi okuduğu için ödeme route'larında `express.json()` ya da `express.urlencoded()` kullanmanız gerekmez. Önce bir body parser çalışmışsa onun sonucu kullanılır. Beklenmeyen hatalar `next(error)`'a iletilir.
-
-## Fastify
-
-```typescript
-import Fastify from 'fastify';
-import { toFastifyPlugin } from 'better-payment/fastify';
-
-const app = Fastify();
-await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
-```
-
-Fastify, `application/x-www-form-urlencoded` gövdeleri varsayılan olarak reddeder (415); oysa iyzico, Param, Akbank ve PayTR callback'lerini bu formatta gönderir. Plugin bu formatı yalnızca kendi route'ları için kabul eder; diğer route'larınız Fastify'ın varsayılanlarıyla kalır.
-
-## Hono
-
-```typescript
-import { Hono } from 'hono';
-import { toHonoHandler } from 'better-payment/hono';
-
-const app = new Hono();
-app.all('/api/pay/*', toHonoHandler(payment));
-```
-
-Hono, Better Payment gibi Node.js, Bun, Deno ve Cloudflare Workers'da çalışır.
-
-## Elysia
-
-```typescript
-import { Elysia } from 'elysia';
-import { toElysiaHandler } from 'better-payment/elysia';
-
-const app = new Elysia();
-app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
-```
-
-`{ parse: 'none' }` handler'a ham gövdeyi bırakır: banka callback'leri form-urlencoded gelir ve imzaları orijinal alanlarla doğrulanır. Bu ayar olmadan `body` okuyan herhangi bir hook (`onTransform`, `derive`, `onBeforeHandle` ya da bir plugin) Elysia'nın isteği önce tüketmesine yol açar. Elysia Bun için tasarlanmıştır, Node.js'te de çalışır.
-
-## React Router
-
-<Since version="0.8.0" />
-
-```typescript
-// app/routes/api.pay.$.ts
-import { toReactRouterHandler } from 'better-payment/react-router';
-import { getBetterPayment } from '~/lib/payment.server';
-
-export const { loader, action } = toReactRouterHandler(getBetterPayment);
-```
-
-Default export'u olmayan bir splat resource route'tur (`api.pay.$.ts`, `/api/pay` altındaki her şeyi yakalar): GET istekleri `loader`'a, POST istekleri (banka callback'leri dahil) `action`'a gider. Aynı kod Remix v2'de de çalışır. `routes.ts` yapılandırması kullanıyorsanız `route('api/pay/*', 'routes/api.pay.$.ts')` olarak kaydedin.
-
-## Düz Node.js [#plain-nodejs]
-
-```typescript
-import { createServer } from 'node:http';
-import { toNodeHandler } from 'better-payment/express';
-
-createServer(toNodeHandler(payment)).listen(3000);
-```
+Onları handler'ın `basePath`'i altına bağlayın (varsayılan `/api/pay`). Listede olmayan bir framework için [diğer framework'ler](/docs/concepts/handler#frameworks) bölümüne bakın.
 
 ## Tembel başlatma [#lazy-initialization]
 
