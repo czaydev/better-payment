@@ -21,7 +21,11 @@ import type {
 import type { PaymentProvider } from './PaymentProvider';
 import type { BetterPaymentLogger } from './logger';
 import type { PaymentEventListeners } from './events';
-import type { BetterPaymentRequest, BetterPaymentResponse } from './BetterPaymentHandler';
+import type {
+  BetterPaymentRequest,
+  BetterPaymentResponse,
+  BuiltInHandlerAction,
+} from './BetterPaymentHandler';
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -139,6 +143,26 @@ export interface PluginContext {
   readonly logger: BetterPaymentLogger | undefined;
   /** A provider by id. Its operations run with hooks and events. */
   use(providerId: string): PaymentProvider;
+  /** The endpoints registered by plugins, without their handlers */
+  readonly endpoints: readonly EndpointInfo[];
+}
+
+/** A plugin endpoint as other plugins see it */
+export interface EndpointInfo {
+  readonly pluginId: string;
+  readonly name: string;
+  readonly method: 'GET' | 'POST';
+  readonly path: string;
+  readonly privileged: boolean;
+  readonly openapi?: EndpointOpenAPIMetadata;
+}
+
+/** The handler serving an endpoint request */
+export interface EndpointHandlerInfo {
+  /** Path prefix the handler is mounted on, e.g. `/api/pay` */
+  readonly basePath: string;
+  /** The built-in actions it serves (`allowedActions`) */
+  readonly allowedActions: readonly BuiltInHandlerAction[];
 }
 
 export interface EndpointContext extends PluginContext {
@@ -148,6 +172,19 @@ export interface EndpointContext extends PluginContext {
   query: URLSearchParams;
   /** Builds a JSON response with a status code other than 200 */
   json(body: unknown, status?: number): BetterPaymentResponse;
+  /** Builds an HTML response */
+  html(body: string, status?: number): BetterPaymentResponse;
+  /** The handler serving the request */
+  readonly handler: EndpointHandlerInfo;
+}
+
+export interface EndpointOpenAPIMetadata {
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  requestBody?: unknown;
+  responses?: Record<string, unknown>;
+  parameters?: unknown[];
 }
 
 /**
@@ -163,6 +200,8 @@ export interface PaymentEndpoint {
    * like refunds. The hook runs for every endpoint that has one.
    */
   privileged?: boolean;
+  /** Optional OpenAPI documentation metadata */
+  openapi?: EndpointOpenAPIMetadata;
   handler: (ctx: EndpointContext) => Awaitable<unknown>;
 }
 

@@ -1,0 +1,139 @@
+---
+title: Ziraat Bankası (EST)
+description: Ziraat Bankası virtual POS (EST / NestPay) integration reference.
+---
+
+Ziraat Bankası's virtual POS runs on EST (Asseco NestPay). Better Payment connects to it with the `est`
+provider and `bank: 'ziraat'`, which selects Ziraat Bankası's production host. 3D Secure requests and
+callbacks are signed with hash version 3: `base64(SHA-512(values sorted by field name, then the
+store key, joined with "|"))`.
+
+<Callout type="info">
+  Ziraat Bankası uses the same EST gateway as İş Bankası, which was verified end to end on the shared EST test environment (non-3D sale, void, refund, order status and all four 3D models). Ziraat Bankası's production host has not been tested; try a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, est } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    ziraat: est({
+      bank: 'ziraat',
+      clientId: process.env.ZIRAAT_CLIENT_ID!,
+      username: process.env.ZIRAAT_API_USER!,
+      password: process.env.ZIRAAT_API_PASSWORD!,
+      storeKey: process.env.ZIRAAT_STORE_KEY!,
+      // storeType?: '3d' | '3d_pay' | '3d_pay_hosting' | '3d_host' (default '3d')
+      // department?: number (BOLUM, when the bank assigned one)
+      // acceptedMdStatuses?: string[] (default ['1'], see below)
+      // baseUrl: defaults from mode (shared EST test host / sanalpos2.ziraatbank.com.tr)
+    }),
+  },
+});
+```
+
+`clientId` is your Ziraat Bankası store number. `username` and `password` belong to the API user
+(XML API), and `storeKey` is the 3D Secure store key; all come from Ziraat Bankası's merchant panel.
+`storeType` must match the 3D model Ziraat Bankası set up for your store.
+
+```bash
+ZIRAAT_CLIENT_ID=your-store-number
+ZIRAAT_API_USER=your-api-user
+ZIRAAT_API_PASSWORD=your-api-password
+ZIRAAT_STORE_KEY=your-3d-store-key
+```
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+### Hosts
+
+| Mode | Host |
+| ---- | ---- |
+| `sandbox` | `https://entegrasyon.asseco-see.com.tr` (shared by every EST bank) |
+| `production` | `https://sanalpos2.ziraatbank.com.tr` |
+
+```typescript
+const payment = betterPayment({
+  mode: 'sandbox', // shared EST test host
+  providers: {
+    ziraat: est({ bank: 'ziraat', clientId, username, password, storeKey }),
+  },
+});
+```
+
+Every EST bank uses the same test host, so sandbox requests reach Asseco's test environment with
+the test store credentials Ziraat Bankası gives you. Pass `baseUrl` only if Ziraat Bankası gave you a different host.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.ziraat.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML API Auth; success when ProcReturnCode is 00 and Response is Approved
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.ziraat.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/ziraat/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits a signed form to the Ziraat Bankası 3D gate
+```
+
+With `3d_pay_hosting` and `3d_host` Ziraat Bankası collects the card on its own page, so the
+request needs no `paymentCard`. Ziraat Bankası POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.ziraat.completeThreeDSPayment(callbackBody);
+```
+
+The hash covers the values of every returned field but not their names, so a valid hash
+alone does not prove which value is the order id. The result is confirmed with Ziraat Bankası:
+
+- a callback with an invalid hash, or for another `clientid`, is rejected as `INVALID_HASH`;
+- `3d` / `3d_host`: Ziraat Bankası only authenticates the card. When `mdStatus` is accepted, the card
+  is charged with the XML API `Auth` (using `md`), and Ziraat Bankası's answer decides;
+- `3d_pay` / `3d_pay_hosting`: Ziraat Bankası charged the card. An approved callback is checked with an
+  order status query; a payment Ziraat Bankası does not confirm is rejected as `INVALID_HASH`.
+
+`paymentId` and `conversationId` are set only for a payment Ziraat Bankası confirmed, so a failure
+never carries an order id taken from the callback.
+
+### mdStatus
+
+`mdStatus` `1` means the card was fully authenticated. `2`, `3` and `4` are half-secure: the card
+or its bank is not enrolled in 3D Secure, or only an attempt was made. In the `3d` and `3d_host`
+models only `1` is charged by default; any other value fails with `MD_STATUS_<value>`. To charge
+half-secure payments too, list them in `acceptedMdStatuses` (for example `['1', '2', '3', '4']`).
+Chargeback liability can then stay with you. In `3d_pay` and `3d_pay_hosting` Ziraat Bankası decides.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.ziraat.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Credit
+await payment.ziraat.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                                  // Void
+const status = await payment.ziraat.getPayment('ORDER123');                                             // ORDERSTATUS
+// status: 'success' (captured sale), 'cancelled' (voided or refunded),
+// 'failure' (declined or unknown order), 'pending' (anything else)
+```
+
+## Browser Client
+
+`better-payment/client` has no `client.ziraat` property. Reach the provider by its key in `providers`:
+
+```typescript
+const result = await client.use('ziraat').initThreeDSPayment(request);
+```
+
+<Callout type="info">
+  BIN and installment queries are not supported for EST: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates with Ziraat Bankası.
+</Callout>
+
+## Other EST banks
+
+The same provider works for [Halkbank (EST)](/docs/banks/halkbank), [İş Bankası (EST)](/docs/banks/isbank), [Şekerbank (EST)](/docs/banks/sekerbank) and [TEB (EST)](/docs/banks/teb). See [EST (NestPay)](/docs/banks/est) to use
+more than one of them in one app.

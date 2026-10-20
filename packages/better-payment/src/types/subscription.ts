@@ -64,7 +64,7 @@ export interface SubscriptionInitializeResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;
@@ -99,7 +99,7 @@ export interface SubscriptionCancelResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;
@@ -128,7 +128,7 @@ export interface SubscriptionUpgradeResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;
@@ -155,7 +155,7 @@ export interface SubscriptionRetrieveResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;
@@ -194,7 +194,7 @@ export interface SubscriptionCardUpdateResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   token?: string;
   checkoutFormContent?: string;
@@ -223,7 +223,7 @@ export interface SubscriptionProductResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;
@@ -260,7 +260,7 @@ export interface PricingPlanResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   data?: {
     referenceCode: string;

@@ -13,7 +13,7 @@ tests/
 │   ├── client/                # Tarayıcı istemcisi
 │   ├── core/                  # Ödeme, handler, doğrulama, sepet ve hata mantığı
 │   ├── examples/              # Özel provider örneği
-│   ├── plugins/               # localizedErrors
+│   ├── plugins/               # i18n, chaos, notifications, openAPI
 │   ├── providers/             # iyzico, PayTR, Parampos, Akbank ve ortak işlemler
 │   ├── testing/               # MockProvider
 │   ├── sandbox-redact.test.ts # Sandbox kayıtlarının hassas veri temizliği

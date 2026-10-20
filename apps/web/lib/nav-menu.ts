@@ -61,8 +61,12 @@ export const menus: Record<MenuKey, { icon: MenuIcon; href: string; groups: read
         id: "banks",
         items: [
           { id: "akbank", href: "/docs/banks/akbank", icon: "building" },
-          { id: "est", href: "/docs/banks/est", icon: "building" },
+          { id: "halkbank", href: "/docs/banks/halkbank", icon: "building" },
+          { id: "isbank", href: "/docs/banks/isbank", icon: "building" },
           { id: "kuveytturk", href: "/docs/banks/kuveytturk", icon: "building" },
+          { id: "sekerbank", href: "/docs/banks/sekerbank", icon: "building" },
+          { id: "teb", href: "/docs/banks/teb", icon: "building" },
+          { id: "ziraat", href: "/docs/banks/ziraat", icon: "building" },
         ],
       },
       {

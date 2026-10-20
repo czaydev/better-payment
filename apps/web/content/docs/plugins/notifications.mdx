@@ -53,7 +53,7 @@ Every channel takes `events`: the [event types](/docs/concepts/events) it receiv
 | Option | Default | Description |
 | ------ | ------- | ----------- |
 | `channels` | — | Where messages go |
-| `locale` | `'en'` | Language of the messages: `'en'`, `'tr'`, `'de'`, `'ru'` or `'ar'`, like [`localizedErrors`](/docs/plugins/localized-errors) |
+| `locale` | `'en'` | Language of the messages: `'en'`, `'tr'`, `'de'`, `'ru'` or `'ar'`, like [`i18n`](/docs/plugins/i18n) |
 | `format` | — | `(event) => string`: builds the message instead of the default one |
 | `minAmount` | — | Skip events with a smaller amount. Compared as a number, whatever the currency; events without an amount are sent. |
 | `filter` | — | `(event) => boolean`: return `false` to skip an event |

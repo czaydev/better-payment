@@ -31,6 +31,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0 # changesets reads git history
+          persist-credentials: false # the push below uses GH_TOKEN
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -44,11 +45,45 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Not changesets/action: v1 reads changesets with a changesets 1 reader that takes every
+      # folder in .changeset/ for an old-format changeset, so it fails on .changeset/pre/ (where
+      # changesets 3 keeps the released changesets in pre mode) with "ENOENT ... pre/changes.md".
       - name: Open or update the release PR
-        uses: changesets/action@v1
-        with:
-          version: pnpm version-packages
-          title: "${{ github.ref_name == 'beta' && 'chore(release): version packages (beta)' || 'chore(release): version packages' }}"
-          commit: "${{ github.ref_name == 'beta' && 'chore(release): version packages (beta)' || 'chore(release): version packages' }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+          BASE: ${{ github.ref_name }}
+          TITLE: "${{ github.ref_name == 'beta' && 'chore(release): version packages (beta)' || 'chore(release): version packages' }}"
+        run: |
+          if ! ls .changeset/*.md 2>/dev/null | grep -qv '/README\.md$'; then
+            echo "No changesets on $BASE; nothing to release."
+            exit 0
+          fi
+
+          branch="changeset-release/$BASE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          pnpm version-packages
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "The changesets do not change better-payment; nothing to release."
+            exit 0
+          fi
+          git add -A
+          git commit -m "$TITLE"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+
+          version=$(node -p "require('./packages/better-payment/package.json').version")
+          node -e '
+            const text = require("fs").readFileSync("packages/better-payment/CHANGELOG.md", "utf8");
+            const start = text.indexOf(`\n## ${process.argv[1]}\n`);
+            const end = text.indexOf("\n## ", start + 1);
+            const section = start === -1 ? "" : text.slice(start + 1, end === -1 ? undefined : end);
+            console.log(`Releases better-payment ${process.argv[1]}. Merging this PR publishes it to npm.\n\n${section.trim()}`);
+          ' "$version" > "$RUNNER_TEMP/release-pr-body.md"
+
+          pr=$(gh pr list --head "$branch" --base "$BASE" --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "$TITLE" --body-file "$RUNNER_TEMP/release-pr-body.md"
+          else
+            gh pr create --head "$branch" --base "$BASE" --title "$TITLE" --body-file "$RUNNER_TEMP/release-pr-body.md"
+          fi

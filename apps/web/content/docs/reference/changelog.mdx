@@ -7,6 +7,12 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.12.0-beta.1
+
+### Added
+
+- **[QNBpay](/docs/providers/sipay#qnbpay):** QNBpay through the Sipay provider, with `qnbpay()` or `sipay({ brand: 'qnbpay' })`. Thanks to [@sizinajans](https://github.com/sizinajans).
+
 ## 0.12.0-beta.0
 
 ### Added
@@ -14,7 +20,7 @@ description: Release history and breaking changes for better-payment.
 - **[Albaraka Türk provider](/docs/banks/albaraka):** non-3D sale, 3D Secure, refund, cancel, order inquiry and pre-authorization over Albaraka's Posnet JSON API. Bank-compatible order ids are generated when conversationId is omitted.
 - **[Denizbank provider](/docs/banks/denizbank):** non-3D sale, 3D Secure (3D Model), refund and cancel over InterVPos. The callback hash is rebuilt from `HASHPARAMS`, and the bank's charge decides the result.
 - **[EST Girogate](/docs/banks/est#girogate):** pay with iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly and other alternative methods through the EST gate, with `girogate: { method, country }` instead of a card.
-- **[More EST banks](/docs/banks/est#banks):** `akbankest` (Akbank's older virtual POS) and `halkbankmkd` (Halkbank Macedonia, with `MKD`) join the EST provider.
+- **[More EST banks](/docs/banks/est):** `akbankest` (Akbank's older virtual POS) and `halkbankmkd` (Halkbank Macedonia, with `MKD`) join the EST provider.
 - **[PayTR Direct API 3D Secure](/docs/providers/paytr):** with `threeDSMode: 'direct'`, `initThreeDSPayment()` takes the card from your own checkout form and returns a signed Direct API form instead of PayTR's iFrame.
 - **[QNB provider](/docs/banks/qnb):** non-3D sale, 3D Secure (3D Model and 3D Pay), refund, cancel and order inquiry over the PayFor XML API. 3D callbacks are verified with the ResponseHash and confirmed with the bank.
 - **[VakıfBank provider](/docs/banks/vakifbank):** non-3D sale, 3D Secure (MPI enrollment, then a VPOS authorization that takes the card and amount from VakıfBank's own 3D record), refund and cancel. `getPayment()` is not supported.
@@ -71,7 +77,7 @@ React Router adapter.
 
 ### Added
 
-- **[React Router adapter](/docs/integrations/frameworks#react-router):** `better-payment/react-router` returns a `loader` and an `action` for a splat resource route, for React Router v7 and Remix v2.
+- **[React Router adapter](/docs/integrations/react-router):** `better-payment/react-router` returns a `loader` and an `action` for a splat resource route, for React Router v7 and Remix v2.
 
 ## 0.7.0
 
@@ -84,25 +90,25 @@ Basket helper, Arabic error messages and iyzico refunds by `paymentId`. **Breaki
 ### Added
 
 - **[`buildBasket()`](/docs/payments/basket):** spreads discounts and shipping over basket items so they add up to the payment total, to the kuruş.
-- **[Localized error messages](/docs/plugins/localized-errors):** Arabic (`ar`). `Accept-Language: ar` picks Arabic in the handler. Thanks to [@poyrazavsever](https://github.com/poyrazavsever).
+- **[Localized error messages](/docs/plugins/i18n):** Arabic (`ar`). `Accept-Language: ar` picks Arabic in the handler. Thanks to [@poyrazavsever](https://github.com/poyrazavsever).
 
 ## 0.6.0
 
 ### Added
 
-- **[Elysia adapter](/docs/integrations/frameworks#elysia):** `better-payment/elysia` mounts the handler on Elysia (Bun) in one line: `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })`. Thanks to [@ScottHallchico](https://github.com/ScottHallchico).
+- **[Elysia adapter](/docs/integrations/elysia):** `better-payment/elysia` mounts the handler on Elysia (Bun) in one line: `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })`. Thanks to [@ScottHallchico](https://github.com/ScottHallchico).
 
 ## 0.5.2
 
 ### Added
 
-- **[Localized error messages](/docs/plugins/localized-errors):** Russian (`ru`). `Accept-Language: ru-RU` picks Russian in the handler. Thanks to [@ius-sharma](https://github.com/ius-sharma).
+- **[Localized error messages](/docs/plugins/i18n):** Russian (`ru`). `Accept-Language: ru-RU` picks Russian in the handler. Thanks to [@ius-sharma](https://github.com/ius-sharma).
 
 ## 0.5.1
 
 ### Added
 
-- **[Localized error messages](/docs/plugins/localized-errors):** German (`de`). `Accept-Language: de-DE` picks German in the handler. Thanks to [@ius-sharma](https://github.com/ius-sharma).
+- **[Localized error messages](/docs/plugins/i18n):** German (`de`). `Accept-Language: de-DE` picks German in the handler. Thanks to [@ius-sharma](https://github.com/ius-sharma).
 
 ### Changed
 
@@ -121,7 +127,7 @@ Plugins and typed payment events. **Breaking:** `betterPayment()` replaces `new 
 
 - **[Plugins](/docs/concepts/plugins):** before/after hooks for provider operations, typed methods, handler endpoints and error codes. [Write your own](/docs/guides/writing-plugins) in a few lines.
 - **[Payment events](/docs/concepts/events):** one typed listener for every provider and flow, emitted only for verified results.
-- **[Localized error messages](/docs/plugins/localized-errors):** the first official plugin, in `better-payment/plugins`. Customer-facing messages in English and Turkish.
+- **[Localized error messages](/docs/plugins/i18n):** the first official plugin, in `better-payment/plugins`. Customer-facing messages in English and Turkish.
 - **[Custom providers](/docs/guides/custom-providers)** with `defineProvider()`, and WebCrypto helpers for signing.
 
 ## 0.4.0

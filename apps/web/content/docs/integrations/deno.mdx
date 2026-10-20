@@ -1,0 +1,64 @@
+---
+title: Deno
+description: Serve Better Payment with Deno.serve on Deno and Deno Deploy.
+---
+
+Better Payment has no runtime dependencies, so Deno loads it straight from npm with the `npm:` specifier. `toFetchHandler` turns the handler into the `(request: Request) => Promise<Response>` function that `Deno.serve` expects.
+
+## 1. Create the server
+
+```typescript
+// main.ts
+import { betterPayment, iyzico, toFetchHandler } from 'npm:better-payment';
+
+const payment = betterPayment({
+  mode: Deno.env.get('DENO_DEPLOYMENT_ID') ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: Deno.env.get('IYZICO_API_KEY')!,
+      secretKey: Deno.env.get('IYZICO_SECRET_KEY')!,
+    }),
+  },
+});
+
+const pay = toFetchHandler(payment);
+
+Deno.serve((request) => {
+  if (new URL(request.url).pathname.startsWith('/api/pay/')) return pay(request);
+  return new Response('Not found', { status: 404 });
+});
+```
+
+Requests outside the handler's `basePath` (default `/api/pay`) go to the rest of your app. With [Hono](/docs/integrations/hono) on Deno, use its adapter instead.
+
+## 2. Run it
+
+```bash
+deno run --allow-net --allow-env main.ts
+```
+
+The handler needs `--allow-net` to call the provider APIs and `--allow-env` to read the keys. On Deno Deploy, set the keys in the project's environment variables.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.
+
+## Idempotency
+
+The default idempotency store keeps duplicate-callback and `Idempotency-Key` records in memory, and every isolate has its own memory. Pass a [shared store](/docs/concepts/handler#duplicate-callbacks-and-idempotency-key) in production. See [edge runtimes](/docs/integrations/edge#idempotency-on-edge-and-serverless) for options.

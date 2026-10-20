@@ -1,0 +1,64 @@
+---
+title: Elysia
+description: Mount the Better Payment handler in an Elysia app on Bun or Node.js.
+---
+
+`better-payment/elysia` mounts the payment handler on an Elysia route. Elysia is built for Bun and also runs on Node.js.
+
+## 1. Create the payment instance
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+See [configuration](/docs/concepts/configuration) for every option and [handler](/docs/concepts/handler) for `allowedActions`, `transformRequest` and the other handler hooks.
+
+## 2. Mount the handler
+
+```typescript
+// server.ts
+import { Elysia } from 'elysia';
+import { toElysiaHandler } from 'better-payment/elysia';
+import { payment } from './payment';
+
+new Elysia()
+  .all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })
+  .listen(3000);
+```
+
+`{ parse: 'none' }` keeps the raw body for the handler: bank callbacks are form-urlencoded and their signatures are checked against the original fields. Without it, any hook that reads `body` (`onTransform`, `derive`, `onBeforeHandle` or a plugin) makes Elysia consume the request first.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.

@@ -2,8 +2,20 @@
   "title": "Entegrasyonlar",
   "icon": "integrations",
   "pages": [
-    "nextjs",
     "frameworks",
-    "edge"
+    "---Fullstack---",
+    "nextjs",
+    "react-router",
+    "---Backend---",
+    "express",
+    "fastify",
+    "hono",
+    "elysia",
+    "node",
+    "---Edge---",
+    "edge",
+    "cloudflare-workers",
+    "deno",
+    "bun"
   ]
 }

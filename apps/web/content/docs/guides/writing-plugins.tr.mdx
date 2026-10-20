@@ -188,7 +188,7 @@ endpoints: {
 - Ödemeleri değiştiren ya da gösteren endpoint'leri `privileged: true` ile işaretleyin: handler, iadelerde olduğu gibi `authorize` hook'u olmadan başlamayı reddeder.
 - Bir adres bir sağlayıcı kimliğiyle ya da `health` ile başlayamaz.
 
-Handler'ın yanıtlarını değiştirmek için `onResponse` kullanın. Tekrar gönderilenler dahil her yanıtta çalışır ve yerine yeni bir yanıt döndürebilir; [localizedErrors](/docs/plugins/localized-errors) bunu, mesajları her isteğin `Accept-Language` başlığına göre çevirmek için kullanır. Hata fırlatırsa hata loglanır ve yanıt değiştirilmeden gönderilir.
+Handler'ın yanıtlarını değiştirmek için `onResponse` kullanın. Tekrar gönderilenler dahil her yanıtta çalışır ve yerine yeni bir yanıt döndürebilir; [i18n](/docs/plugins/i18n) bunu, mesajları her isteğin `Accept-Language` başlığına göre çevirmek için kullanır. Hata fırlatırsa hata loglanır ve yanıt değiştirilmeden gönderilir.
 
 ## Hata kodları [#error-codes]
 
