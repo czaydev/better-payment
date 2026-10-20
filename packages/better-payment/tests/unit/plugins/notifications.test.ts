@@ -209,7 +209,7 @@ describe('notifications', () => {
     expect(flushed).toBe(true);
   });
 
-  it('formats messages in the localizedErrors languages, escaped for Slack', async () => {
+  it('formats messages in the languages of the i18n plugin, escaped for Slack', async () => {
     const { fetch, calls } = mockFetch();
     const payment = setup({
       fetch,

@@ -15,6 +15,7 @@ const movedDocs: Record<string, string> = {
   "api/types": "reference/types",
   "api/error-codes": "reference/error-codes",
   "guides/changelog": "reference/changelog",
+  "plugins/localized-errors": "plugins/i18n",
 };
 
 /**

@@ -1,0 +1,62 @@
+---
+title: Bun
+description: Better Payment'i Bun.serve ile sunun.
+---
+
+`toFetchHandler`, ödeme handler'ını `Bun.serve`'ün beklediği `fetch` fonksiyonuna çevirir. Bun `.env` dosyalarını kendisi okur; anahtarlar için ek kurulum gerekmez.
+
+## 1. Sunucuyu oluşturun [#1-create-the-server]
+
+```typescript
+// server.ts
+import { betterPayment, iyzico, toFetchHandler } from 'better-payment';
+
+const payment = betterPayment({
+  mode: Bun.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: Bun.env.IYZICO_API_KEY!,
+      secretKey: Bun.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+});
+
+const pay = toFetchHandler(payment);
+
+Bun.serve({
+  port: 3000,
+  fetch(request) {
+    if (new URL(request.url).pathname.startsWith('/api/pay/')) return pay(request);
+    return new Response('Not found', { status: 404 });
+  },
+});
+```
+
+Handler'ın `basePath`'i (varsayılan `/api/pay`) dışındaki istekler uygulamanızın geri kalanına gider. Bun'da [Elysia](/docs/integrations/elysia) ya da [Hono](/docs/integrations/hono) kullanıyorsanız onların adapter'larını kullanın.
+
+## 2. Çalıştırın [#2-run-it]
+
+```bash
+bun add better-payment
+bun run server.ts
+```
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.

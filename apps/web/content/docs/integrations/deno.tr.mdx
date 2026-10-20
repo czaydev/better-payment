@@ -1,0 +1,64 @@
+---
+title: Deno
+description: Better Payment'i Deno ve Deno Deploy'da Deno.serve ile sunun.
+---
+
+Better Payment'in runtime bağımlılığı yoktur; bu yüzden Deno onu `npm:` belirteciyle doğrudan npm'den yükler. `toFetchHandler`, handler'ı `Deno.serve`'ün beklediği `(request: Request) => Promise<Response>` fonksiyonuna çevirir.
+
+## 1. Sunucuyu oluşturun [#1-create-the-server]
+
+```typescript
+// main.ts
+import { betterPayment, iyzico, toFetchHandler } from 'npm:better-payment';
+
+const payment = betterPayment({
+  mode: Deno.env.get('DENO_DEPLOYMENT_ID') ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: Deno.env.get('IYZICO_API_KEY')!,
+      secretKey: Deno.env.get('IYZICO_SECRET_KEY')!,
+    }),
+  },
+});
+
+const pay = toFetchHandler(payment);
+
+Deno.serve((request) => {
+  if (new URL(request.url).pathname.startsWith('/api/pay/')) return pay(request);
+  return new Response('Not found', { status: 404 });
+});
+```
+
+Handler'ın `basePath`'i (varsayılan `/api/pay`) dışındaki istekler uygulamanızın geri kalanına gider. Deno'da [Hono](/docs/integrations/hono) kullanıyorsanız onun adapter'ını kullanın.
+
+## 2. Çalıştırın [#2-run-it]
+
+```bash
+deno run --allow-net --allow-env main.ts
+```
+
+Handler, sağlayıcı API'lerini çağırmak için `--allow-net`, anahtarları okumak için `--allow-env` izni ister. Deno Deploy'da anahtarları projenin ortam değişkenlerine ekleyin.
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.
+
+## Idempotency [#idempotency]
+
+Varsayılan idempotency deposu, tekrar eden callback ve `Idempotency-Key` kayıtlarını bellekte tutar ve her isolate'in kendi belleği vardır. Canlı ortamda [paylaşımlı bir depo](/docs/concepts/handler#duplicate-callbacks-and-idempotency-key) verin. Seçenekler için [edge ortamları](/docs/integrations/edge#idempotency-on-edge-and-serverless) sayfasına bakın.

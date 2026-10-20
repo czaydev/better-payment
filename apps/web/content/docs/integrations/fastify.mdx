@@ -1,0 +1,71 @@
+---
+title: Fastify
+description: Register Better Payment as a Fastify plugin.
+---
+
+`better-payment/fastify` returns a Fastify plugin that serves every payment route under the prefix you register it with.
+
+## 1. Create the payment instance
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+See [configuration](/docs/concepts/configuration) for every option and [handler](/docs/concepts/handler) for `allowedActions`, `transformRequest` and the other handler hooks.
+
+## 2. Register the plugin
+
+```typescript
+// server.ts
+import Fastify from 'fastify';
+import { toFastifyPlugin } from 'better-payment/fastify';
+import { payment } from './payment';
+
+const app = Fastify();
+await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
+
+await app.listen({ port: 3000 });
+```
+
+Use the handler's `basePath` (default `/api/pay`) as the `prefix`.
+
+Fastify rejects `application/x-www-form-urlencoded` bodies by default (415), but iyzico, Param, Akbank and PayTR post their callbacks in that format. The plugin accepts it for its own routes only, so your other routes keep Fastify's defaults.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.
+
+## Request body size
+
+Fastify applies its own `bodyLimit` (1 MiB by default). Bank callbacks are a few kB.

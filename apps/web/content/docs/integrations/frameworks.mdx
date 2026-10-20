@@ -1,88 +1,27 @@
 ---
-title: Express, Fastify, Hono
-description: Mount the payment handler in Express, Fastify, Hono, Elysia, React Router or a plain Node.js server.
+title: Overview
+description: Framework adapters for Next.js, React Router, Express, Fastify, Hono, Elysia, Node.js and edge runtimes.
 ---
 
-Each adapter is a separate import and has no dependencies, so you only load the one you use. For Next.js, see the [Next.js guide](/docs/integrations/nextjs); for Workers, Deno and Bun, see [edge runtimes](/docs/integrations/edge).
+Each adapter is a separate import and has no dependencies, so you only load the one you use.
+
+| Framework | Import | Function |
+| --- | --- | --- |
+| [Next.js](/docs/integrations/nextjs) | `better-payment/next` | `toNextJsHandler` |
+| [React Router](/docs/integrations/react-router) | `better-payment/react-router` | `toReactRouterHandler` |
+| [Express](/docs/integrations/express) | `better-payment/express` | `toExpressHandler` |
+| [Fastify](/docs/integrations/fastify) | `better-payment/fastify` | `toFastifyPlugin` |
+| [Hono](/docs/integrations/hono) | `better-payment/hono` | `toHonoHandler` |
+| [Elysia](/docs/integrations/elysia) | `better-payment/elysia` | `toElysiaHandler` |
+| [Node.js](/docs/integrations/node) | `better-payment/express` | `toNodeHandler` |
+| [Cloudflare Workers](/docs/integrations/cloudflare-workers), [Deno](/docs/integrations/deno), [Bun](/docs/integrations/bun) | `better-payment` | `toFetchHandler` |
 
 All adapters:
 - pass JSON and form-urlencoded bodies (the bank callbacks) to the handler
 - send PayTR's `OK` as plain text
 - keep the `Location` header of redirects (`callbackRedirect`)
 
-Register them under the handler's `basePath` (default `/api/pay`).
-
-## Express
-
-```typescript
-import express from 'express';
-import { toExpressHandler } from 'better-payment/express';
-import { payment } from './payment';
-
-const app = express();
-app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
-```
-
-You don't need `express.json()` or `express.urlencoded()` for the payment routes, because the adapter reads the raw body. If a body parser runs first, its result is used. Unexpected errors are passed to `next(error)`.
-
-## Fastify
-
-```typescript
-import Fastify from 'fastify';
-import { toFastifyPlugin } from 'better-payment/fastify';
-
-const app = Fastify();
-await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
-```
-
-Fastify rejects `application/x-www-form-urlencoded` bodies by default (415), but iyzico, Param, Akbank and PayTR post their callbacks in that format. The plugin accepts it for its own routes only, so your other routes keep Fastify's defaults.
-
-## Hono
-
-```typescript
-import { Hono } from 'hono';
-import { toHonoHandler } from 'better-payment/hono';
-
-const app = new Hono();
-app.all('/api/pay/*', toHonoHandler(payment));
-```
-
-Hono runs on Node.js, Bun, Deno and Cloudflare Workers, like Better Payment.
-
-## Elysia
-
-```typescript
-import { Elysia } from 'elysia';
-import { toElysiaHandler } from 'better-payment/elysia';
-
-const app = new Elysia();
-app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
-```
-
-`{ parse: 'none' }` keeps the raw body for the handler: bank callbacks are form-urlencoded and their signatures are checked against the original fields. Without it, any hook that reads `body` (`onTransform`, `derive`, `onBeforeHandle` or a plugin) makes Elysia consume the request first. Elysia is built for Bun and also runs on Node.js.
-
-## React Router
-
-<Since version="0.8.0" />
-
-```typescript
-// app/routes/api.pay.$.ts
-import { toReactRouterHandler } from 'better-payment/react-router';
-import { getBetterPayment } from '~/lib/payment.server';
-
-export const { loader, action } = toReactRouterHandler(getBetterPayment);
-```
-
-A splat resource route (`api.pay.$.ts` matches everything under `/api/pay`) with no default export: GET requests go to `loader`, POST requests (bank callbacks included) to `action`. The same code works in Remix v2. With `routes.ts` config, register it as `route('api/pay/*', 'routes/api.pay.$.ts')`.
-
-## Plain Node.js
-
-```typescript
-import { createServer } from 'node:http';
-import { toNodeHandler } from 'better-payment/express';
-
-createServer(toNodeHandler(payment)).listen(3000);
-```
+Register them under the handler's `basePath` (default `/api/pay`). For a framework that is not listed, see [other frameworks](/docs/concepts/handler#frameworks).
 
 ## Lazy initialization
 

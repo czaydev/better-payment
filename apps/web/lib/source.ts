@@ -5,6 +5,7 @@ import { toFumadocsSource } from "fumadocs-mdx/runtime/server";
 import { i18n, type Locale } from "@/lib/i18n/config";
 import { releaseStatus } from "@/lib/release";
 import { withBasePath } from "@/lib/base-path";
+import { pageIcon } from "@/lib/docs-page-icons";
 
 /**
  * Sidebar group icons from the brand's frosted-glass set
@@ -27,7 +28,15 @@ function brandIconsPlugin(): LoaderPlugin {
   };
   return {
     name: "better-payment:icons",
-    transformPageTree: { file: resolve, folder: resolve, separator: resolve },
+    transformPageTree: {
+      // Pages get a line icon (or a brand tile) from lib/docs-page-icons.ts
+      file: (node) => {
+        if (node.icon === undefined) node.icon = pageIcon(node.url, node.external);
+        return resolve(node);
+      },
+      folder: resolve,
+      separator: resolve,
+    },
   };
 }
 

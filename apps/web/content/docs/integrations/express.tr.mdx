@@ -1,0 +1,75 @@
+---
+title: Express
+description: Better Payment handler'ını Express 4 veya 5 uygulamasına bağlayın.
+---
+
+`better-payment/express`, ödeme handler'ını bir Express middleware'ine çevirir. Hiç bağımlılığı yoktur; Express 4 ve 5 ile çalışır.
+
+## 1. Ödeme örneğini oluşturun [#1-create-the-payment-instance]
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+Tüm seçenekler için [yapılandırma](/docs/concepts/configuration), `allowedActions`, `transformRequest` ve diğer handler kancaları için [handler](/docs/concepts/handler) sayfasına bakın.
+
+## 2. Handler'ı bağlayın [#2-mount-the-handler]
+
+```typescript
+// server.ts
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+
+app.listen(3000);
+```
+
+Adapter ham gövdeyi kendisi okuduğu için ödeme route'larında `express.json()` ya da `express.urlencoded()` kullanmanız gerekmez. Önce bir body parser çalışmışsa onun sonucu kullanılır. Beklenmeyen hatalar `next(error)`'a iletilir.
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.
+
+## İstek gövdesi boyutu [#request-body-size]
+
+<Since version="0.8.1" />
+
+Adapter bir istek gövdesinin en fazla 1 MiB'ını okur ve daha büyükleri için `413` döner. Banka callback'leri birkaç kB'tır. Sınırı `maxBodySize` (bayt) ile değiştirin:
+
+```typescript
+app.all('/api/pay/*path', toExpressHandler(payment, { maxBodySize: 64 * 1024 }));
+```

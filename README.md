@@ -2,7 +2,7 @@
 
 > Unified, type-safe payment gateway for Node.js & TypeScript.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Akbank, Kuveyt Türk, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
+One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Akbank, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
 (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
@@ -128,28 +128,29 @@ list and suggested customer messages.
 if (result.code === PaymentErrorCode.INSUFFICIENT_FUNDS) askForAnotherCard();
 ```
 
-For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, EST, QNB, VakıfBank and Denizbank, `paymentId` is your **order id**: the
+For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Garanti BBVA, EST, QNB, VakıfBank and Denizbank, `paymentId` is your **order id**: the
 `conversationId` you pass in, or an alphanumeric id generated for you. Pass
 this id to `refund`, `cancel` and `getPayment`.
 
 ## Providers
 
-| Provider    | Non-3D                    | 3D Secure                   | Refund | Cancel          | Status | BIN | Installments      |
-| ----------- | ------------------------- | --------------------------- | :----: | --------------- | :----: | :-: | ----------------- |
-| iyzico      | ✓                         | ✓                           |   ✓    | ✓               |   ✓    |  ✓  | ✓                 |
-| PayTR       | ✓ (needs non-3D approval) | ✓ iFrame / Direct API       |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
-| Parampos    | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
-| Sipay       | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
-| QNBpay ³    | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
-| Paratika ⁴  | ✓                         | ✓ Direct POST 3D            |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
-| Akbank      | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
-| Kuveyt Türk | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
-| EST ¹       | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
-| Denizbank   | ✓                         | ✓ 3D Model                  |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
-| Albaraka ³  | ✓                         | ✓ 3D                        |   ✓    | ✓ (same day)    |  ✓ ³   |  —  | —                 |
-| VakıfBank   | ✓                         | ✓ MPI + VPOS (3DS)          |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
-| Yapı Kredi  | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
-| QNB         | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
+| Provider     | Non-3D                    | 3D Secure                   | Refund | Cancel          | Status | BIN | Installments      |
+| ------------ | ------------------------- | --------------------------- | :----: | --------------- | :----: | :-: | ----------------- |
+| iyzico       | ✓                         | ✓                           |   ✓    | ✓               |   ✓    |  ✓  | ✓                 |
+| PayTR        | ✓ (needs non-3D approval) | ✓ iFrame / Direct API       |   ✓    | ✓ (full refund) |   ✓    |  ✓  | ✓ (account rates) |
+| Parampos     | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
+| Sipay        | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| QNBpay ³     | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| Paratika ⁴   | ✓                         | ✓ Direct POST 3D            |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
+| Akbank       | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
+| Kuveyt Türk  | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
+| Garanti BBVA | ✓                         | ✓ 3D / 3D_PAY / GarantiPay  |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
+| EST ¹        | ✓                         | ✓ 3D / 3D Pay / 3D Host     |   ✓    | ✓               |   ✓    |  —  | —                 |
+| Denizbank    | ✓                         | ✓ 3D Model                  |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
+| Albaraka ²   | ✓                         | ✓ 3D                        |   ✓    | ✓ (same day)    |  ✓ ²   |  —  | —                 |
+| VakıfBank    | ✓                         | ✓ MPI + VPOS (3DS)          |   ✓    | ✓ (same day)    |   —    |  —  | —                 |
+| Yapı Kredi   | ✓                         | ✓ Posnet OOS                |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
+| QNB          | ✓                         | ✓ 3D Model / 3D Pay         |   ✓    | ✓ (next day)    |   ✓    |  —  | —                 |
 
 ¹ İş Bankası, Ziraat Bankası, Halkbank, TEB, Şekerbank, Akbank's older virtual POS and
 Halkbank Macedonia, with `est({ bank })`.
@@ -190,6 +191,12 @@ Halkbank Macedonia, with `est({ bank })`.
 - **QNB:** the bank POSTs to your `callbackUrl`. The `ResponseHash` is verified, then the
   result is confirmed with the bank: `3DModel` charges with `3DModelPayment`, `3DPay` is
   checked with an order inquiry.
+- **Garanti BBVA:** the bank POSTs to your `callbackUrl`. The hash is rebuilt from the
+  fields in `hashparams`, then the result is confirmed with the bank: `3D` provisions
+  with the XML API for the order from your records,
+  `completeThreeDSPayment(callbackBody, { orderId, amount, currency })`; `3D_PAY` and
+  GarantiPay are checked with an order inquiry. An unsigned callback is only ever a
+  failure, without ids.
 - **Paratika / VakıfPay / ZiraatPay:** the customer's browser posts the card straight to
   Paratika (Direct POST 3D), which POSTs the result to your `callbackUrl`. The `sdSha512`
   hash is verified when `secretKey` is set, and the payment is always confirmed with
@@ -310,14 +317,18 @@ const payment = betterPayment({ providers: { ... }, plugins: [auditLog] });
 payment.on('payment.succeeded', (event) => orders.markPaid(event.conversationId));
 ```
 
-Official plugins ship under `better-payment/plugins`. `localizedErrors` puts
-customer-facing error messages in `errorMessage`, in the customer's language
-(English, Turkish, German, Russian, and Arabic included; per request from `Accept-Language` in the handler):
+Official plugins ship under `better-payment/plugins`. `i18n` puts
+customer-facing error messages in `errorMessage`, in the customer's language. It works like
+Better Auth's i18n plugin: English is built in, Turkish, German, Russian, and Arabic come in `locales`,
+and the handler picks each response's language from `Accept-Language`, a cookie, or your own callback:
 
 ```typescript
-import { localizedErrors } from 'better-payment/plugins';
+import { i18n, locales } from 'better-payment/plugins';
 
-const payment = betterPayment({ providers: { ... }, plugins: [localizedErrors({ locale: 'tr' })] });
+const payment = betterPayment({
+  providers: { ... },
+  plugins: [i18n({ translations: { tr: locales.tr }, defaultLocale: 'tr' })],
+});
 ```
 
 `chaos` injects declines, lost responses (`NETWORK_ERROR`) and delays in tests, so you can check how your application handles them.

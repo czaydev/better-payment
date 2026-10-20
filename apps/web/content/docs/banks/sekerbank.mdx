@@ -1,0 +1,139 @@
+---
+title: Şekerbank (EST)
+description: Şekerbank virtual POS (EST / NestPay) integration reference.
+---
+
+Şekerbank's virtual POS runs on EST (Asseco NestPay). Better Payment connects to it with the `est`
+provider and `bank: 'sekerbank'`, which selects Şekerbank's production host. 3D Secure requests and
+callbacks are signed with hash version 3: `base64(SHA-512(values sorted by field name, then the
+store key, joined with "|"))`.
+
+<Callout type="info">
+  Şekerbank uses the same EST gateway as İş Bankası, which was verified end to end on the shared EST test environment (non-3D sale, void, refund, order status and all four 3D models). Şekerbank's production host has not been tested; try a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, est } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    sekerbank: est({
+      bank: 'sekerbank',
+      clientId: process.env.SEKERBANK_CLIENT_ID!,
+      username: process.env.SEKERBANK_API_USER!,
+      password: process.env.SEKERBANK_API_PASSWORD!,
+      storeKey: process.env.SEKERBANK_STORE_KEY!,
+      // storeType?: '3d' | '3d_pay' | '3d_pay_hosting' | '3d_host' (default '3d')
+      // department?: number (BOLUM, when the bank assigned one)
+      // acceptedMdStatuses?: string[] (default ['1'], see below)
+      // baseUrl: defaults from mode (shared EST test host / sanalpos.sekerbank.com.tr)
+    }),
+  },
+});
+```
+
+`clientId` is your Şekerbank store number. `username` and `password` belong to the API user
+(XML API), and `storeKey` is the 3D Secure store key; all come from Şekerbank's merchant panel.
+`storeType` must match the 3D model Şekerbank set up for your store.
+
+```bash
+SEKERBANK_CLIENT_ID=your-store-number
+SEKERBANK_API_USER=your-api-user
+SEKERBANK_API_PASSWORD=your-api-password
+SEKERBANK_STORE_KEY=your-3d-store-key
+```
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+### Hosts
+
+| Mode | Host |
+| ---- | ---- |
+| `sandbox` | `https://entegrasyon.asseco-see.com.tr` (shared by every EST bank) |
+| `production` | `https://sanalpos.sekerbank.com.tr` |
+
+```typescript
+const payment = betterPayment({
+  mode: 'sandbox', // shared EST test host
+  providers: {
+    sekerbank: est({ bank: 'sekerbank', clientId, username, password, storeKey }),
+  },
+});
+```
+
+Every EST bank uses the same test host, so sandbox requests reach Asseco's test environment with
+the test store credentials Şekerbank gives you. Pass `baseUrl` only if Şekerbank gave you a different host.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.sekerbank.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML API Auth; success when ProcReturnCode is 00 and Response is Approved
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.sekerbank.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/sekerbank/payment/complete-3ds',
+});
+// init.threeDSHtmlContent auto-submits a signed form to the Şekerbank 3D gate
+```
+
+With `3d_pay_hosting` and `3d_host` Şekerbank collects the card on its own page, so the
+request needs no `paymentCard`. Şekerbank POSTs the result to `callbackUrl`:
+
+```typescript
+const result = await payment.sekerbank.completeThreeDSPayment(callbackBody);
+```
+
+The hash covers the values of every returned field but not their names, so a valid hash
+alone does not prove which value is the order id. The result is confirmed with Şekerbank:
+
+- a callback with an invalid hash, or for another `clientid`, is rejected as `INVALID_HASH`;
+- `3d` / `3d_host`: Şekerbank only authenticates the card. When `mdStatus` is accepted, the card
+  is charged with the XML API `Auth` (using `md`), and Şekerbank's answer decides;
+- `3d_pay` / `3d_pay_hosting`: Şekerbank charged the card. An approved callback is checked with an
+  order status query; a payment Şekerbank does not confirm is rejected as `INVALID_HASH`.
+
+`paymentId` and `conversationId` are set only for a payment Şekerbank confirmed, so a failure
+never carries an order id taken from the callback.
+
+### mdStatus
+
+`mdStatus` `1` means the card was fully authenticated. `2`, `3` and `4` are half-secure: the card
+or its bank is not enrolled in 3D Secure, or only an attempt was made. In the `3d` and `3d_host`
+models only `1` is charged by default; any other value fails with `MD_STATUS_<value>`. To charge
+half-secure payments too, list them in `acceptedMdStatuses` (for example `['1', '2', '3', '4']`).
+Chargeback liability can then stay with you. In `3d_pay` and `3d_pay_hosting` Şekerbank decides.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.sekerbank.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // Credit
+await payment.sekerbank.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                                  // Void
+const status = await payment.sekerbank.getPayment('ORDER123');                                             // ORDERSTATUS
+// status: 'success' (captured sale), 'cancelled' (voided or refunded),
+// 'failure' (declined or unknown order), 'pending' (anything else)
+```
+
+## Browser Client
+
+`better-payment/client` has no `client.sekerbank` property. Reach the provider by its key in `providers`:
+
+```typescript
+const result = await client.use('sekerbank').initThreeDSPayment(request);
+```
+
+<Callout type="info">
+  BIN and installment queries are not supported for EST: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates with Şekerbank.
+</Callout>
+
+## Other EST banks
+
+The same provider works for [Halkbank (EST)](/docs/banks/halkbank), [İş Bankası (EST)](/docs/banks/isbank), [TEB (EST)](/docs/banks/teb) and [Ziraat Bankası (EST)](/docs/banks/ziraat). See [EST (NestPay)](/docs/banks/est) to use
+more than one of them in one app.

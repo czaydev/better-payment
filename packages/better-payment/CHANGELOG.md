@@ -6,6 +6,12 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
+## 0.12.0-beta.1
+
+### Added
+
+- Add QNBpay, which runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })` uses QNBpay's hosts and provider id, with the same payments, 3D Secure, refunds, pre-authorization and installment queries as Sipay Thanks to @sizinajans (#232).
+
 ## 0.12.0-beta.0
 
 ### Added
