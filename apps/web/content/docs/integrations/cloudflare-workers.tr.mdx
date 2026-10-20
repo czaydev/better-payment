@@ -1,0 +1,63 @@
+---
+title: Cloudflare Workers
+description: Better Payment'i toFetchHandler ile bir Cloudflare Worker'da çalıştırın.
+---
+
+Better Payment yalnızca `fetch` ve WebCrypto kullanır; bu yüzden bir Worker'da `nodejs_compat` bayrağı olmadan çalışır. `toFetchHandler`, ödeme handler'ını bir Worker `fetch` fonksiyonuna çevirir.
+
+## 1. Anahtarlarınızı secret olarak ekleyin [#1-add-your-keys-as-secrets]
+
+```bash
+npx wrangler secret put IYZICO_API_KEY
+npx wrangler secret put IYZICO_SECRET_KEY
+```
+
+## 2. Worker'ı oluşturun [#2-create-the-worker]
+
+```typescript
+// src/index.ts
+import { betterPayment, iyzico, toFetchHandler } from 'better-payment';
+
+interface Env {
+  IYZICO_API_KEY: string;
+  IYZICO_SECRET_KEY: string;
+}
+
+export default {
+  fetch(request: Request, env: Env): Promise<Response> {
+    const payment = betterPayment({
+      mode: 'sandbox',
+      providers: {
+        iyzico: iyzico({ apiKey: env.IYZICO_API_KEY, secretKey: env.IYZICO_SECRET_KEY }),
+      },
+    });
+    return toFetchHandler(payment)(request);
+  },
+};
+```
+
+Worker'lar secret'ları `process.env`'de değil `env`'de verir; bu yüzden örnek `fetch` içinde oluşturulur. Oluşturmak ucuzdur: yalnızca yapılandırmayı okur.
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.
+
+## Idempotency [#idempotency]
+
+Varsayılan idempotency deposu, tekrar eden callback ve `Idempotency-Key` kayıtlarını bellekte tutar ve her isolate'in kendi belleği vardır. Canlı ortamda [paylaşımlı bir depo](/docs/concepts/handler#duplicate-callbacks-and-idempotency-key) verin. Seçenekler için [edge ortamları](/docs/integrations/edge#idempotency-on-edge-and-serverless) sayfasına bakın. Workers'da atomik `setIfAbsent`'i Durable Objects ya da D1 sağlayabilir; Workers KV nihai tutarlı (eventually consistent) olduğu için sağlayamaz.

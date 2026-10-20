@@ -1,0 +1,154 @@
+---
+title: i18n
+description: Müşterilere ödemenin neden başarısız olduğunu kendi dillerinde söyleyin.
+---
+
+<Since version="0.5.0" />
+
+Sağlayıcılar hata mesajlarını kendi ifadeleri ve dilleriyle, çoğu zaman teknik terimlerle yazar ("Do not honour", "Invalid merchant"). `i18n` plugin'i başarısız sonuçların `errorMessage` alanını, normalize [hata koduna](/docs/reference/error-codes) göre seçilen, müşterinin dilinde bir mesajla değiştirir. [Better Auth'un i18n plugin'i](https://better-auth.com/docs/plugins/i18n) gibi çalışır: İngilizce yerleşiktir, desteklediğiniz dilleri siz eklersiniz ve her isteğin dili seçtiğiniz stratejilerle algılanır.
+
+Yerleşik çeviriler: İngilizce ve Türkçe <Since version="0.5.0" />, Almanca <Since version="0.5.1" />, Rusça <Since version="0.5.2" /> ve Arapça <Since version="0.7.0" />.
+
+<Callout type="info">
+0.12.0'a kadar bu plugin'in adı `localizedErrors` idi. Eski ad çalışmaya devam eder ve kullanımdan kaldırılmıştır; bkz. [localizedErrors'tan geçiş](#migrating-from-localizederrors).
+</Callout>
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { i18n, locales } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    i18n({
+      translations: { tr: locales.tr, de: locales.de },
+      defaultLocale: 'tr',
+    }),
+  ],
+});
+
+const result = await payment.createPayment(request);
+result.code;            // 'INSUFFICIENT_FUNDS'
+result.errorMessage;    // 'Kartınızın bakiyesi veya limiti yetersiz. Başka bir kart deneyin.'
+result.providerMessage; // the provider's own message, for your logs
+```
+
+Yalnızca `code` alanı olan sonuçlar değişir: başarısız sonuçlar ve `NETWORK_ERROR` ile gelen `pending` sonuçlar. Sağlayıcının metni loglarınız ve destek ekibiniz için `providerMessage` alanında kalır.
+
+## Çeviriler [#translations]
+
+`translations` her dili, hata koduna göre mesajlarıyla eşler. İngilizce yerleşiktir, yalnızca diğer dilleri eklersiniz. Yerleşik diller `locales` içindedir: `en`, `tr`, `de`, `ru` ve `ar`.
+
+```typescript
+import { i18n, locales, type TranslationDictionary } from 'better-payment/plugins';
+
+// All built-in languages
+i18n({ translations: locales });
+
+// Some of them, with your own wording for one message
+i18n({
+  translations: {
+    tr: { ...locales.tr, INSUFFICIENT_FUNDS: 'Bakiyeniz yetersiz, lütfen başka bir kart deneyin.' },
+    de: locales.de,
+  },
+});
+
+// A language of your own
+const es: TranslationDictionary = {
+  INSUFFICIENT_FUNDS: 'Fondos insuficientes. Intente con otra tarjeta.',
+  CARD_DECLINED: 'Su banco rechazó el pago.',
+};
+i18n({ translations: { es }, defaultLocale: 'es' });
+```
+
+Bir dilde eksik olan kod İngilizce mesajda kalır. Çevirisi olmayan bir `defaultLocale` `ConfigurationError` fırlatır.
+
+## Seçenekler [#options]
+
+| Seçenek | Tip | Varsayılan | Açıklama |
+| ------- | --- | ---------- | -------- |
+| `translations` | `Record<string, TranslationDictionary>` | zorunlu | Dile, sonra hata koduna göre mesajlar |
+| `defaultLocale` | `string` | `'en'` | Kodda çağırdığınız işlemlerin ve dili algılanamayan yanıtların dili |
+| `detection` | `Array<'header' \| 'cookie' \| 'callback'>` | `['header']` | Öncelik sırasıyla algılama stratejileri |
+| `localeCookie` | `string` | `'locale'` | `cookie` stratejisinin okuduğu çerez |
+| `getLocale` | `(request) => string \| null \| Promise<string \| null>` | — | `callback` stratejisi için isteğin dili |
+
+## Dil algılama [#locale-detection]
+
+[HTTP handler](/docs/concepts/handler) her yanıtı kendi isteğine göre çevirir. `detection` içindeki stratejiler sırayla çalışır ve desteklenen ilk dil kazanır; hiçbiri bulamazsa yanıt `defaultLocale` dilinde olur.
+
+- `header`: q değerleriyle birlikte `Accept-Language` başlığı. Bölge, diline düşer: `tr-TR` Türkçe alır.
+- `cookie`: adı `localeCookie` olan çerez.
+- `callback`: istekle çağrılan `getLocale`.
+
+```typescript
+i18n({
+  translations: locales,
+  detection: ['cookie', 'header'],
+  localeCookie: 'lang',
+});
+
+// Language from a query parameter: /api/pay/iyzico/payment?lang=tr
+i18n({
+  translations: locales,
+  detection: ['callback'],
+  getLocale: (request) => new URL(request.url, 'http://localhost').searchParams.get('lang'),
+});
+
+// Always Turkish
+i18n({ translations: { tr: locales.tr }, defaultLocale: 'tr', detection: [] });
+```
+
+Bir `Idempotency-Key` için tekrar gönderilen yanıtlar da yeni isteğe göre çevrilir. Handler'ın kendi hata yanıtları (404, 403, geçersiz gövde) geliştiriciler içindir ve İngilizce kalır.
+
+## Kodunuzda [#in-your-code]
+
+Kodda çağırdığınız işlemler `defaultLocale` dilini kullanır. Başka bir dil için ya da plugin hook'ları olmadan çalışan sağlayıcıya özel metotların (iyzico ödeme formu, abonelikler) sonuçları için `payment.errors` kullanın:
+
+```typescript
+payment.errors.message('EXPIRED_CARD', 'en');   // "Check your card's expiry date."
+payment.errors.translate(checkoutResult, 'tr'); // the result, with errorMessage in Turkish
+await payment.errors.detectLocale(request);     // 'tr', by the detection strategies
+payment.errors.locales;                         // ['en', 'tr', 'de']
+```
+
+## Diğer plugin'lerin hata kodları [#error-codes-of-other-plugins]
+
+Diğer plugin'lerin `$ERROR_CODES` içinde tanımladığı kodlar da çevrilir. Plugin'in kendi mesajı varsayılandır; çevirileri `translations` içinde ekleyin:
+
+```typescript
+plugins: [
+  blockList({ bins: ['400000'] }), // declares BLOCKED_BIN in $ERROR_CODES
+  i18n({
+    translations: { tr: { ...locales.tr, BLOCKED_BIN: 'Bu kart kullanılamaz.' } },
+    defaultLocale: 'tr',
+  }),
+],
+```
+
+Önce plugin'in kodu (`errorCode` içinde), sonra normalize `code` aranır.
+
+## localizedErrors'tan geçiş [#migrating-from-localizederrors]
+
+`localizedErrors`, `errorMessages`, `LocalizedErrorsOptions` ve `ErrorMessageDictionary` çalışmaya devam eder ve kullanımdan kaldırılmıştır. `localizedErrors` tüm yerleşik dilleri içeriyordu; `i18n` ile desteklediğiniz dilleri listeleyin ya da hepsi için `locales` verin.
+
+| `localizedErrors` | `i18n` |
+| ----------------- | ------ |
+| `localizedErrors({ locale: 'tr' })` | `i18n({ translations: locales, defaultLocale: 'tr' })` |
+| `messages: { tr: { ... } }` | `translations: { tr: { ...locales.tr, ... } }` |
+| `detectLocale: true` | `detection: ['header']` (varsayılan) |
+| `detectLocale: (request) => ...` | `detection: ['callback'], getLocale: (request) => ...` |
+| `detectLocale: false` | `detection: []` |
+| `fallbackLocale` | Yedek dil her zaman İngilizcedir |
+| `errorMessages` | `locales` |
+| `ErrorMessageDictionary` | `TranslationDictionary` |
+
+## Better Payment'e dil eklemek [#add-a-language-to-better-payment]
+
+Yerleşik çeviriler `packages/better-payment/src/plugins/i18n/locales/` altında, her dil için bir dosyada ve `Record<PaymentErrorCode, string>` tipindedir: bir kodu eksik olan dosya derlenmez.
+
+1. `en.ts` dosyasını dilin adıyla (`fr.ts`) kopyalayın ve mesajları çevirin. Mesajları müşteriye yönelik, o dilde doğal okunan ifadelerle ve teknik ayrıntısız yazın. Paket boyutu kontrolüne sığdırmak için kısaltmayın; yeni dil sınırı aşarsa bunu pull request'te belirtin.
+2. Dili `locales/index.ts` içinden dışa aktarın.
+3. Bir pull request açın. Mevcut test her dilde her kodun mesajı olduğunu kontrol eder.

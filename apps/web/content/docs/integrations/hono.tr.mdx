@@ -1,0 +1,76 @@
+---
+title: Hono
+description: Better Payment handler'ını Node.js, Bun, Deno veya Cloudflare Workers üzerindeki bir Hono uygulamasına bağlayın.
+---
+
+`better-payment/hono`, ödeme handler'ını bir Hono route'una bağlar. Hono da Better Payment da web standardı API'leri kullanır; bu yüzden aynı uygulama Node.js, Bun, Deno ve Cloudflare Workers'da çalışır.
+
+## 1. Ödeme örneğini oluşturun [#1-create-the-payment-instance]
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+Tüm seçenekler için [yapılandırma](/docs/concepts/configuration), `allowedActions`, `transformRequest` ve diğer handler kancaları için [handler](/docs/concepts/handler) sayfasına bakın.
+
+Cloudflare Workers'da `process.env` varsayılan olarak yoktur: örneği, [Cloudflare Workers](/docs/integrations/cloudflare-workers) sayfasındaki gibi isteğin içinde Worker'ın `env`'iyle oluşturun.
+
+## 2. Handler'ı bağlayın [#2-mount-the-handler]
+
+```typescript
+// app.ts
+import { Hono } from 'hono';
+import { toHonoHandler } from 'better-payment/hono';
+import { payment } from './payment';
+
+export const app = new Hono();
+app.all('/api/pay/*', toHonoHandler(payment));
+```
+
+Adapter ham isteği handler'a geçirir; böylece form-urlencoded banka callback'leri imza kontrolü için orijinal alanlarını korur.
+
+Uygulamayı ortamınızın beklediği şekilde başlatın:
+
+```typescript
+// Node.js
+import { serve } from '@hono/node-server';
+serve(app);
+
+// Bun, Deno and Cloudflare Workers
+export default app;
+```
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.

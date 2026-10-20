@@ -1,0 +1,123 @@
+---
+title: OpenAPI & Scalar Reference
+description: OpenAPI 3.1 schema generator and interactive Scalar documentation for payment handler endpoints.
+---
+
+<Since version="0.12.0" />
+
+Frontend developers, mobile engineers and integration teams need to know exactly which routes the payment handler serves, what request bodies they accept, and what responses they return.
+
+The `openAPI` plugin automatically inspects all configured payment providers, core handler routes, and active plugin endpoints to generate:
+1. A valid **OpenAPI 3.1.0** specification document at `${path}/openapi.json`.
+2. A fast, interactive **Scalar API Reference** documentation page at `${path}`.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+import { openAPI } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  plugins: [
+    openAPI({
+      path: '/reference', // serves /api/pay/reference and /api/pay/reference/openapi.json
+      info: {
+        title: 'Checkout Payment API',
+        version: '1.0.0',
+        description: 'Interactive API reference for web and mobile checkout endpoints',
+      },
+    }),
+  ],
+});
+```
+
+## Served Routes
+
+When mounted on the default handler base path `/api/pay`:
+
+| Route | Method | Description |
+| ----- | ------ | ----------- |
+| `/api/pay/reference` | `GET` | Interactive Scalar API reference HTML page |
+| `/api/pay/reference/openapi.json` | `GET` | Raw OpenAPI 3.1.0 specification document |
+
+## Documented Core Endpoints
+
+The specification lists only the routes your handler serves: the actions in `handler.allowedActions` (by default `payment/complete-3ds`, `callback`, `installment` and `bin-check`) plus `GET /health`, with the handler `basePath` as its `servers` entry. Enable more actions and they appear too. Routes that need the `authorize` hook carry `security: [{ bearerAuth: [] }]`. The full set is:
+- **Payments:** `POST /{provider}/payment`, `POST /{provider}/payment/init-3ds`, `POST /{provider}/payment/complete-3ds`, `GET /{provider}/payment/{paymentId}`
+- **Callbacks:** `POST /{provider}/callback`
+- **Refunds & Cancels:** `POST /{provider}/refund`, `POST /{provider}/cancel` (marked with Bearer auth)
+- **Pre-authorization:** `POST /{provider}/authorize`, `POST /{provider}/authorize/init-3ds`, `POST /{provider}/capture`, `POST /{provider}/void`
+- **Cards & BINs:** `POST /{provider}/cards/save`, `POST /{provider}/cards/list`, `POST /{provider}/cards/delete`, `POST /{provider}/bin-check`
+- **Installments:** `POST /{provider}/installment`
+- **Health Check:** `GET /health`
+
+## Production and access
+
+The reference is off in `mode: 'production'`: both routes return 404 unless you set `disabled: false`. In `mode: 'sandbox'` it is on unless you set `disabled: true`. To serve it in production only to your own team, set `privileged: true`. The routes then go through the handler's `authorize` hook, which becomes required:
+
+```typescript
+const payment = betterPayment({
+  mode: 'production',
+  providers: { /* ... */ },
+  plugins: [openAPI({ disabled: false, privileged: true })],
+  handler: {
+    authorize: (ctx) => ctx.request.headers.authorization === `Bearer ${process.env.DOCS_TOKEN}`,
+  },
+});
+```
+
+## Documenting Custom Plugin Endpoints
+
+Any official or custom plugin can declare `openapi` metadata on its endpoints:
+
+```typescript
+import { definePlugin } from 'better-payment';
+
+const inventoryPlugin = definePlugin({
+  id: 'inventory',
+  endpoints: {
+    checkStock: {
+      method: 'GET',
+      path: '/inventory/check',
+      privileged: true,
+      openapi: {
+        summary: 'Check product availability',
+        description: 'Queries warehouse stock before initializing checkout',
+        tags: ['Inventory'],
+      },
+      handler: async (ctx) => {
+        return { available: true };
+      },
+    },
+  },
+});
+```
+
+Privileged endpoints (`privileged: true`) are automatically annotated with `security: [{ bearerAuth: [] }]`.
+
+## The Scalar script
+
+The reference page loads `@scalar/api-reference` from jsDelivr at an exact version, pinned in the library, so a new Scalar release cannot change the page on a merchant's domain without a release of `better-payment`. Set `scalarScriptUrl` to pin another version or to serve the script from your own origin:
+
+```typescript
+openAPI({
+  path: '/reference',
+  scalarScriptUrl: '/assets/scalar/api-reference.js', // self-hosted, no CDN
+});
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `path` | `'/reference'` | Path relative to the handler basePath |
+| `info.title` | `'Better Payment API'` | Title shown in the OpenAPI spec and documentation header |
+| `info.version` | `'1.0.0'` | Semantic API version |
+| `info.description` | — | Summary description for your API reference |
+| `disabled` | `true` in `mode: 'production'`, `false` in `mode: 'sandbox'` | When `true`, both routes return 404 |
+| `privileged` | `false` | When `true`, both routes go through the handler's `authorize` hook, which then becomes required |
+| `scalarScriptUrl` | pinned jsDelivr URL | URL of the Scalar reference UI script; point it at a self-hosted copy to avoid the CDN |

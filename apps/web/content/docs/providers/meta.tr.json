@@ -2,9 +2,12 @@
   "title": "Sağlayıcılar",
   "icon": "providers",
   "pages": [
+    "---Ödeme Servisleri---",
     "iyzico",
     "paytr",
     "parampos",
-    "sipay"
+    "sipay",
+    "---Bankalar---",
+    "...../banks"
   ]
 }

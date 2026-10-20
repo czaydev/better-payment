@@ -1,0 +1,79 @@
+---
+title: React Router
+description: Better Payment'i bir React Router v7 (veya Remix v2) resource route'undan sunun.
+---
+
+<Since version="0.8.0" />
+
+`better-payment/react-router`, bir splat resource route için `loader` ve `action` döndürür. Framework modundaki React Router v7 ve Remix v2 ile çalışır.
+
+## 1. Ödeme örneğini oluşturun [#1-create-the-payment-instance]
+
+```typescript
+// app/lib/payment.server.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+const createPayment = () =>
+  betterPayment({
+    mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+    providers: {
+      iyzico: iyzico({
+        apiKey: process.env.IYZICO_API_KEY!,
+        secretKey: process.env.IYZICO_SECRET_KEY!,
+      }),
+    },
+    handler: {
+      onCallback: async (result) => markOrder(result.paymentId, result.status),
+      callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+    },
+  });
+
+let instance: ReturnType<typeof createPayment> | undefined;
+
+export const getBetterPayment = () => (instance ??= createPayment());
+```
+
+`.server.ts` uzantısı modülü ve anahtarlarınızı tarayıcı paketinin dışında tutar. Örneği bir fonksiyon içinde oluşturmak, build'in ortam değişkenlerine ihtiyaç duymamasını sağlar.
+
+## 2. Resource route'u ekleyin [#2-add-the-resource-route]
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+Route'un default export'u yoktur, yani bir resource route'tur: GET istekleri `loader`'a, POST istekleri (banka callback'leri dahil) `action`'a gider. `api.pay.$.ts`, `/api/pay` altındaki her şeyi yakalar.
+
+`routes.ts` yapılandırması kullanıyorsanız dosyayı açıkça kaydedin:
+
+```typescript
+// app/routes.ts
+import { type RouteConfig, route } from '@react-router/dev/routes';
+
+export default [
+  route('api/pay/*', 'routes/api.pay.$.ts'),
+] satisfies RouteConfig;
+```
+
+## 3. Ödeme başlatın [#3-start-a-payment]
+
+Route'lar `/api/pay` altında sunulur, frontend onları doğrudan çağırır:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+[Tipli istemci](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) aynı route'ları sarmalar.
+
+## 4. Callback adresleri [#4-callback-urls]
+
+`callbackUrl`'i `https://siteniz.com/api/pay/<provider>/payment/complete-3ds` olarak ayarlayın. Handler callback'i doğrular, `onCallback`'i çağırır ve müşteriyi `callbackRedirect` ile yönlendirir.
+
+PayTR için PayTR panelindeki **bildirim URL'ini** `https://siteniz.com/api/pay/paytr/callback` olarak ayarlayın.

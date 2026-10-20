@@ -1,0 +1,78 @@
+---
+title: Node.js
+description: Serve Better Payment from a plain Node.js HTTP server, without a framework.
+---
+
+`toNodeHandler` from `better-payment/express` works with `node:http` directly, so you don't need a framework. It is the same function as `toExpressHandler`.
+
+## 1. Create the payment instance
+
+```typescript
+// payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+  handler: {
+    onCallback: async (result) => markOrder(result.paymentId, result.status),
+    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+  },
+});
+```
+
+See [configuration](/docs/concepts/configuration) for every option and [handler](/docs/concepts/handler) for `allowedActions`, `transformRequest` and the other handler hooks.
+
+## 2. Mount the handler
+
+```typescript
+// server.ts
+import { createServer } from 'node:http';
+import { toNodeHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const pay = toNodeHandler(payment);
+
+createServer((req, res) => {
+  if (req.url?.startsWith('/api/pay/')) return pay(req, res);
+  res.statusCode = 404;
+  res.end();
+}).listen(3000);
+```
+
+The handler reads the raw body itself, including the form-urlencoded bank callbacks.
+
+## 3. Start a payment
+
+The routes are served under `/api/pay`, so the frontend calls them directly:
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(paymentRequest),
+});
+```
+
+The [typed client](/docs/integrations/nextjs#3-start-a-payment-from-the-frontend) (`better-payment/client`) wraps the same routes.
+
+## 4. Callback URLs
+
+Set `callbackUrl` to `https://yoursite.com/api/pay/<provider>/payment/complete-3ds`. The handler verifies the callback, calls `onCallback` and redirects the customer with `callbackRedirect`.
+
+For PayTR, set the **notification URL** in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`.
+
+## Request body size
+
+<Since version="0.8.1" />
+
+The adapter reads at most 1 MiB of a request body and answers `413` for larger ones. Change the limit with `maxBodySize` (in bytes):
+
+```typescript
+const pay = toNodeHandler(payment, { maxBodySize: 64 * 1024 });
+```

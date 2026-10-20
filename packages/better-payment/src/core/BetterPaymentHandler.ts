@@ -2,7 +2,7 @@ import type { PaymentCore, RegisteredEndpoint } from './BetterPayment';
 import { ProviderType } from './BetterPaymentConfig';
 import { BetterPaymentError, ConfigurationError } from './errors';
 import { EventListenerError } from './events';
-import type { EndpointContext } from './plugin';
+import type { EndpointContext, EndpointHandlerInfo } from './plugin';
 import { VERSION } from '../version';
 import { PaymentStatus } from '../types';
 import type { PaymentResponse } from '../types';
@@ -348,6 +348,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export class BetterPaymentHandler {
   private readonly basePath: string;
   private readonly allowed: Set<HandlerAction>;
+  private readonly info: EndpointHandlerInfo;
   private readonly idempotency?: Required<Omit<HandlerIdempotencyOptions, 'scope'>> &
     Pick<HandlerIdempotencyOptions, 'scope'>;
   private readonly endpoints: Map<string, RegisteredEndpoint>;
@@ -362,6 +363,12 @@ export class BetterPaymentHandler {
         ? ALL_HANDLER_ACTIONS
         : (options.allowedActions ?? DEFAULT_HANDLER_ACTIONS);
     this.allowed = new Set(allowed);
+    this.info = Object.freeze({
+      basePath: this.basePath,
+      allowedActions: Object.freeze(
+        allowed.filter((a): a is BuiltInHandlerAction => ALL_HANDLER_ACTIONS.includes(a as never))
+      ),
+    });
 
     if (options.idempotency !== false) {
       this.idempotency = {
@@ -511,11 +518,21 @@ export class BetterPaymentHandler {
     const responses = new WeakSet<BetterPaymentResponse>();
     const endpointContext: EndpointContext = {
       ...this.core.context,
+      handler: this.info,
       request,
       body,
       query: new URL(request.url, 'http://localhost').searchParams,
       json: (value, status = 200) => {
         const response = this.jsonResponse(status, value);
+        responses.add(response);
+        return response;
+      },
+      html: (content, status = 200) => {
+        const response: BetterPaymentResponse = {
+          status,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: content,
+        };
         responses.add(response);
         return response;
       },

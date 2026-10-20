@@ -3,13 +3,19 @@
   "icon": "banks",
   "pages": [
     "akbank",
+    "halkbank",
+    "isbank",
     "kuveytturk",
+    "sekerbank",
+    "teb",
+    "ziraat",
     "est",
     "denizbank",
     "albaraka",
     "vakifbank",
     "yapikredi",
     "qnb",
+    "garanti",
     "ziraat-katilim"
   ]
 }

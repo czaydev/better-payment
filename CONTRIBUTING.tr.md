@@ -474,7 +474,7 @@ pnpm --filter web docs:check      # üretilen sayfalar ve public API hedefleri
 
 Üretim, tanınmayan MDX bileşenlerini veya çalıştırılabilir ifadeleri sessizce atlamak yerine hata verir. Yeni bir doküman bileşeni eklerken `apps/web/scripts/docs-content.mjs` içine açık bir dönüşüm ve test ekleyin. Kod blokları kod olarak korunur, çalıştırılmaz.
 
-**Hata mesajı dilleri** (`localizedErrors`), `packages/better-payment/src/plugins/localized-errors/` altında her dil için bir dosyadır. Mesajları müşteriye doğal gelecek şekilde yazın. Paket boyutu kontrolüne (`pnpm --filter better-payment size`) sığdırmak için asla kısaltmayın: yeni bir dil sınırı aşarsa PR'da belirtin, sınırı bakımcılar yükseltir.
+**Hata mesajı dilleri** (`i18n` plugin'i), `packages/better-payment/src/plugins/i18n/locales/` altında her dil için bir dosyadır. Mesajları müşteriye doğal gelecek şekilde yazın. Paket boyutu kontrolüne (`pnpm --filter better-payment size`) sığdırmak için asla kısaltmayın: yeni bir dil sınırı aşarsa PR'da belirtin, sınırı bakımcılar yükseltir.
 
 ## Sürüm ve Yayın
 

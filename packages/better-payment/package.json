@@ -1,6 +1,6 @@
 {
   "name": "better-payment",
-  "version": "0.12.0-beta.0",
+  "version": "0.12.0-beta.1",
   "description": "Unified payment gateway library for Turkish payment providers",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -103,6 +103,7 @@
     "vakifbank",
     "yapikredi",
     "qnb",
+    "garanti",
     "payfor",
     "ziraatkatilim",
     "turkey",

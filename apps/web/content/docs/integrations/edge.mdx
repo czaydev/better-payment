@@ -13,6 +13,8 @@ description: Run Better Payment on Vercel Edge, Cloudflare Workers, Deno and Bun
 
 Every release is tested in the Vercel Edge Runtime VM. That VM has no `Buffer`, `process` or `require`. The test signs requests and verifies callbacks for all four providers there, and compares the results with values computed in Node.js.
 
+Each runtime has its own page with a full example: [Cloudflare Workers](/docs/integrations/cloudflare-workers), [Deno](/docs/integrations/deno) and [Bun](/docs/integrations/bun). [Hono](/docs/integrations/hono) and [Elysia](/docs/integrations/elysia) have their own adapters.
+
 ## Next.js (edge)
 
 The [Next.js route handler](/docs/integrations/nextjs) works unchanged. Only switch the runtime:
@@ -21,42 +23,6 @@ The [Next.js route handler](/docs/integrations/nextjs) works unchanged. Only swi
 // app/api/pay/[...path]/route.ts
 export const runtime = 'edge'; // or 'nodejs'
 ```
-
-## Cloudflare Workers
-
-```typescript
-import { betterPayment, iyzico, toFetchHandler } from 'better-payment';
-
-interface Env {
-  IYZICO_API_KEY: string;
-  IYZICO_SECRET_KEY: string;
-}
-
-export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    const payment = betterPayment({
-      mode: 'sandbox',
-      providers: {
-        iyzico: iyzico({ apiKey: env.IYZICO_API_KEY, secretKey: env.IYZICO_SECRET_KEY }),
-      },
-    });
-    return toFetchHandler(payment)(request);
-  },
-};
-```
-
-## Deno and Bun
-
-```typescript
-import { betterPayment, toFetchHandler } from 'npm:better-payment';
-
-const payment = betterPayment({ /* ... */ });
-
-Deno.serve(toFetchHandler(payment));          // Deno
-// Bun.serve({ fetch: toFetchHandler(payment) }); // Bun
-```
-
-`toFetchHandler` turns the handler into a `(request: Request) => Promise<Response>` function. [Hono](/docs/integrations/frameworks#hono) has its own adapter.
 
 ## Idempotency on edge and serverless
 

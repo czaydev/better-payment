@@ -2,9 +2,12 @@
   "title": "Providers",
   "icon": "providers",
   "pages": [
+    "---Payment services---",
     "iyzico",
     "paytr",
     "parampos",
-    "sipay"
+    "sipay",
+    "---Banks---",
+    "...../banks"
   ]
 }
