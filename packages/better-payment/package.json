@@ -55,6 +55,11 @@
       "types": "./dist/react-router/index.d.ts",
       "import": "./dist/react-router/index.mjs",
       "require": "./dist/react-router/index.js"
+    },
+    "./sveltekit": {
+      "types": "./dist/sveltekit/index.d.ts",
+      "import": "./dist/sveltekit/index.mjs",
+      "require": "./dist/sveltekit/index.js"
     }
   },
   "sideEffects": false,
@@ -107,6 +112,7 @@
     "nextjs",
     "react-router",
     "remix",
+    "sveltekit",
     "edge",
     "cloudflare-workers",
     "deno"

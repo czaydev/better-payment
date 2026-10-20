@@ -54,6 +54,7 @@ export default defineConfig({
       'better-payment/fastify': path.resolve(__dirname, './src/adapters/fastify.ts'),
       'better-payment/elysia': path.resolve(__dirname, './src/adapters/elysia.ts'),
       'better-payment/react-router': path.resolve(__dirname, './src/adapters/react-router.ts'),
+      'better-payment/sveltekit': path.resolve(__dirname, './src/adapters/sveltekit.ts'),
       'better-payment': path.resolve(__dirname, './src/index.ts'),
     },
   },

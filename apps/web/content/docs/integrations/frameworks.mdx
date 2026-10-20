@@ -1,6 +1,6 @@
 ---
 title: Express, Fastify, Hono
-description: Mount the payment handler in Express, Fastify, Hono, Elysia, React Router or a plain Node.js server.
+description: Mount the payment handler in Express, Fastify, Hono, Elysia, React Router, SvelteKit or a plain Node.js server.
 ---
 
 Each adapter is a separate import and has no dependencies, so you only load the one you use. For Next.js, see the [Next.js guide](/docs/integrations/nextjs); for Workers, Deno and Bun, see [edge runtimes](/docs/integrations/edge).
@@ -74,6 +74,20 @@ export const { loader, action } = toReactRouterHandler(getBetterPayment);
 ```
 
 A splat resource route (`api.pay.$.ts` matches everything under `/api/pay`) with no default export: GET requests go to `loader`, POST requests (bank callbacks included) to `action`. The same code works in Remix v2. With `routes.ts` config, register it as `route('api/pay/*', 'routes/api.pay.$.ts')`.
+
+## SvelteKit
+
+```typescript
+// src/routes/api/pay/[...path]/+server.ts
+import { toSvelteKitHandler } from 'better-payment/sveltekit';
+import { getBetterPayment } from '$lib/payment.server';
+
+export const { GET, POST } = toSvelteKitHandler(getBetterPayment);
+```
+
+SvelteKit passes a standard web `Request`, so the adapter has no SvelteKit runtime dependency. The catch-all server route handles both application requests and form-urlencoded callbacks from banks.
+
+In production, SvelteKit protects form POSTs by checking their origin. Bank callbacks are cross-origin, so SvelteKit 3 applications must add the exact bank origins they use to `csrf.trustedOrigins` in the `sveltekit(...)` options in `vite.config.ts`. Do not use `'*'`: only trust the payment-provider origins configured for your application. On SvelteKit 2, the legacy setting is `kit.csrf.checkOrigin`; upgrade to `trustedOrigins` when available.
 
 ## Plain Node.js
 

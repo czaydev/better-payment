@@ -13,6 +13,7 @@ import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
 import { toReactRouterHandler } from 'better-payment/react-router';
+import { toSvelteKitHandler } from 'better-payment/sveltekit';
 import { Elysia } from 'elysia';
 
 const createPayment = () =>
@@ -31,6 +32,9 @@ export const { GET, POST } = toNextJsHandler(getBetterPayment);
 
 // React Router v7 / Remix v2: app/routes/api.pay.$.ts (a splat resource route)
 export const { loader, action } = toReactRouterHandler(getBetterPayment);
+
+// SvelteKit: src/routes/api/pay/[...path]/+server.ts
+export const { GET: svelteKitGET, POST: svelteKitPOST } = toSvelteKitHandler(getBetterPayment);
 
 // Express: no body parser needed for the payment routes
 const expressApp = express();

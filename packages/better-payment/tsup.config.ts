@@ -12,6 +12,7 @@ export default defineConfig({
     'fastify/index': 'src/adapters/fastify.ts',
     'elysia/index': 'src/adapters/elysia.ts',
     'react-router/index': 'src/adapters/react-router.ts',
+    'sveltekit/index': 'src/adapters/sveltekit.ts',
   },
   format: ['cjs', 'esm'],
   dts: {

@@ -33,6 +33,8 @@ const budgets = [
   { file: 'dist/elysia/index.js', maxGzipKb: 1 },
   { file: 'dist/react-router/index.mjs', maxGzipKb: 1 },
   { file: 'dist/react-router/index.js', maxGzipKb: 1 },
+  { file: 'dist/sveltekit/index.mjs', maxGzipKb: 1 },
+  { file: 'dist/sveltekit/index.js', maxGzipKb: 1 },
 ];
 
 // better-payment/client must stay browser-safe

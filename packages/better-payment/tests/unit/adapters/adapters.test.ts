@@ -20,6 +20,7 @@ import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
 import { toElysiaHandler } from 'better-payment/elysia';
 import { toReactRouterHandler } from 'better-payment/react-router';
+import { toSvelteKitHandler } from 'better-payment/sveltekit';
 import { mockPaymentRequest } from '../../fixtures/payment-data';
 
 const PAYTR = { merchantId: '123456', merchantKey: 'KEY', merchantSalt: 'SALT' };
@@ -94,6 +95,12 @@ const adapters: Record<string, () => Promise<Send>> = {
       fromResponse(
         await (method === 'GET' ? loader : action)({ request: webRequest(method, ...rest) })
       );
+  },
+  'SvelteKit (toSvelteKitHandler, lazy)': async () => {
+    let payment: BetterPayment | undefined;
+    const { GET, POST } = toSvelteKitHandler(() => (payment ??= createPayment()));
+    return async (method, ...rest) =>
+      fromResponse(await (method === 'GET' ? GET : POST)({ request: webRequest(method, ...rest) }));
   },
   Hono: async () => {
     const app = new Hono();

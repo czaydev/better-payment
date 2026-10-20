@@ -43,6 +43,9 @@
       ],
       "better-payment/react-router": [
         "src/adapters/react-router.ts"
+      ],
+      "better-payment/sveltekit": [
+        "src/adapters/sveltekit.ts"
       ]
     },
     "noUnusedLocals": false,

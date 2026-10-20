@@ -125,7 +125,7 @@ jobs:
       - name: Smoke test framework adapter subpaths (CJS and ESM)
         run: |
           # Resolve by package name so a missing exports mapping fails, even if dist exists.
-          for entry in next:toNextJsHandler express:toExpressHandler hono:toHonoHandler fastify:toFastifyPlugin elysia:toElysiaHandler react-router:toReactRouterHandler; do
+          for entry in next:toNextJsHandler express:toExpressHandler hono:toHonoHandler fastify:toFastifyPlugin elysia:toElysiaHandler react-router:toReactRouterHandler sveltekit:toSvelteKitHandler; do
             adapter="${entry%%:*}"
             handler="${entry#*:}"
             node -e "const assert = require('node:assert/strict'); const path = 'better-payment/' + process.argv[1]; assert.equal(typeof require(path)[process.argv[2]], 'function', path + ' CJS handler export')" "$adapter" "$handler"
@@ -144,7 +144,7 @@ jobs:
           test -f dist/client/index.js && test -f dist/client/index.d.ts
           test -f dist/testing/index.js && test -f dist/testing/index.mjs && test -f dist/testing/index.d.ts
           test -f dist/plugins/index.js && test -f dist/plugins/index.mjs && test -f dist/plugins/index.d.ts
-          for adapter in next express hono fastify elysia react-router; do
+          for adapter in next express hono fastify elysia react-router sveltekit; do
             for extension in js mjs d.ts; do
               test -f "dist/$adapter/index.$extension"
             done
