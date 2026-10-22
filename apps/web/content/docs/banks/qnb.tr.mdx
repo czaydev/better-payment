@@ -54,16 +54,17 @@ const init = await payment.qnb.initThreeDSPayment({
 QNB sonucu `callbackUrl` adresine POST eder:
 
 ```typescript
-const result = await payment.qnb.completeThreeDSPayment(callbackBody);
+// orderId and amount: optional, from your records, never from the callback body
+const result = await payment.qnb.completeThreeDSPayment(callbackBody, { orderId, amount });
 ```
 
 `ResponseHash`, üye işyeri numaranız, kullanıcı kodunuz ve `merchantPass` ile kontrol edilir. Değerler ayraçsız birleştirildiği için sonuç ayrıca bankayla doğrulanır:
 
-- hash'i geçersiz ya da başka bir üye işyerine ait callback `INVALID_HASH` olarak reddedilir;
+- hash'i geçersiz, başka bir üye işyerine ya da verdiğiniz `orderId` dışında bir siparişe ait callback `INVALID_HASH` olarak reddedilir;
 - `3DModel`: `3DStatus` `1` ise ödeme `3DModelPayment` ile tahsil edilir ve sonucu bankanın cevabı belirler;
-- `3DPay`: onaylı bir callback sipariş sorgusuyla kontrol edilir (onaylı, iptal edilmemiş, aynı tutar); bankanın doğrulamadığı bir ödeme `INVALID_HASH` olarak reddedilir.
+- `3DPay`: onaylı bir callback sipariş sorgusuyla kontrol edilir (onaylı, iptal edilmemiş, sizin `amount` değeriniz ya da verilmemişse callback'teki tutar); bankanın doğrulamadığı bir ödeme `INVALID_HASH` olarak reddedilir.
 
-`paymentId` ve `conversationId` yalnızca bankanın doğruladığı bir ödemede doldurulur.
+`paymentId` ve `conversationId` yalnızca bankanın doğruladığı bir ödemede, zaman aşımında ise yalnızca `orderId` verdiyseniz doldurulur.
 
 ## İade, iptal ve durum sorgusu [#refund-cancel--status]
 

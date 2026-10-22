@@ -43,6 +43,7 @@ const banks: RouteItem[] = [
   { name: "Garanti BBVA", logo: "/brand/banks/garanti-bbva.svg", w: 389, h: 69, since: "0.12.0" },
   { name: "Yapı Kredi", logo: "/brand/banks/yapi-kredi.svg", w: 146, h: 26, since: "0.12.0" },
   { name: "QNB", logo: "/brand/banks/qnb.svg", w: 1550, h: 452, since: "0.12.0" },
+  { name: "Ziraat Katılım", since: "0.12.0" },
   { name: "DenizBank", logo: "/brand/banks/denizbank.svg", w: 183, h: 32, since: "0.12.0" },
   { name: "VakıfBank", logo: "/brand/banks/vakifbank.svg", w: 529, h: 64, since: "0.12.0" },
 ];
