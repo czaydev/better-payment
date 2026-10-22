@@ -11,18 +11,36 @@ const budgets = [
   // the Sipay provider, 40 kB since QNB, 42 kB with Yapı Kredi, 44 kB with VakıfBank,
   // 46 kB with Albaraka Türk, 48 kB with Denizbank, 49 kB with QNBpay, 51 kB with Garanti BBVA, 54 kB with Paratika alongside the
   // other providers
-  { file: 'dist/index.mjs', maxGzipKb: 54 },
-  { file: 'dist/index.js', maxGzipKb: 54 },
+  { file: 'dist/index.mjs', maxGzipKb: 55 },
+  { file: 'dist/index.js', maxGzipKb: 55 },
   { file: 'dist/client/index.mjs', maxGzipKb: 2 },
   { file: 'dist/client/index.js', maxGzipKb: 2 },
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },
   { file: 'dist/testing/index.js', maxGzipKb: 8 },
   // Official plugins, with every built-in error message language. Raise this for new
   // languages; translations are never shortened to fit it. 7 kB since the
-  // notifications plugin (its messages in the same five languages). ESM bundlers
-  // drop the plugins an application does not import.
-  { file: 'dist/plugins/index.mjs', maxGzipKb: 9 },
-  { file: 'dist/plugins/index.js', maxGzipKb: 9 },
+  // notifications plugin, 9 kB with the openAPI plugin, 11 kB with failover. The
+  // currencyConversion, redact, threeDSTimeout, captcha, rateLimit, pendingResolver,
+  // refundApproval, webhookForwarding, mcp and telemetry plugins take the bundle to
+  // 22.32 / 22.34 kB gzip, so the budget is 23 kB. ESM bundlers drop the plugins an
+  // application does not import.
+  { file: 'dist/plugins/index.mjs', maxGzipKb: 23 },
+  { file: 'dist/plugins/index.js', maxGzipKb: 23 },
+  // The fraud rules engine is a separate subpath (`better-payment/fraud`); the plugins
+  // barrel only re-exports its types, so it costs that entry point nothing. 3.90 kB
+  // gzip measured on the merged tree, so its own budget is 4 kB.
+  { file: 'dist/fraud/index.mjs', maxGzipKb: 4 },
+  { file: 'dist/fraud/index.js', maxGzipKb: 4 },
+  // The commission router is a separate subpath (`better-payment/commission-router`),
+  // it is deliberately not in the plugins barrel: 7.83 / 7.85 kB gzip measured on the
+  // merged tree, 8 kB leaves room for the matching rules an application adds.
+  { file: 'dist/commission-router/index.mjs', maxGzipKb: 8 },
+  { file: 'dist/commission-router/index.js', maxGzipKb: 8 },
+  // The routing engine is a separate subpath: its conditions, weighted splits,
+  // store and explain() would break the plugins barrel's budget. 5.57 / 5.58 kB gzip
+  // measured against beta; 6 kB leaves room for a few more conditions.
+  { file: 'dist/routing/index.mjs', maxGzipKb: 6 },
+  { file: 'dist/routing/index.js', maxGzipKb: 6 },
   { file: 'dist/next/index.mjs', maxGzipKb: 1 },
   { file: 'dist/next/index.js', maxGzipKb: 1 },
   { file: 'dist/express/index.mjs', maxGzipKb: 1 },
@@ -31,6 +49,8 @@ const budgets = [
   { file: 'dist/hono/index.js', maxGzipKb: 1 },
   { file: 'dist/fastify/index.mjs', maxGzipKb: 1 },
   { file: 'dist/fastify/index.js', maxGzipKb: 1 },
+  { file: 'dist/nestjs/index.mjs', maxGzipKb: 1 },
+  { file: 'dist/nestjs/index.js', maxGzipKb: 1 },
   { file: 'dist/elysia/index.mjs', maxGzipKb: 1 },
   { file: 'dist/elysia/index.js', maxGzipKb: 1 },
   { file: 'dist/react-router/index.mjs', maxGzipKb: 1 },

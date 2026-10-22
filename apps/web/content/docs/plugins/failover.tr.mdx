@@ -1,0 +1,86 @@
+---
+title: Sağlayıcı Yedekleme (Failover)
+description: Sağlayıcı kesintilerinde veya geçici hatalarda ödemeyi otomatik olarak yedek sağlayıcıya yönlendirin, dahili circuit breaker ile gereksiz beklemeleri önleyin.
+---
+
+<Since version="0.12.0" />
+
+Birden fazla sanal POS veya ödeme kuruluşu ile çalışan işletmeler, birincil sağlayıcıda yaşanan kesintiler, ağ zaman aşımları ya da geçici ağ geçidi hataları yüzünden satış kaybedebilir. `failover` eklentisi, geçici bir altyapı hatası tespit ettiğinde ödemeyi belirlediğiniz sırayla yedek sağlayıcılara yönlendirerek yüksek erişilebilirlik (high availability) sağlar.
+
+En önemlisi, failover **sıfır çift çekim garantisi** sunar: sonucu belirsiz olan işlemleri (`NETWORK_ERROR` veya bankanın çekimi yapmış olabileceği `pending` durumları) kesinlikle tekrar denemez. Sağlayıcının ya da önündeki gateway'in kart çekildikten sonra da dönebildiği HTTP 500, 502 ve 504 cevaplarından sonra da ödemeyi başka sağlayıcıya taşımaz.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico, paytr, parampos } from 'better-payment';
+import { failover } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  defaultProvider: 'iyzico',
+  providers: {
+    iyzico: iyzico({ apiKey: '...', secretKey: '...' }),
+    paytr: paytr({ merchantId: '...', merchantKey: '...', merchantSalt: '...' }),
+    parampos: parampos({ clientCode: '...', guid: '...' }),
+  },
+  plugins: [
+    failover({
+      order: ['iyzico', 'paytr', 'parampos'],
+      // Only errors where the charge definitely did not take place
+      on: ['PROVIDER_ERROR', 'PROVIDER_UNAVAILABLE', 'TIMEOUT_BEFORE_SEND'],
+      circuitBreaker: {
+        failures: 5,
+        window: '1m',
+        cooldown: '5m',
+      },
+      onSwitch: ({ from, to, operation, attempt }) => {
+        console.warn(`[failover] Switched ${operation} from ${from} to ${to} (attempt ${attempt})`);
+      },
+    }),
+  ],
+});
+
+// If iyzico returns a transient error, automatically executes on paytr
+const result = await payment.createPayment({
+  orderId: 'ORDER-101',
+  amount: 250,
+  currency: 'TRY',
+  paymentCard: { ... },
+});
+```
+
+## Nasıl Çalışır? [#how-it-works]
+
+1. **Before hook & Circuit Breaker kontrolü**: Seçili sağlayıcının devre kesicisi (circuit breaker) açıksa, gereksiz ve zaman alıcı bir HTTP çağrısı yapılmadan işlem doğrudan `order` listesindeki ilk sağlıklı sağlayıcıya yönlendirilir.
+2. **Çalıştırma**: Sağlayıcı çağrılır.
+3. **After hook & Yedek geçişi**: Sağlayıcı `on` listesindeki bir geçici hata ile dönerse, hata circuit breaker'a kaydedilir, sıradaki uygun yedek sağlayıcı çağrılır.
+4. **Güvenlik koruması**: Sonucu belirsiz (`status: 'pending'` veya `code: 'NETWORK_ERROR'`) işlemler asla tekrar denenmez. Müşteri kart retleri (`INSUFFICIENT_FUNDS`, `CARD_DECLINED`, `EXPIRED_CARD`) de ret olarak korunur, başka sağlayıcıya aktarılmaz.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `order` | tüm tanımlı sağlayıcılar | Öncelik sırasına göre sağlayıcı kimlikleri veya dinamik fonksiyon `(ctx) => string[]` |
+| `on` | `PROVIDER_ERROR`, `PROVIDER_UNAVAILABLE`, `TIMEOUT_BEFORE_SEND`, `SYSTEM_ERROR`, `503` | Yedeklemeyi tetikleyen hata kodları. HTTP 500, 502 ve 504 listede olsa bile tetiklemez |
+| `operations` | `['createPayment', 'authorize']` | Yedeklemenin geçerli olduğu operasyonlar |
+| `circuitBreaker` | `{ failures: 5, window: '1m', cooldown: '5m' }` | Devre kesici eşiği, zaman penceresi ve bekleme süresi |
+| `onSwitch` | — | Sağlayıcı değiştiğinde tetiklenen geri çağırma fonksiyonu |
+
+## Devre Kesici Durumu ve Yönetimi [#circuit-breaker-status--management]
+
+Eklenti, ödeme nesnesine bir `failover` alanı ekler:
+
+```typescript
+// Inspect circuit state across all providers
+const circuits = payment.failover.status();
+// {
+//   iyzico: { state: 'open', failures: 5, openUntil: 2026-10-18T04:10:00.000Z },
+//   paytr: { state: 'closed', failures: 0, openUntil: null }
+// }
+
+// Manually trip a provider during planned maintenance
+payment.failover.trip('iyzico', '15m');
+
+// Manually reset a provider or all providers
+payment.failover.reset('iyzico');
+payment.failover.reset();
+```

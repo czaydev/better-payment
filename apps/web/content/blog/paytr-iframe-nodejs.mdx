@@ -1,0 +1,143 @@
+---
+title: "PayTR iFrame API integration with Node.js"
+description: "Use the PayTR iFrame API from Node.js: create the token, show the payment page, verify the notification URL and answer with OK."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Node.js, PayTR, Express]
+---
+
+With the PayTR iFrame API, card data never reaches your server: the customer enters the card on PayTR's page. That is a good thing, but two parts of the integration often go wrong:
+
+1. **The token signature.** Every request is signed with `base64(HMAC-SHA256(data + merchant_salt, merchant_key))`, and the order of the fields matters.
+2. **Where the result comes from.** The `merchant_ok_url` the customer returns to does **not** carry the result. The result arrives server-to-server at the **notification URL** (Bildirim URL) set in the PayTR panel. That notification's hash must be verified, and the answer must be plain-text `OK`.
+
+This post sets up both with [Better Payment](/docs) on Express. On Next.js, the same setup works with the [Next.js adapter](/docs/integrations/nextjs).
+
+## 1. Install
+
+```bash
+npm install better-payment express
+```
+
+```bash
+PAYTR_MERCHANT_ID=...
+PAYTR_MERCHANT_KEY=...
+PAYTR_MERCHANT_SALT=...
+APP_URL=https://yourstore.com
+```
+
+## 2. The payment object
+
+```typescript
+// payment.ts
+import { betterPayment, paytr } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox', // sandbox: test_mode=1
+  providers: {
+    paytr: paytr({
+      merchantId: process.env.PAYTR_MERCHANT_ID!,
+      merchantKey: process.env.PAYTR_MERCHANT_KEY!,
+      merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
+    }),
+  },
+  handler: {
+    // Only notifications with a valid hash reach this hook
+    onCallback: async (result) => {
+      // result.paymentId === merchant_oid (your order id)
+      await db.orders.updatePayment(result.paymentId, result.status);
+    },
+  },
+});
+```
+
+## 3. Start the payment page
+
+Create the token on the server, with the amount from your order:
+
+```typescript
+// server.ts
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+
+// PayTR notifications: POST /api/pay/paytr/callback
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+
+app.post('/checkout/:orderId', async (req, res) => {
+  const order = await db.orders.find(req.params.orderId);
+
+  const init = await payment.paytr.initThreeDSPayment({
+    price: order.total,
+    paidPrice: order.total,
+    currency: 'TRY',
+    basketId: order.id,
+    conversationId: order.id, // merchant_oid: letters and digits only
+    callbackUrl: `${process.env.APP_URL}/orders/${order.id}`, // where the customer returns
+    installment: undefined, // undefined: any, 1: single payment, n: up to n installments
+    buyer: { ...order.buyer, ip: req.ip! },
+    shippingAddress: order.shippingAddress,
+    billingAddress: order.billingAddress,
+    basketItems: order.items,
+  });
+
+  if (init.status !== 'pending') {
+    return res.status(422).send(init.errorMessage);
+  }
+
+  // A ready page with the PayTR iframe (or redirect to init.redirectUrl)
+  res.send(init.threeDSHtmlContent);
+});
+
+app.listen(3000);
+```
+
+Notes:
+
+- `payment_amount` is sent in kuruş; pass `paidPrice` in TL.
+- Basket items are written to `user_basket` with TL prices.
+- `buyer.gsmNumber` and `billingAddress.address` are sent to PayTR, so don't leave them empty.
+
+## 4. The notification URL
+
+In the PayTR panel, set the notification URL to `https://yourstore.com/api/pay/paytr/callback`. For every notification, the handler:
+
+1. Verifies the `hash` with your `merchant_key` and `merchant_salt`. A wrong hash gives `INVALID_HASH` and the order is not updated.
+2. Passes the result to `onCallback` as `success` or `failure`.
+3. Answers PayTR with plain-text `OK`. Without it, PayTR keeps re-sending the notification.
+
+<Callout type="warn">
+  PayTR can send the same notification more than once. Make your order update idempotent: don't process an order that is already paid.
+</Callout>
+
+Without the handler, you can call the same verification yourself:
+
+```typescript
+app.post('/paytr/notification', express.urlencoded({ extended: false }), async (req, res) => {
+  const result = await payment.paytr.completeThreeDSPayment(req.body);
+  if (result.errorCode === 'INVALID_HASH') return res.status(400).send('bad hash');
+  await db.orders.updatePayment(result.paymentId, result.status);
+  res.type('text/plain').send('OK');
+});
+```
+
+## 5. Refund, cancel and status
+
+```typescript
+await payment.paytr.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+
+// PayTR has no void; cancel() is a full refund
+await payment.paytr.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });
+
+const status = await payment.paytr.getPayment('ORDER123');
+```
+
+To expose these over HTTP, set `allowedActions` and an `authorize` hook on the handler; otherwise actions such as refunds are not served at all. See [HTTP handler](/docs/concepts/handler).
+
+## Next steps
+
+- Every option is on the [PayTR page](/docs/providers/paytr).
+- Test cards and sandbox setup are in [test cards](/docs/guides/test-cards).
+- To add iyzico or a bank virtual POS to the same app, read [iyzico 3D Secure with Next.js](/blog/iyzico-nextjs-3d-secure); the request shape is the same.

@@ -1,0 +1,104 @@
+---
+title: 3D Secure Zaman Aşımı
+description: Başlatılan 3D Secure ödemelerini otomatik takip edin ve terk edilenleri zaman aşımına uğratın.
+---
+
+<Since version="0.12.0" />
+
+Bir müşteri 3D Secure ödeme akışını başlattığında ve banka doğrulama sayfasını kapattığında, ödeme kalıcı olarak başlatılmış veya beklemede kalır. Rezerve edilen ürün stokları kilitli kalır ve sipariş raporlarında askıda ödemeler birikir.
+
+`threeDSTimeout` eklentisi, başlatılan 3D Secure akışlarını takip eder ve geri dönmeyen terk edilmiş ödemeleri otomatik olarak zaman aşımına uğratır.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { threeDSTimeout } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    threeDSTimeout({
+      after: '15m',
+      onExpire: async (flow) => {
+        // Release locked inventory or cancel order
+        await releaseOrderInventory(flow.conversationId);
+      },
+    }),
+  ],
+});
+```
+
+## Nasıl Çalışır? [#how-it-works]
+
+1. **Otomatik Takip**: Eklenti `initThreeDSPayment` ve `initThreeDSAuthorize` çağrılarına kanca atarak başlayan 3D Secure işlemlerini depolar.
+2. **Otomatik Temizleme**: Müşteri doğrulamayı tamamlayıp `completeThreeDSPayment` çalıştığında akış depodan silinir.
+3. **Geç Callback Koruması**: Zaman aşımına uğrayan akışlar sonlandırılmadan önce sağlayıcı API'si (`getPayment`) sorgulanır. Sağlayıcı `SUCCESS` bildiriyorsa (ör. gecikmiş webhook veya geç yönlendirme), akış zaman aşımına uğratılmaz ve başarıyla çözülmüş sayılır.
+4. **Serverless Uyumlu**: Kütüphane içinde arka plan `setInterval` zamanlayıcısı bulunmaz; Vercel, AWS Lambda, Cloudflare Workers gibi sunucusuz ortamlarda sorunsuz çalışır.
+
+## Zamanlanmış Görev ile Temizleme [#scheduled-expiration]
+
+Terk edilmiş akışları zamanlanmış bir cron göreviyle periyodik temizleyin:
+
+```typescript
+// Call from a scheduled worker or API route
+const result = await payment.threeDS.expireStale();
+console.log(`Expired ${result.expired.length} abandoned 3DS payments.`);
+```
+
+### Next.js / Vercel Cron Örneği [#nextjs--vercel-cron-example]
+
+`app/api/cron/expire-3ds/route.ts`:
+
+```typescript
+import { NextResponse } from 'next/server';
+import { payment } from '@/lib/payment';
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  const result = await payment.threeDS.expireStale();
+  return NextResponse.json(result);
+}
+```
+
+`vercel.json`:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/expire-3ds",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+```
+
+### Node-cron / Express Örneği [#node-cron--express-example]
+
+```typescript
+import cron from 'node-cron';
+
+// Run every 10 minutes
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    const { expired, resolved } = await payment.threeDS.expireStale();
+    console.log(`[cron] Expired: ${expired.length}, Resolved: ${resolved}`);
+  } catch (error) {
+    console.error('[cron] Failed to expire stale 3DS payments:', error);
+  }
+});
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `after` | `'15m'` | Bir akışın terk edilmiş sayılması için gereken süre (`'15m'`, `'30m'`, `'1h'` veya milisaniye) |
+| `store` | In-memory | `ThreeDSFlowStore` arayüzünü uygulayan özel veri saklama katmanı (Redis, veritabanı vb.) |
+| `onExpire` | — | Akış zaman aşımına uğradığında çalıştırılacak `(flow) => Promise<void>` veya `void` geri çağırma |
+| `checkProvider` | `true` | Zaman aşımına uğratmadan önce ödemenin gecikmeli başarılı olup olmadığını sağlayıcıdan doğrular |

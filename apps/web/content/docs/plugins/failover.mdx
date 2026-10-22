@@ -1,0 +1,86 @@
+---
+title: Provider Failover
+description: Automatically retry payments on backup providers when a provider is down, with a built-in circuit breaker.
+---
+
+<Since version="0.12.0" />
+
+Merchants with multiple payment provider contracts lose sales when their primary provider suffers downtime, network timeouts, or intermittent gateway errors. The `failover` plugin ensures high availability by automatically trying backup providers in a specified order whenever a transient provider failure occurs.
+
+Importantly, failover guarantees **zero double charging**: it strictly never retries payments with an unknown outcome (such as `NETWORK_ERROR` or `pending` status where the transaction may already have processed at the bank), and never moves a payment after an HTTP 500, 502 or 504 answer, which a provider or its gateway can send after the card was charged.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico, paytr, parampos } from 'better-payment';
+import { failover } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  defaultProvider: 'iyzico',
+  providers: {
+    iyzico: iyzico({ apiKey: '...', secretKey: '...' }),
+    paytr: paytr({ merchantId: '...', merchantKey: '...', merchantSalt: '...' }),
+    parampos: parampos({ clientCode: '...', guid: '...' }),
+  },
+  plugins: [
+    failover({
+      order: ['iyzico', 'paytr', 'parampos'],
+      // Only errors where the charge definitely did not take place
+      on: ['PROVIDER_ERROR', 'PROVIDER_UNAVAILABLE', 'TIMEOUT_BEFORE_SEND'],
+      circuitBreaker: {
+        failures: 5,
+        window: '1m',
+        cooldown: '5m',
+      },
+      onSwitch: ({ from, to, operation, attempt }) => {
+        console.warn(`[failover] Switched ${operation} from ${from} to ${to} (attempt ${attempt})`);
+      },
+    }),
+  ],
+});
+
+// If iyzico returns a transient error, automatically executes on paytr
+const result = await payment.createPayment({
+  orderId: 'ORDER-101',
+  amount: 250,
+  currency: 'TRY',
+  paymentCard: { ... },
+});
+```
+
+## How It Works
+
+1. **Before hook & Circuit Breaker check**: If the requested or default provider currently has an open circuit breaker, the operation is immediately routed to the first healthy provider in `order` without attempting a doomed network call.
+2. **Execution**: The provider is called.
+3. **After hook & Failover walk**: If the provider returns a failure matching the `on` error list, `failover` logs the failure in the circuit breaker, checks the next available provider in `order`, and executes the payment.
+4. **Safety guard**: Calls that return `status: 'pending'` or `code: 'NETWORK_ERROR'` are never retried. Customer card declines (`INSUFFICIENT_FUNDS`, `CARD_DECLINED`, `EXPIRED_CARD`) are also preserved as declines rather than retried.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `order` | all configured providers | Priority list of provider IDs or a dynamic function `(ctx) => string[]` |
+| `on` | `PROVIDER_ERROR`, `PROVIDER_UNAVAILABLE`, `TIMEOUT_BEFORE_SEND`, `SYSTEM_ERROR`, `503` | Error codes that trigger failover. HTTP 500, 502 and 504 never do, even when listed |
+| `operations` | `['createPayment', 'authorize']` | Operations failover applies to |
+| `circuitBreaker` | `{ failures: 5, window: '1m', cooldown: '5m' }` | Circuit breaker thresholds and cooldown |
+| `onSwitch` | — | Callback fired when switching providers |
+
+## Circuit Breaker Status & Management
+
+The plugin adds a `failover` namespace to the payment instance:
+
+```typescript
+// Inspect circuit state across all providers
+const circuits = payment.failover.status();
+// {
+//   iyzico: { state: 'open', failures: 5, openUntil: 2026-10-18T04:10:00.000Z },
+//   paytr: { state: 'closed', failures: 0, openUntil: null }
+// }
+
+// Manually trip a provider during planned maintenance
+payment.failover.trip('iyzico', '15m');
+
+// Manually reset a provider or all providers
+payment.failover.reset('iyzico');
+payment.failover.reset();
+```

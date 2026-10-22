@@ -1,0 +1,143 @@
+---
+title: "Node.js ile PayTR iFrame API entegrasyonu"
+description: "PayTR iFrame API'yi Node.js'te kullanmak: token oluşturma, ödeme sayfasını gösterme, Bildirim URL'ini doğrulama ve OK yanıtı."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Node.js, PayTR, Express]
+---
+
+PayTR iFrame API'de kart bilgisi sizin sunucunuza hiç gelmez: müşteri kartını PayTR'nin sayfasında girer. Bu iyi bir şey, ama entegrasyonun iki noktası sık sık yanlış yapılır:
+
+1. **Token imzası:** Her istek `base64(HMAC-SHA256(veri + merchant_salt, merchant_key))` ile imzalanır ve alanların sırası önemlidir.
+2. **Sonuç nereden gelir:** Müşterinin döndüğü `merchant_ok_url` ödemenin sonucunu **taşımaz**. Sonuç, PayTR panelinde tanımladığınız **Bildirim URL**'ine sunucudan sunucuya gelir. Bu bildirimin hash'i doğrulanmalı ve yanıt olarak düz metin `OK` dönülmelidir.
+
+Bu yazıda ikisini de [Better Payment](/docs) ile Express üzerinde kuruyoruz. Next.js kullanıyorsanız aynı yapı [Next.js adaptörüyle](/docs/integrations/nextjs) de çalışır.
+
+## 1. Kurulum
+
+```bash
+npm install better-payment express
+```
+
+```bash
+PAYTR_MERCHANT_ID=...
+PAYTR_MERCHANT_KEY=...
+PAYTR_MERCHANT_SALT=...
+APP_URL=https://magazaniz.com
+```
+
+## 2. Ödeme nesnesi
+
+```typescript
+// payment.ts
+import { betterPayment, paytr } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox', // sandbox: test_mode=1
+  providers: {
+    paytr: paytr({
+      merchantId: process.env.PAYTR_MERCHANT_ID!,
+      merchantKey: process.env.PAYTR_MERCHANT_KEY!,
+      merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
+    }),
+  },
+  handler: {
+    // Yalnızca hash'i doğrulanmış bildirimler buraya gelir
+    onCallback: async (result) => {
+      // result.paymentId === merchant_oid (sipariş numaranız)
+      await db.orders.updatePayment(result.paymentId, result.status);
+    },
+  },
+});
+```
+
+## 3. Ödeme sayfasını başlatın
+
+Token'ı sunucuda, siparişinizin tutarıyla oluşturun:
+
+```typescript
+// server.ts
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+
+// PayTR bildirimleri: POST /api/pay/paytr/callback
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+
+app.post('/checkout/:orderId', async (req, res) => {
+  const order = await db.orders.find(req.params.orderId);
+
+  const init = await payment.paytr.initThreeDSPayment({
+    price: order.total,
+    paidPrice: order.total,
+    currency: 'TRY',
+    basketId: order.id,
+    conversationId: order.id, // merchant_oid: yalnızca harf ve rakam
+    callbackUrl: `${process.env.APP_URL}/orders/${order.id}`, // müşterinin döneceği sayfa
+    installment: undefined, // undefined: tüm taksitler, 1: tek çekim, n: en fazla n taksit
+    buyer: { ...order.buyer, ip: req.ip! },
+    shippingAddress: order.shippingAddress,
+    billingAddress: order.billingAddress,
+    basketItems: order.items,
+  });
+
+  if (init.status !== 'pending') {
+    return res.status(422).send(init.errorMessage);
+  }
+
+  // PayTR iframe'ini içeren hazır sayfa (ya da init.redirectUrl'e yönlendirin)
+  res.send(init.threeDSHtmlContent);
+});
+
+app.listen(3000);
+```
+
+Notlar:
+
+- `payment_amount` kuruş cinsinden gönderilir; `paidPrice` değerini TL olarak vermeniz yeterli.
+- Sepet ürünleri `user_basket` alanına TL fiyatlarıyla yazılır.
+- `buyer.gsmNumber` ve `billingAddress.address` PayTR'ye gönderilir, boş bırakmayın.
+
+## 4. Bildirim URL'i
+
+PayTR panelinde Bildirim URL'ini `https://magazaniz.com/api/pay/paytr/callback` olarak ayarlayın. Handler bu adrese gelen her bildirimde şunları yapar:
+
+1. `hash` alanını sizin `merchant_key` ve `merchant_salt` değerlerinizle doğrular. Hash tutmazsa sonuç `INVALID_HASH` olur ve sipariş güncellenmez.
+2. Sonucu `success` veya `failure` olarak `onCallback`'e verir.
+3. PayTR'ye düz metin `OK` döner. Bu yanıt gelmezse PayTR bildirimi tekrar tekrar gönderir.
+
+<Callout type="warn">
+  PayTR aynı bildirimi birden fazla kez gönderebilir. Sipariş güncellemenizi idempotent yazın: zaten ödenmiş bir siparişi tekrar işlemeyin.
+</Callout>
+
+Handler kullanmak istemiyorsanız aynı doğrulamayı elle de çağırabilirsiniz:
+
+```typescript
+app.post('/paytr/bildirim', express.urlencoded({ extended: false }), async (req, res) => {
+  const result = await payment.paytr.completeThreeDSPayment(req.body);
+  if (result.errorCode === 'INVALID_HASH') return res.status(400).send('bad hash');
+  await db.orders.updatePayment(result.paymentId, result.status);
+  res.type('text/plain').send('OK');
+});
+```
+
+## 5. İade, iptal ve durum sorgusu
+
+```typescript
+await payment.paytr.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' });
+
+// PayTR'de void yoktur; cancel() tam iade yapar
+await payment.paytr.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });
+
+const status = await payment.paytr.getPayment('ORDER123');
+```
+
+Bu işlemleri HTTP üzerinden açacaksanız handler'da `allowedActions` ve bir `authorize` hook'u tanımlayın; aksi halde iade gibi işlemler hiç açılmaz. Bkz. [HTTP handler](/docs/concepts/handler).
+
+## Sonraki adımlar
+
+- Tüm seçenekler için [PayTR sayfası](/docs/providers/paytr).
+- Test kartları ve sandbox ayarları için [test kartları](/docs/guides/test-cards).
+- Aynı uygulamaya iyzico ya da bir banka sanal POS'u eklemek için [Next.js ile iyzico 3D Secure](/blog/iyzico-nextjs-3d-secure) yazısına bakın; istek yapısı aynıdır.

@@ -1,0 +1,34 @@
+{
+  "name": "next-shop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example shop app: a complete better-payment checkout with Prisma + SQLite and MockProvider.",
+  "scripts": {
+    "dev": "prisma generate && prisma db push --skip-generate && next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "setup": "prisma generate && prisma db push --skip-generate",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push --skip-generate",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app lib e2e playwright.config.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "better-payment": "workspace:*",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.0",
+    "prisma": "6.19.3",
+    "typescript": "^5.9.3"
+  }
+}

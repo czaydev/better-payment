@@ -21,7 +21,10 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
-      "unrs-resolver"
+      "unrs-resolver",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
     ],
     "overrides": {
       "minimatch@^9": "^9.0.7"

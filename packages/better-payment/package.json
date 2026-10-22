@@ -1,6 +1,6 @@
 {
   "name": "better-payment",
-  "version": "0.12.0-beta.1",
+  "version": "0.12.0-beta.2",
   "description": "Unified payment gateway library for Turkish payment providers",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -26,6 +26,21 @@
       "import": "./dist/plugins/index.mjs",
       "require": "./dist/plugins/index.js"
     },
+    "./fraud": {
+      "types": "./dist/fraud/index.d.ts",
+      "import": "./dist/fraud/index.mjs",
+      "require": "./dist/fraud/index.js"
+    },
+    "./commission-router": {
+      "types": "./dist/commission-router/index.d.ts",
+      "import": "./dist/commission-router/index.mjs",
+      "require": "./dist/commission-router/index.js"
+    },
+    "./routing": {
+      "types": "./dist/routing/index.d.ts",
+      "import": "./dist/routing/index.mjs",
+      "require": "./dist/routing/index.js"
+    },
     "./next": {
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.mjs",
@@ -45,6 +60,11 @@
       "types": "./dist/fastify/index.d.ts",
       "import": "./dist/fastify/index.mjs",
       "require": "./dist/fastify/index.js"
+    },
+    "./nestjs": {
+      "types": "./dist/nestjs/index.d.ts",
+      "import": "./dist/nestjs/index.mjs",
+      "require": "./dist/nestjs/index.js"
     },
     "./elysia": {
       "types": "./dist/elysia/index.d.ts",
@@ -142,6 +162,7 @@
     "@commitlint/cli": "^18.6.1",
     "@commitlint/config-conventional": "^18.6.3",
     "@edge-runtime/vm": "^5.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/express": "^5.0.6",
     "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^6.21.0",

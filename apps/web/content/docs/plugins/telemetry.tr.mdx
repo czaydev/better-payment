@@ -1,0 +1,100 @@
+---
+title: Telemetri
+description: Her sağlayıcı çağrısı için OpenTelemetry uyumlu span ve metrikler; niteliklerde kart verisi yok.
+---
+
+<Since version="0.12.0" />
+
+`telemetry` plugin'i tüm sağlayıcı işlemlerini kendi [OpenTelemetry](https://opentelemetry.io) tracer ve meter kaydedicilerinize bildirir: çağrı başına, sağlayıcıyı, işlemi, sonucu, HTTP durumunu, deneme sayısını ve süreyi taşıyan bir span, ayrıca bir çağsayacı ve gecikme histogramı. Kütüphanenin içinde gelir ve **bağımlılık gerektirmez**: yapısal olarak uyumlu nesnelerle konuşur, yani gerçek bir `@opentelemetry/api` tracer'ı iki paket birbirinden haberdan olmadan çalışır ([hata kodları](/docs/reference/error-codes)).
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { trace, metrics } from '@opentelemetry/api';
+import { telemetry } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  mode: 'production',
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    telemetry({
+      tracer: trace.getTracer('better-payment'),
+      meter: metrics.getMeter('better-payment'),
+    }),
+  ],
+});
+```
+
+`tracer`, `meter` ya da ikisini birden verin. Hiçbiri verilmezse plugin hiçbir iş yapmaz. Yalnızca sağlayıcı işlemleri bildirilir; sağlayıcıya özel metotlar (checkout formülleri, abonelikler) [plugin sistemi](/docs/concepts/plugins) içindeki gibi hook'larsız çalışır.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `tracer` | — | OpenTelemetry tracer'ınız, örneğin `trace.getTracer('better-payment')` |
+| `meter` | — | OpenTelemetry meter'ınız, örneğin `metrics.getMeter('better-payment')` |
+| `enabled` | `true` | Bildirmeyi kapatmak için, örneğin ortama göre |
+| `operations` | hepsi | Yalnızca bu işlemleri bildirir, tek ya da liste |
+| `pendingTimeoutMs` | `300000` | Sonucu hiç gelmeyen (exception fırlatan sağlayıcı) çağrının başlangıç zamanını düşürür, böylece bir şey sızamaz |
+| `maxPending` | `512` | İşlem başına eşzamanlı açık çağrı sınırı |
+
+```typescript
+payment.telemetry.disable(); // the hooks do no work at all
+payment.telemetry.enable();
+payment.telemetry.enabled;   // true
+```
+
+## Span nitelikleri [#span-attributes]
+
+Her çağrı, adında `payment.<operation>` olan (`payment.createPayment`, `payment.refund`, ...) ve yalnızca şu nitelikleri taşıyan bir span üretir:
+
+| Nitelik | Açıklama |
+| ------- | -------- |
+| `payment.provider` | Sağlayıcı kimliği, örneğin `iyzico` |
+| `payment.operation` | İşlem, örneğin `createPayment` |
+| `payment.result` | `success`, `pending` ya da `failure` |
+| `payment.code` | Normalize edilmiş hata kodu, örneğin `CARD_DECLINED` ya da `NETWORK_ERROR` |
+| `payment.http.status` | Sağlayıcı yanıt verdiyse verdiği HTTP durumu |
+| `payment.retry.count` | Yapılan HTTP denemeleri, ilk dahil (`1` denemenin tekrarlanmadığını gösterir) |
+| `payment.duration_ms` | Çağrının duvar saati cinsinden süresi (milisaniye) |
+
+Her nitelik düşük kartinalitylidir ve yalnızca işlem meta verisinden gelir. Kart numaraları, tokenler, CVV, e-postalar, IP'ler, conversation id'ler, istek/yanıt gövdeleri ve sağlayıcı mesajları okunmaz; bu nedenle bir niteliğe asla ulaşamazlar. 64 karakterden uzun değerler düşürülür. Başarısız span `ERROR` (2), başarılı olan `OK` (1) durumu alır.
+
+## Metrikler [#metrics]
+
+Bir `meter` verildiğinde plugin ayrıca çağrı başına şunları kaydeder:
+
+- `payment.calls` sayacı: yukarıdaki niteliklerle `+1`, süre hariç;
+- `payment.duration` histogramı: çağrının milisaniye cinsinden süresi.
+
+Her iki enstrüman da tembelce, ilk bildirilen çağrıda bir kez oluşturulur.
+
+## OpenTelemetry uyumluluğu [#opentelemetry-compatibility]
+
+`@opentelemetry/api` bağımlılığı yoktur: plugin kullandığı birkaç üyeyi (`startSpan`, `setAttribute`, `setStatus`, `end`, `createCounter`, `createHistogram`) gerçek API ile aynı biçime sahip yapısal arayüzler olarak tanımlar — `TelemetryTracer`, `TelemetrySpan`, `TelemetryMeter`. OpenTelemetry'nin verdiği her şey (`trace.getTracer`, `metrics.getMeter`) bu arayüzleri karşılar; OpenTelemetry kullanmayan uygulamalar kendi tracer'ını ya da hiçbir şey vermeyebilir.
+
+## Panolar ve uyarılar [#dashboards-and-alerts]
+
+Nitelik kümesi, üç sağlayıcı-çağrısı SLO'su için gereken tam şeydir. OpenTelemetry collector metrikleri Prometheus'a gönderirken `payment.calls` sayacı `payment_calls_total`, `payment.duration` histogramı ise `payment_duration_milliseconds` olur:
+
+```
+# failure ratio over the last 5 minutes, per provider
+sum by (payment_provider) (
+  rate(payment_calls_total{payment_result="failure"}[5m])
+)
+/
+sum by (payment_provider) (rate(payment_calls_total[5m]))
+```
+
+| Sinyal | Sorgu | Önerilen uyarı |
+| ------ | ----- | -------------- |
+| Hata oranı | `payment_calls_total` içinde `payment_result="failure"`, `payment_provider` ve `payment_operation` kırılımı | %5 üzerinde uyar, 5 dakika boyunca %20 üzerinde sayfa ara |
+| Gecikme | `payment_duration_milliseconds` p95 ve p99, `payment_operation` başına | 10 dakika boyunca p95 ~8s üzerinde |
+| Kayıp yanıtlar | `payment_code="NETWORK_ERROR"` hızı | İlk kalıcı yükselişte uyar: her `NETWORK_ERROR` çekilmiş bir kart olabilir, tekrar denemeden önce `getPayment()` ile mutabakat yapın |
+
+Span'ler aynı nitelikleri taşıdığı için izler, kart verisi içerebilecek bir log satırı açmadan hangi ödemenin hangi sağlayıcı çağrısının yavaş ya da hatalı olduğunu gösterir.
+
+## Ödeme güvenliği [#payment-safety]
+
+Telemetri bir ödemenin sonucunu asla değiştiremez: plugin yalnızca after hook'unda sonucu okur ve hiçbir şey döndürmez; her tracer ve meter çağrısı sarılmıştır — exception fırlatan bir tracer yapılandırılmış [logger](/docs/concepts/logging) üzerinden raporlanır ve ödemeye değişmeden devam edilir. Kayıt işlemleri sınırlıdır (timer yok, yukarıdaki `pendingTimeoutMs` ve `maxPending`), ve plugin Node'a özel API kullanmadığı için kütüphanenin geri kalanı gibi edge çalıştırıcılarında da çalışır.

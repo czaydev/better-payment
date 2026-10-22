@@ -1,0 +1,11 @@
+# Prisma + SQLite artifacts
+node_modules/
+.next/
+prisma/dev.db
+prisma/dev.db-journal
+test-results/
+playwright-report/
+next-env.d.ts
+*.tsbuildinfo
+.env
+.env.local

@@ -18,6 +18,27 @@ export interface FailureResult {
   /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
+  /**
+   * The HTTP status of the provider response, on results built from an HTTP error
+   * that got an answer. Absent when no response arrived (transport errors) and
+   * when the provider returned a failure body with a 2xx status.
+   */
+  httpStatus?: number;
+  /** HTTP attempts made before this result, counting the first one (1 = no retry) */
+  attempts?: number;
+}
+
+/**
+ * The transport metadata of a thrown HTTP error: the status the provider answered
+ * with, and how many attempts were made. Nothing sensitive: the request body and
+ * headers are never part of it.
+ */
+function transportMeta(error: unknown): Partial<FailureResult> {
+  const e = error as { response?: { status?: unknown }; attempts?: unknown } | undefined;
+  const meta: Partial<FailureResult> = {};
+  if (typeof e?.response?.status === 'number') meta.httpStatus = e.response.status;
+  if (typeof e?.attempts === 'number') meta.attempts = e.attempts;
+  return meta;
 }
 
 /**
@@ -55,11 +76,14 @@ export function failureResult<T extends FailureResult>(
   fallback: string,
   extra: Partial<T> = {}
 ): T {
+  const meta = transportMeta(error);
+
   if (isNetworkError(error)) {
     return {
       status: PaymentStatus.PENDING,
       errorCode: NETWORK_ERROR_CODE,
       errorMessage: `No response from ${providerName}${networkCause(error)}. The transaction may have been processed; verify it with getPayment() before retrying.`,
+      ...meta,
       ...extra,
     } as T;
   }
@@ -86,6 +110,7 @@ export function failureResult<T extends FailureResult>(
     ...(code ? { errorCode: code } : {}),
     errorMessage: message,
     rawResponse: data,
+    ...meta,
     ...extra,
   } as T;
 }

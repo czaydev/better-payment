@@ -7,6 +7,37 @@ description: Release history and breaking changes for better-payment.
   The version history was reset. `0.0.1` is the first release of the reworked package. Releases `1.x`–`3.x` had incorrect provider integrations and callback checks that could be bypassed. Do not use them. See [What's New in 0.0.1](/docs/whats-new) for the reasoning and a step-by-step migration guide.
 </Callout>
 
+## 0.12.0-beta.2
+
+### Added
+
+- **[Commission router](/docs/plugins/commission-router):** routes each payment to the cheapest eligible provider from your own rate tables, with an explainable quote, tie and share-cap policies, per-order overrides, and fallbacks only when no charge happened. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Currency conversion](/docs/plugins/currency-conversion):** convert prices before payments using Central Bank (TCMB) rates or custom FX providers, with kuruş-accurate basket allocation and refund rate locking. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Provider failover](/docs/plugins/failover):** automatically retry payments on backup providers during provider downtime or transient errors, with circuit breaker state management. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Fraud rules](/docs/plugins/fraud-rules):** `fraudRules()` counts payment attempts per IP, card, BIN, email or buyer, refuses card-testing runs, blocked BIN ranges and amounts over your limit before the provider is called, and exposes `FRAUD_BLOCKED` and `RATE_LIMITED` through `$ERROR_CODES`; counters are keyed by salted hashes and available under `better-payment/fraud`. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Garanti BBVA provider](/docs/banks/garanti):** non-3D and 3D Secure payments (3D, 3D_PAY), [GarantiPay](/docs/banks/garanti#garantipay), refund, cancel and order inquiry over the GVP XML API. 3D callbacks are verified from `hashparams` and confirmed with the bank. Thanks to [@sizinajans](https://github.com/sizinajans).
+- **[i18n plugin](/docs/plugins/i18n):** `localizedErrors` is now `i18n` and works like Better Auth's i18n plugin: `translations` with the built-in `locales`, `defaultLocale`, and `detection` strategies (`header`, `cookie`, `callback`) for each handler response. The old name still works and is deprecated.
+- **[MCP server plugin](/docs/plugins/mcp):** Expose Better Payment as a Model Context Protocol (MCP) server for AI assistants. Thanks to [@Enard52](https://github.com/Enard52).
+- **[NestJS adapter](/docs/integrations/frameworks#nestjs):** mount the payment handler in a NestJS controller on the Express or Fastify platform with `better-payment/nestjs`, without a `@nestjs/*` dependency. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Example shop](/docs/integrations/next-shop):** a runnable Next.js + Prisma storefront with a cart, server-side amounts, 3D Secure, payment events and refunds. Thanks to [@Enard52](https://github.com/Enard52).
+- **[OpenAPI & Scalar Reference plugin](/docs/plugins/openapi):** Generate OpenAPI 3.1.0 schemas and serve an interactive Scalar API reference documentation page for payment handler endpoints. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Pending Payment Resolver](/docs/plugins/pending-resolver):** Recovers timed out payments by read-only provider status checks, emitting exactly one terminal event per payment even when resolvers run concurrently. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Captcha verification](/docs/plugins/captcha):** the `captcha` plugin verifies Cloudflare Turnstile, Google reCAPTCHA v3 or hCaptcha tokens server-side before a payment runs, so card-testing bots are stopped before they reach the provider. Callbacks and 3DS completions are never blocked. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Rate Limiting](/docs/plugins/rate-limit):** New `rateLimit` plugin throttles handler endpoints per route; the key defaults to an app-controlled source and only reads `X-Forwarded-For` when `trustProxy` is enabled. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Redaction (PCI DSS & KVKK)](/docs/plugins/redact):** mask cardholder data, CVV, and personal data in logs, events, and audit trails without altering provider requests. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Refund approval plugin](/docs/plugins/refund-approval):** Require manager review and approval for refunds and cancellations above a configurable amount threshold, preventing accidental or unauthorized large payouts. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Routing](/docs/plugins/routing):** picks the provider of each payment from your own rules (card family, card origin, amount, installment, health), with a dry-run `explain()`, deterministic 70/30 splits, audit listeners, and refunds that always reach the provider that took the payment. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Telemetry](/docs/plugins/telemetry):** OpenTelemetry-compatible spans and metrics for every provider call, with no card data in attributes and no dependencies. Thanks to [@Enard52](https://github.com/Enard52).
+- **[3D Secure timeout](/docs/plugins/three-ds-timeout):** the `threeDSTimeout` plugin tracks initiated 3D Secure flows and expires the ones the customer abandons after a configurable delay. Each flow is re-checked with the provider first, so a late successful callback is never discarded, and `payment.threeDS.expireStale()` can be run from a cron job or a serverless schedule. Thanks to [@Enard52](https://github.com/Enard52).
+- **[Webhook forwarding plugin](/docs/plugins/webhook-forwarding):** Forward payment events to external microservices as HMAC-SHA256 signed webhooks with exponential backoff retries and card data sanitization. Thanks to [@Enard52](https://github.com/Enard52).
+
+### Fixed
+
+- **[Failover](/docs/plugins/failover):** no failover after an HTTP 500, 502 or 504 answer, which can come after the card was charged, so a gateway error cannot charge the customer twice.
+- **[Writing plugins](/docs/guides/writing-plugins):** plugin `POST` endpoints refuse form bodies (CSRF) unless they set `acceptForm`, and a failing `onRequest` hook answers 503; [rate limit](/docs/plugins/rate-limit) no longer turns off silently when its store fails (`passOnStoreError` to keep the old behavior).
+- **[Redaction](/docs/plugins/redact):** `fields` and `custom` add to the defaults instead of replacing them, cardholder name and provider secrets are masked by default, and identifiers and the 3D Secure page come back unmasked.
+- **[Refund approval](/docs/plugins/refund-approval):** the approver of the HTTP endpoints comes from your session through `getActor`, never from the request body; cancellations and unreadable amounts wait for approval, and a double approval refunds once.
+
 ## 0.12.0-beta.1
 
 ### Added

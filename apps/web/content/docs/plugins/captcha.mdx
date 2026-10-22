@@ -1,0 +1,98 @@
+---
+title: Captcha Verification
+description: Protect your checkout and payment endpoints from automated card-testing bots.
+---
+
+<Since version="0.12.0" />
+
+Automated bots frequently test stolen credit card numbers on payment forms. A captcha before the payment operation is the cheapest and most reliable defense against card testing and fraud.
+
+The `captcha` plugin verifies tokens against **Cloudflare Turnstile**, **Google reCAPTCHA v3**, or **hCaptcha** before invoking the payment provider.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { captcha } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    captcha({
+      provider: 'cloudflare-turnstile',
+      secretKey: process.env.TURNSTILE_SECRET!,
+    }),
+  ],
+});
+```
+
+## How It Works
+
+1. **Token Extraction**: The plugin inspects the request body (e.g. `captchaToken`, `cf-turnstile-response`, `g-recaptcha-response`, `h-captcha-response`) and HTTP headers (`x-captcha-response`).
+2. **Server-Side Verification**: Before the payment operation runs, the token is verified directly with the chosen provider's `siteverify` API.
+3. **Bot Prevention**: If the token is missing or fails verification, the request immediately terminates with `status: 'failure'` and normalized error code `CAPTCHA_MISSING` or `CAPTCHA_INVALID`.
+4. **Excludes Provider Callbacks**: Bank redirects, 3D Secure completions, and webhook notifications are never blocked by the captcha plugin.
+
+## Supported Providers
+
+### Cloudflare Turnstile
+
+Fast, privacy-first CAPTCHA replacement:
+
+```typescript
+captcha({
+  provider: 'cloudflare-turnstile',
+  secretKey: process.env.TURNSTILE_SECRET_KEY!,
+});
+```
+
+### Google reCAPTCHA v3
+
+Supports behavioral score thresholds (0.0 to 1.0):
+
+```typescript
+captcha({
+  provider: 'google-recaptcha',
+  secretKey: process.env.RECAPTCHA_SECRET_KEY!,
+  minScore: 0.5, // reject submissions with score < 0.5
+});
+```
+
+### hCaptcha
+
+```typescript
+captcha({
+  provider: 'hcaptcha',
+  secretKey: process.env.HCAPTCHA_SECRET_KEY!,
+});
+```
+
+## Frontend Example
+
+Pass the token in your payment request:
+
+```typescript
+// Next.js / React with Cloudflare Turnstile
+const res = await fetch('/api/pay/iyzico/payment', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-captcha-response': turnstileToken,
+  },
+  body: JSON.stringify({
+    price: '150.00',
+    paidPrice: '150.00',
+    card: { ... },
+  }),
+});
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `provider` | — | `'cloudflare-turnstile'`, `'google-recaptcha'`, or `'hcaptcha'` |
+| `secretKey` | — | Secret key from your captcha provider console |
+| `minScore` | `0.5` | Minimum score required for Google reCAPTCHA v3 (from 0.0 to 1.0) |
+| `operations` | Payment inits | Which operations require captcha (default: `['createPayment', 'initThreeDSPayment', 'authorize', 'initThreeDSAuthorize']`) |
+| `getToken` | — | Custom function `(req) => string` to extract the token |

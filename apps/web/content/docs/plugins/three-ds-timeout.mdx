@@ -1,0 +1,104 @@
+---
+title: 3D Secure Timeout
+description: Automatically track initiated 3D Secure payments and expire abandoned ones.
+---
+
+<Since version="0.12.0" />
+
+When a customer starts a 3D Secure payment and closes the bank authentication page, the payment remains in an initiated or pending state indefinitely. Reserved inventory remains locked, checkout sessions hang, and reports show uncompleted payments.
+
+The `threeDSTimeout` plugin tracks started 3D Secure flows and expires abandoned ones that never return.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { threeDSTimeout } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    threeDSTimeout({
+      after: '15m',
+      onExpire: async (flow) => {
+        // Release locked inventory or cancel order
+        await releaseOrderInventory(flow.conversationId);
+      },
+    }),
+  ],
+});
+```
+
+## How It Works
+
+1. **Automatic Tracking**: The plugin hooks into `initThreeDSPayment` and `initThreeDSAuthorize`, recording started 3D Secure flows.
+2. **Auto-Cleanup**: When the customer finishes authentication and `completeThreeDSPayment` runs, the flow is cleared from storage.
+3. **Late Callback Protection**: When expiring stale flows, the plugin queries the provider (`getPayment`) first. If the provider reports `SUCCESS` (e.g. late webhook or delayed redirect), the payment is marked resolved instead of expired.
+4. **Serverless Friendly**: Designed without background `setInterval` timers so it works seamlessly on serverless platforms (Vercel, AWS Lambda, Cloudflare Workers).
+
+## Scheduled Expiration
+
+Trigger stale payment cleanup periodically using your scheduler or cron runner:
+
+```typescript
+// Call from a scheduled worker or API route
+const result = await payment.threeDS.expireStale();
+console.log(`Expired ${result.expired.length} abandoned 3DS payments.`);
+```
+
+### Next.js / Vercel Cron Example
+
+In `app/api/cron/expire-3ds/route.ts`:
+
+```typescript
+import { NextResponse } from 'next/server';
+import { payment } from '@/lib/payment';
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  const result = await payment.threeDS.expireStale();
+  return NextResponse.json(result);
+}
+```
+
+In `vercel.json`:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/expire-3ds",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+```
+
+### Node-cron / Express Example
+
+```typescript
+import cron from 'node-cron';
+
+// Run every 10 minutes
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    const { expired, resolved } = await payment.threeDS.expireStale();
+    console.log(`[cron] Expired: ${expired.length}, Resolved: ${resolved}`);
+  } catch (error) {
+    console.error('[cron] Failed to expire stale 3DS payments:', error);
+  }
+});
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `after` | `'15m'` | Inactivity threshold before a flow is considered abandoned (`'15m'`, `'30m'`, `'1h'`, or milliseconds) |
+| `store` | In-memory | Custom storage backend implementing `ThreeDSFlowStore` (e.g. Redis, database) |
+| `onExpire` | — | Callback `(flow) => Promise<void>` or `void` executed when a flow expires |
+| `checkProvider` | `true` | Queries the payment provider before expiring to confirm whether payment succeeded late |

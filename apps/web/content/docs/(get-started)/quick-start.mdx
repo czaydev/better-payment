@@ -148,3 +148,9 @@ payment.on('payment.failed', async (event) => {
   await orders.markFailed(event.conversationId, event.code);
 });
 ```
+
+## Complete example [#complete-example]
+
+The [Next.js + Prisma example shop](/docs/integrations/next-shop) puts these steps together with a
+database, a cart and refunds. It runs on `MockProvider` without credentials, so you can follow the
+whole flow before you have a provider account.

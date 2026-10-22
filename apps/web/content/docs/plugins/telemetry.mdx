@@ -1,0 +1,100 @@
+---
+title: Telemetry
+description: OpenTelemetry-compatible spans and metrics for every provider call, with no card data in attributes.
+---
+
+<Since version="0.12.0" />
+
+The `telemetry` plugin reports every provider operation to your [OpenTelemetry](https://opentelemetry.io) tracer and meter: one span per call with the provider, operation, result, HTTP status, retry count and duration, plus a call counter and a latency histogram. It ships with the library and needs **no dependency**: it talks to structurally compatible objects, so a real `@opentelemetry/api` tracer satisfies it without either package knowing about the other ([error codes](/docs/reference/error-codes)).
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { trace, metrics } from '@opentelemetry/api';
+import { telemetry } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  mode: 'production',
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    telemetry({
+      tracer: trace.getTracer('better-payment'),
+      meter: metrics.getMeter('better-payment'),
+    }),
+  ],
+});
+```
+
+Pass a `tracer`, a `meter`, or both. Without either, the plugin does no work at all. Only provider operations are reported; provider-specific methods (checkout forms, subscriptions) run without hooks, like in the [plugin system](/docs/concepts/plugins).
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `tracer` | — | Your OpenTelemetry tracer, e.g. `trace.getTracer('better-payment')` |
+| `meter` | — | Your OpenTelemetry meter, e.g. `metrics.getMeter('better-payment')` |
+| `enabled` | `true` | Turn reporting off, for example per environment |
+| `operations` | all | Only report these operations, one or a list |
+| `pendingTimeoutMs` | `300000` | Drop the start time of a call whose result never came (a provider that threw), so nothing leaks |
+| `maxPending` | `512` | Cap on concurrently open calls per operation |
+
+```typescript
+payment.telemetry.disable(); // the hooks do no work at all
+payment.telemetry.enable();
+payment.telemetry.enabled;   // true
+```
+
+## Span attributes
+
+Each call produces one span named `payment.<operation>` (`payment.createPayment`, `payment.refund`, ...) with exactly these attributes:
+
+| Attribute | Description |
+| --------- | ----------- |
+| `payment.provider` | The provider id, e.g. `iyzico` |
+| `payment.operation` | The operation, e.g. `createPayment` |
+| `payment.result` | `success`, `pending` or `failure` |
+| `payment.code` | Normalized error code, e.g. `CARD_DECLINED` or `NETWORK_ERROR` |
+| `payment.http.status` | The HTTP status the provider answered with, when it answered |
+| `payment.retry.count` | HTTP attempts made, counting the first one (`1` means no retry) |
+| `payment.duration_ms` | Wall-clock duration of the call in milliseconds |
+
+Every attribute is low cardinality and comes from the operation metadata only. Card numbers, tokens, CVV, emails, IPs, conversation ids, request and response bodies and provider messages are never read, so they can never reach an attribute. Values longer than 64 characters are dropped. A failed span gets status `ERROR` (2), a successful one `OK` (1).
+
+## Metrics
+
+With a `meter` the plugin also records, per call:
+
+- counter `payment.calls`: `+1` with the attributes above, minus the duration;
+- histogram `payment.duration`: the call duration in milliseconds.
+
+Both instruments are created once, lazily, on the first reported call.
+
+## OpenTelemetry compatibility
+
+There is no dependency on `@opentelemetry/api`: the plugin declares the handful of members it uses (`startSpan`, `setAttribute`, `setStatus`, `end`, `createCounter`, `createHistogram`) as structural interfaces — `TelemetryTracer`, `TelemetrySpan`, `TelemetryMeter` — with the same shapes the real API has. Anything OpenTelemetry hands you (`trace.getTracer`, `metrics.getMeter`) satisfies them, and applications without OpenTelemetry can pass their own tracer or nothing at all.
+
+## Dashboards and alerts
+
+The attribute set is exactly what you need for the three provider-call SLOs. With the OpenTelemetry collector exporting metrics to Prometheus, the counter `payment.calls` becomes `payment_calls_total` and the histogram `payment.duration` becomes `payment_duration_milliseconds`:
+
+```
+# failure ratio over the last 5 minutes, per provider
+sum by (payment_provider) (
+  rate(payment_calls_total{payment_result="failure"}[5m])
+)
+/
+sum by (payment_provider) (rate(payment_calls_total[5m]))
+```
+
+| Signal | Query | Suggested alert |
+| ------ | ----- | --------------- |
+| Error rate | `payment_result="failure"` over `payment_calls_total`, by `payment_provider` and `payment_operation` | warn above 5%, page above 20% for 5 minutes |
+| Latency | p95 and p99 of `payment_duration_milliseconds` per `payment_operation` | p95 above ~8s for 10 minutes |
+| Lost responses | `payment_code="NETWORK_ERROR"` rate | alert on the first sustained rise: every `NETWORK_ERROR` may be a charged card, so reconcile with `getPayment()` before retrying |
+
+Spans carry the same attributes, so traces show which provider call of which checkout was slow or failed without opening a log line that might contain card data.
+
+## Payment safety
+
+Telemetry can never change a payment outcome: the plugin only reads the result in an after hook and returns nothing, and every tracer and meter call is wrapped — a tracer that throws is reported through the configured [logger](/docs/concepts/logging) and the payment continues unchanged. The bookkeeping is bounded (no timers, `pendingTimeoutMs` and `maxPending` above), and the plugin uses no Node-only APIs, so it runs on edge runtimes like the rest of the library.

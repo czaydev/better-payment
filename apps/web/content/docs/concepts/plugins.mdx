@@ -52,7 +52,7 @@ Provider-specific methods (the iyzico checkout form, PWI and subscriptions, PayT
 
 ## Official plugins
 
-Official plugins ship in the package, under `better-payment/plugins`:
+Official plugins ship in the package: most under `better-payment/plugins`, and larger ones under their own subpath:
 
 | Plugin | What it does |
 | ------ | ------------ |
@@ -60,5 +60,19 @@ Official plugins ship in the package, under `better-payment/plugins`:
 | [`chaos`](/docs/plugins/chaos) | Injects failures and delays into operations, to test how your application handles them |
 | [`notifications`](/docs/plugins/notifications) | Sends sales, refunds and failures to Slack, Discord, Telegram or your own channel |
 | [`openAPI`](/docs/plugins/openapi) | OpenAPI 3.1.0 schema generation and interactive Scalar reference documentation for handler endpoints |
+| [`failover`](/docs/plugins/failover) | Retries payments on backup providers when a provider is down, with a circuit breaker |
+| [`currencyConversion`](/docs/plugins/currency-conversion) | Converts amounts with TCMB exchange rates, with markup, kuruş-accurate baskets and refund rate locking |
+| [`redact`](/docs/plugins/redact) | Masks card data, CVV and personal data in logs, events and audit trails |
+| [`threeDSTimeout`](/docs/plugins/three-ds-timeout) | Tracks started 3D Secure payments and expires abandoned ones |
+| [`captcha`](/docs/plugins/captcha) | Verifies a Turnstile, reCAPTCHA or hCaptcha token before payment operations |
+| [`rateLimit`](/docs/plugins/rate-limit) | Throttles incoming HTTP handler requests to protect against bot floods and card testing |
+| [`pendingResolver`](/docs/plugins/pending-resolver) | Queries and resolves timed out payments (`NETWORK_ERROR`) on a schedule |
+| [`refundApproval`](/docs/plugins/refund-approval) | Requires manager review and approval for refunds and cancellations above a threshold |
+| [`webhookForwarding`](/docs/plugins/webhook-forwarding) | Forwards payment events to external microservices as HMAC-SHA256 signed webhooks with retries |
+| [`mcp`](/docs/plugins/mcp) | Exposes Better Payment as a Model Context Protocol (MCP) server for AI agents |
+| [`telemetry`](/docs/plugins/telemetry) | OpenTelemetry-compatible spans and metrics for every provider call, with no card data in attributes |
+| [`fraudRules`](/docs/plugins/fraud-rules) | Counts attempts per IP, card and buyer and refuses card-testing runs before the provider is called (subpath `better-payment/fraud`) |
+| [`commissionRouter`](/docs/plugins/commission-router) | Routes each payment to the cheapest eligible provider from your own commission rate tables (subpath `better-payment/commission-router`) |
+| [`routing`](/docs/plugins/routing) | Picks the provider of each payment by card family, card origin, amount, installment and health (subpath `better-payment/routing`) |
 
-Planned: a commission router that sends each payment to the cheapest provider ([#51](https://github.com/czaydev/better-payment/issues/51)). Need something else? [Write your own](/docs/guides/writing-plugins); it takes a few lines.
+Need something else? [Write your own](/docs/guides/writing-plugins); it takes a few lines.

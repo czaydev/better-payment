@@ -1,0 +1,103 @@
+---
+title: Rate Limiting
+description: HTTP handler uç noktalarını bot saldırılarına, scraping'e ve kart deneme (card testing) girişimlerine karşı koruyun.
+---
+
+<Since version="0.12.0" />
+
+HTTP handler; ödeme, 3D Secure callback ve sorgulama uç noktalarını dış dünyaya açar. Hız sınırlaması (rate limit) olmadığında botlar bu rotaları suistimal edebilir veya kart deneme saldırıları gerçekleştirebilir. `rateLimit` plugin'i, HTTP handler seviyesinde yapılandırılabilir bir istek sınırlaması sağlar.
+
+Banka ve ödeme sağlayıcı bildirimlerinin aksamaması için sağlayıcı callback'leri varsayılan olarak sınırlandırmanın dışında tutulur.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { rateLimit } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    rateLimit({
+      window: '1m',
+      max: 30,
+      // Only enable when a reverse proxy you control sets X-Forwarded-For
+      trustProxy: true,
+      rules: {
+        '/payment': { window: '1m', max: 5 },
+        '/callback/*': false, // never limit provider callbacks
+      },
+    }),
+  ],
+});
+```
+
+Bir istemci limiti aştığında handler `429 Too Many Requests` yanıtı, standart rate limit başlıkları (`Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) ve `RATE_LIMITED` hata kodunu döndürür (`localizedErrors` kuruluysa mesaj otomatik olarak yerelleştirilir).
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `window` | `'1m'` | Zaman penceresi: milisaniye veya `'30s'`, `'1m'`, `'1h'` gibi süre metni |
+| `max` | `60` | Pencere başına izin verilen maksimum istek sayısı |
+| `rules` | `{}` | Rota bazlı özel kurallar veya hariç tutmalar. Hariç tutmak için `false` verin |
+| `key` | yok | `BetterPaymentRequest` üzerinden istemci tanımlayıcısını çıkaran fonksiyon; `trustProxy` etkin değilse zorunludur |
+| `trustProxy` | `false` | Varsayılan çıkarıcının proxy başlıklarına güvenmesi; `true` tek güvenilir atlama, sayı ise atlama sayısı |
+| `store` | `MemoryRateLimitStore` | Sayaç depolama katmanı (`RateLimitStore`) |
+| `excludeCallbacks` | `true` | Sağlayıcı callback'lerini varsayılan olarak hız sınırının dışında tutar |
+| `passOnStoreError` | `false` | Store hata verirken istekleri sınırsız geçirir (ve hatayı loglar). Varsayılan olarak handler, store düzelene kadar `503` döner |
+
+## İstemci Kimliği ve Proxy [#client-identity-and-proxies]
+
+Hız sınırlaması ancak istemcinin istekler arasında kendi kovasını (bucket) değiştiremediği durumda işe yarar. `X-Forwarded-For` gibi başlıklar, uygulama bunları belirleyen güvenilir bir proxy arkasında değilse saldırgan kontrolündedir; bu yüzden plugin varsayılan olarak güvenlidir:
+
+- `trustProxy` kapalıyken (varsayılan) plugin `X-Forwarded-For`, `X-Real-IP` veya `CF-Connecting-IP` başlıklarını **okumaz**. Bu modda uygulamanızın kontrol ettiği bir kimlik döndüren `key` fonksiyonu vermelisiniz (API anahtarı, oturum kullanıcı kimliği, imzalı çerez). Ne `key` ne de `trustProxy` verilmişse, plugin kurulurken `ConfigurationError` fırlatır; böylece her istekte yeni bir başlıkla aşılabilecek bir limit sessizce devreye girmek yerine hata başlangıçta görünür olur.
+- `trustProxy: true` iken varsayılan çıkarıcı `X-Forwarded-For` zincirinin **sağdaki** (son) değerini alır; bulamazsa `X-Real-IP`, ardından `CF-Connecting-IP` dener. İstemci başına istediği kadar sahte adres ekleyebilir, ancak gerçekten gözlemlenen adresi yalnızca sizin güvenilir proxy'niz ekler. Uygulamanın önünde birden fazla proxy varsa `trustProxy`'yi sayı olarak verin (ör. `trustProxy: 2` sondan ikinci değeri kullanır). İlk değeri okumak yalnızca `X-Forwarded-For` değerini eklemek yerine tamamen üzerine yazan proxy'lerde güvenlidir; sağdan okuma her iki durumda da güvenlidir.
+
+```typescript
+rateLimit({
+  // Behind a reverse proxy (nginx, Cloudflare, Caddy) that sets X-Forwarded-For
+  trustProxy: true,
+  window: '1m',
+  max: 60,
+});
+
+rateLimit({
+  // No trusted proxy: bucket by data the app itself controls
+  key: (req) => req.headers['x-api-key'] ?? 'anonymous',
+  window: '1m',
+  max: 60,
+});
+```
+
+## Rota Bazlı Kurallar [#per-route-rules]
+
+Kritik uç noktalara daha katı limitler tanımlayabilir veya belirli rotaları tamamen hariç tutabilirsiniz:
+
+```typescript
+rateLimit({
+  window: '1m',
+  max: 60,
+  rules: {
+    // Stricter limit on card payment attempts to prevent card testing
+    '/payment': { window: '1m', max: 5 },
+    '/payment/init-3ds': { window: '1m', max: 5 },
+    // Never limit callbacks or webhook responses
+    '/callback/*': false,
+  },
+});
+```
+
+## Testlerde Sıfırlama [#resetting-in-tests]
+
+Testlerinizde sayaçları `payment.rateLimit.reset()` ile programatik olarak sıfırlayabilirsiniz:
+
+```typescript
+// Reset all stored rate limit keys
+payment.rateLimit.reset();
+
+// Or reset a specific client key
+payment.rateLimit.reset('global:127.0.0.1');
+```

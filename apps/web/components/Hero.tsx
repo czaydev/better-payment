@@ -51,7 +51,7 @@ export default function Hero({
       <div className="mx-auto grid max-w-[84rem] items-center gap-10 px-5 pt-32 pb-10 sm:px-8 md:grid-cols-[1.05fr_0.95fr] md:pt-40">
         <div className="min-w-0">
           <Link
-            href={localePath(lang, "/docs/whats-new")}
+            href={localePath(lang, "/docs/reference/changelog")}
             className="bp-enter group/badge mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card/80 py-1 pr-3 pl-1 text-caption font-medium text-foreground backdrop-blur-sm transition-colors hover:border-line-strong"
             style={at(160)}
           >

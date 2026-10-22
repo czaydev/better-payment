@@ -52,7 +52,7 @@ Sağlayıcıya özel metotlar (iyzico ödeme formu, PWI ve abonelikler, PayTR to
 
 ## Resmi plugin'ler [#official-plugins]
 
-Resmi plugin'ler paketle birlikte, `better-payment/plugins` altında gelir:
+Resmi plugin'ler paketle birlikte gelir: çoğu `better-payment/plugins` altında, daha büyükleri kendi alt yolunda:
 
 | Plugin | Ne yapar |
 | ------ | -------- |
@@ -60,5 +60,19 @@ Resmi plugin'ler paketle birlikte, `better-payment/plugins` altında gelir:
 | [`chaos`](/docs/plugins/chaos) | Uygulamanızın hataları nasıl karşıladığını test etmek için işlemlere hata ve gecikme enjekte eder |
 | [`notifications`](/docs/plugins/notifications) | Satışları, iadeleri ve hataları Slack, Discord, Telegram veya kendi kanalınıza gönderir |
 | [`openAPI`](/docs/plugins/openapi) | Handler endpoint'leri için OpenAPI 3.1.0 şema üretimi ve etkileşimli Scalar API referansı |
+| [`failover`](/docs/plugins/failover) | Bir sağlayıcı çöktüğünde ödemeyi devre kesici (circuit breaker) ile yedek sağlayıcılarda yeniden dener |
+| [`currencyConversion`](/docs/plugins/currency-conversion) | Tutarları TCMB kurlarıyla dönüştürür; kâr marjı, kuruş hassasiyetinde sepet ve iadede kur kilidi |
+| [`redact`](/docs/plugins/redact) | Kart verilerini, CVV'yi ve kişisel verileri loglarda, olaylarda ve denetim kayıtlarında maskeler |
+| [`threeDSTimeout`](/docs/plugins/three-ds-timeout) | Başlatılan 3D Secure ödemelerini takip eder, terk edilenleri zaman aşımına uğratır |
+| [`captcha`](/docs/plugins/captcha) | Ödeme işlemlerinden önce Turnstile, reCAPTCHA veya hCaptcha token'ını doğrular |
+| [`rateLimit`](/docs/plugins/rate-limit) | Bot saldırılarına ve kart deneme girişimlerine karşı HTTP handler isteklerini sınırlandırır |
+| [`pendingResolver`](/docs/plugins/pending-resolver) | Zaman aşımına uğrayan ödemeleri (`NETWORK_ERROR`) belirli takvimle sorgular ve çözer |
+| [`refundApproval`](/docs/plugins/refund-approval) | Belirli bir limitin üzerindeki iade ve iptaller için yönetici onayı gerektirir |
+| [`webhookForwarding`](/docs/plugins/webhook-forwarding) | Ödeme olaylarını diğer mikroservislere HMAC-SHA256 imzalı ve yeniden denemeli webhook olarak iletir |
+| [`mcp`](/docs/plugins/mcp) | Better Payment'ı yapay zekâ ajanları için Model Context Protocol (MCP) sunucusu olarak sunar |
+| [`telemetry`](/docs/plugins/telemetry) | Her sağlayıcı çağrısı için OpenTelemetry uyumlu span ve metrikler; niteliklerde kart verisi yok |
+| [`fraudRules`](/docs/plugins/fraud-rules) | IP, kart ve alıcı başına denemeleri sayar, kart testi saldırılarını sağlayıcı çağrılmadan reddeder (alt yol `better-payment/fraud`) |
+| [`commissionRouter`](/docs/plugins/commission-router) | Her ödemeyi kendi komisyon oranı tablolarınıza göre en ucuz uygun sağlayıcıya yönlendirir (alt yol `better-payment/commission-router`) |
+| [`routing`](/docs/plugins/routing) | Her ödemeyi kart ailesi, kartın menşei, tutar, taksit ve sağlığa göre doğru sağlayıcıya gönderir (alt yol `better-payment/routing`) |
 
-Planlanan: her ödemeyi en ucuz sağlayıcıya gönderen bir komisyon yönlendirici ([#51](https://github.com/czaydev/better-payment/issues/51)). Başka bir şeye mi ihtiyacınız var? [Kendi plugin'inizi yazın](/docs/guides/writing-plugins); birkaç satır yeterli.
+Başka bir şeye mi ihtiyacınız var? [Kendi plugin'inizi yazın](/docs/guides/writing-plugins); birkaç satır yeterli.

@@ -113,6 +113,53 @@ describe('HttpClient', () => {
     expect(result.errorMessage).toContain('No response from iyzico (ECONNRESET: read ECONNRESET)');
   });
 
+  it('failureResult copies httpStatus and attempts from the HttpError, extra wins', () => {
+    const answered = new HttpError(
+      'Payment declined at transport level',
+      { method: 'POST', url: '/pay' },
+      { response: { status: 402, data: { errorMessage: 'No' }, headers: {} } }
+    );
+    answered.attempts = 2;
+    expect(failureResult('Test', answered, 'failed')).toMatchObject({
+      status: PaymentStatus.FAILURE,
+      httpStatus: 402,
+      attempts: 2,
+    });
+
+    const lost = new HttpError(
+      'Request timed out',
+      { method: 'POST', url: '/pay' },
+      { code: 'ETIMEDOUT' }
+    );
+    lost.attempts = 3;
+    const withExtra = failureResult('Test', lost, 'failed', { attempts: 9 });
+    expect(withExtra).toMatchObject({
+      status: PaymentStatus.PENDING,
+      errorCode: 'NETWORK_ERROR',
+      attempts: 9,
+    });
+    expect(withExtra.httpStatus).toBeUndefined();
+  });
+
+  it('marks the failed HttpError with the attempt that gave up', async () => {
+    const failing = recordingFetch(() => new Response('{}', { status: 503 }));
+    const retried = await http(failing.fetchImpl, {
+      retry: { attempts: 3, delay: 0, statusCodes: [503] },
+    })
+      .get('/x')
+      .catch((e: unknown) => e);
+    expect(retried).toBeInstanceOf(HttpError);
+    expect((retried as HttpError).attempts).toBe(3);
+
+    // Payments are never retried: exactly one attempt is reported
+    const single = await http(failing.fetchImpl, {
+      retry: { attempts: 3, delay: 0, statusCodes: [503] },
+    })
+      .post('/pay', '{}')
+      .catch((e: unknown) => e);
+    expect((single as HttpError).attempts).toBe(1);
+  });
+
   it('times out with ETIMEDOUT', async () => {
     const fetchImpl: typeof fetch = (_input, init) =>
       new Promise((_resolve, reject) => {
@@ -172,8 +219,9 @@ describe('HttpClient', () => {
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).config).toMatchObject({ method: 'POST', url: '/pay' });
-      const logged = JSON.stringify((logger.error as ReturnType<typeof vi.fn>).mock.calls, (_k, v) =>
-        v instanceof Error ? { ...v } : v
+      const logged = JSON.stringify(
+        (logger.error as ReturnType<typeof vi.fn>).mock.calls,
+        (_k, v) => (v instanceof Error ? { ...v } : v)
       );
       expect(logged).not.toContain('5528790000000008');
       expect(logged).not.toContain('IYZWSv2 secret');

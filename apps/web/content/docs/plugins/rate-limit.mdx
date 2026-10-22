@@ -1,0 +1,103 @@
+---
+title: Rate Limiting
+description: Protect HTTP handler endpoints from bot floods, scraping, and card testing.
+---
+
+<Since version="0.12.0" />
+
+The HTTP handler exposes payment, 3D Secure callback, and query endpoints. Without rate limits, automated bots can flood routes or attempt brute-force card testing attacks. The `rateLimit` plugin provides configurable sliding-window request throttling at the HTTP handler layer.
+
+Provider callbacks are excluded by default so bank webhook notifications are never dropped.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { rateLimit } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    rateLimit({
+      window: '1m',
+      max: 30,
+      // Only enable when a reverse proxy you control sets X-Forwarded-For
+      trustProxy: true,
+      rules: {
+        '/payment': { window: '1m', max: 5 },
+        '/callback/*': false, // never limit provider callbacks
+      },
+    }),
+  ],
+});
+```
+
+When a client exceeds the limit, the handler responds with `429 Too Many Requests`, standard rate limit headers (`Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`), and the `RATE_LIMITED` error code (automatically translated if `localizedErrors` is installed).
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `window` | `'1m'` | Window duration: milliseconds or string like `'30s'`, `'1m'`, `'1h'` |
+| `max` | `60` | Maximum allowed requests per window |
+| `rules` | `{}` | Per-route rules or exclusions. Set to `false` to exclude a route |
+| `key` | none | Function extracting client identifier from `BetterPaymentRequest`. Required unless `trustProxy` is enabled |
+| `trustProxy` | `false` | Let the default key extraction trust proxy headers. `true` means one trusted hop, a number means that many hops |
+| `store` | `MemoryRateLimitStore` | Counter storage backend (`RateLimitStore`) |
+| `excludeCallbacks` | `true` | Exclude provider callbacks from rate limiting by default |
+| `passOnStoreError` | `false` | Let requests through, unlimited, while the store fails (and log the error). By default the handler answers `503` until the store is back |
+
+## Client Identity and Proxies
+
+Rate limiting only works if the client cannot change its bucket between requests. Headers like `X-Forwarded-For` are attacker-controlled whenever the app is not behind a proxy that sets them, so the plugin is safe by default:
+
+- With `trustProxy` disabled (the default), the plugin **never** reads `X-Forwarded-For`, `X-Real-IP` or `CF-Connecting-IP`. You must then pass `key` with an identity your app controls (API key, session user id, signed cookie). If neither `key` nor `trustProxy` is set, constructing the plugin throws a `ConfigurationError` at startup instead of silently using a limit that every client could bypass with a fresh header on each request.
+- With `trustProxy: true` the default extractor takes the **right-most** (last) `X-Forwarded-For` entry, falling back to `X-Real-IP` and then `CF-Connecting-IP`. A client can prepend as many fake addresses as it likes, but only your trusted proxy can append the address it actually observed. Set `trustProxy` to a number when several proxies sit in front (e.g. `trustProxy: 2` uses the second-to-last entry). Note that reading the *first* entry would only be safe with proxies that overwrite `X-Forwarded-For` instead of appending to it; the right-most reading is safe for both.
+
+```typescript
+rateLimit({
+  // Behind a reverse proxy (nginx, Cloudflare, Caddy) that sets X-Forwarded-For
+  trustProxy: true,
+  window: '1m',
+  max: 60,
+});
+
+rateLimit({
+  // No trusted proxy: bucket by data the app itself controls
+  key: (req) => req.headers['x-api-key'] ?? 'anonymous',
+  window: '1m',
+  max: 60,
+});
+```
+
+## Per-Route Rules
+
+You can assign granular limits to sensitive endpoints or exclude internal routes:
+
+```typescript
+rateLimit({
+  window: '1m',
+  max: 60,
+  rules: {
+    // Stricter limit on card payment attempts to prevent card testing
+    '/payment': { window: '1m', max: 5 },
+    '/payment/init-3ds': { window: '1m', max: 5 },
+    // Never limit callbacks or webhook responses
+    '/callback/*': false,
+  },
+});
+```
+
+## Resetting in Tests
+
+You can reset rate limits programmatically using `payment.rateLimit.reset()`:
+
+```typescript
+// Reset all stored rate limit keys
+payment.rateLimit.reset();
+
+// Or reset a specific client key
+payment.rateLimit.reset('global:127.0.0.1');
+```

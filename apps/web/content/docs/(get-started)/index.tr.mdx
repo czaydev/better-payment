@@ -5,10 +5,6 @@ description: Node.js ve Türk ödeme sağlayıcıları için tip güvenli, birle
 
 **Better Payment**, Türk ödeme sağlayıcılarını (iyzico, PayTR, Akbank, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank ve EST bankaları: İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) tek bir TypeScript API'siyle entegre etmenizi sağlar.
 
-<Callout type="warn">
-  **0.0.1 yeni bir başlangıç.** Sürüm geçmişi sıfırlandı. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bu sürümler kullanımdan kaldırıldı. Nelerin değiştiğini ve nasıl geçiş yapacağınızı [0.0.1'deki yenilikler](/docs/whats-new) sayfasında okuyun.
-</Callout>
-
 ## Neden Better Payment? [#why-better-payment]
 
 Her ödeme sağlayıcısının kendi SDK'sı, istek formatı, imza yöntemi ve hata modeli var. **Better Payment** bu farkları tek bir arayüzün arkasına gizler.
@@ -76,3 +72,14 @@ const result = await payment.initThreeDSPayment({
 });
 // Render result.threeDSHtmlContent in the customer's browser
 ```
+
+## Sonraki adımlar [#next-steps]
+
+<Cards>
+  <Card title="Kurulum" description="Paketi ekleyin ve ilk sağlayıcınızı yapılandırın." href="/docs/installation" />
+  <Card title="Hızlı Başlangıç" description="Sandbox modunda ilk 3D Secure ödemenizi alın." href="/docs/quick-start" />
+</Cards>
+
+<Callout type="info">
+  `3.x`'ten mi geçiyorsunuz? [Geçiş rehberini](/docs/whats-new) izleyin.
+</Callout>

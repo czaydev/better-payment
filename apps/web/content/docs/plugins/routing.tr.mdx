@@ -1,0 +1,274 @@
+---
+title: Yönlendirme
+description: Her ödemeyi kart ailesi, kartın menşei, tutar, taksit ve sağlık kurallarıyla doğru sağlayıcıya gönderin.
+---
+
+<Since version="0.13.0" />
+
+Birden fazla sanal POS sözleşmesi olan işyerlerinin çoğu kuralı ödeme başlamadan bilir: banka içi Bonus taksitleri Garanti'ye, World taksitleri Yapı Kredi'ye, yabancı kartlar onları kabul eden sağlayıcıya gitmelidir. `routing` plugin'i bu kuralları koda çevirir, sağlayıcıyı bir before hook'unda seçer ve her kararı açıklar.
+
+Yönlendirme ayrı bir giriş noktasıdır, `better-payment/plugins` barrel'ının parçası değildir: `better-payment/routing` paketini içe aktarmayan bir uygulama motorunu hiç indirmez.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, garanti, iyzico, paytr, yapikredi } from 'better-payment';
+import { routing } from 'better-payment/routing';
+
+const payment = betterPayment({
+  providers: {
+    garanti: garanti({ /* ... */ }),
+    yapikredi: yapikredi({ /* ... */ }),
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+  plugins: [
+    routing({
+      rules: [
+        { name: 'Bonus installments', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+        { name: 'World installments', when: { cardFamily: 'World', installment: { min: 2 } }, use: 'yapikredi' },
+        { name: 'Foreign cards', when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },
+      ],
+      default: { weights: { iyzico: 70, paytr: 30 } },
+    }),
+  ],
+});
+
+const result = await payment.createPayment(request);
+console.log(payment.routing.decision?.provider); // 'garanti' for a 6-installment Bonus card
+```
+
+Yönlendirme yalnızca ödeme nesnesinde yapılan çağrılar için çalışır. Bir sağlayıcıda (`payment.iyzico.createPayment()`) veya [HTTP handler](/docs/concepts/handler)'ın bir sağlayıcı adresi üzerinden yapılan çağrı asla taşınmaz: bu çağrılar adını verdiğiniz sağlayıcıda çalışır.
+
+## Kurallar [#rules]
+
+Kurallar sırayla denetlenir. Koşulları eşleşen **ve** hedefinde en az bir uygun sağlayıcı bulunan ilk kural kazanır; yalnızca kullanılamayan sağlayıcıları olan bir kural atlanır ve sıradaki kural denenir. Bir kuralın `use` veya `strategy` alanı olmalıdır; `name` isteğe bağlıdır ve `explain()` çıktısında görünür.
+
+```typescript
+routing({
+  rules: [
+    { name: 'Large tickets', when: { amount: { min: '50000' } }, use: 'akbank' },
+    { name: 'Authorizations', when: { operation: 'authorize' }, use: ['iyzico', 'paytr'] },
+  ],
+  default: 'iyzico',
+});
+```
+
+## Koşullar [#conditions]
+
+Ayarlanan her koşul eşleşmelidir (VE). Ayarlanmayan bir koşul kuralı kısıtlamaz.
+
+| Koşul | Tür | Örnek | Anlamı |
+| ----- | --- | ----- | ------ |
+| `bin` | string veya liste | `'552879'` | BIN öneki/önekleri; herhangi bir önek eşleşmesi |
+| `bank` | string veya liste | `'Garanti BBVA'` | Kartı veren banka, büyük/küçük harf duyarsız, tam eşleşme |
+| `cardFamily` | string veya liste | `'Bonus'` | Kart ailesi/programı |
+| `cardType` | `'credit'` veya `'debit'` | `'debit'` | `CREDIT_CARD`/`DEBIT_CARD` değerleri normalize edilir |
+| `cardOrigin` | `'domestic'` veya `'foreign'` | `'foreign'` | `international`/`local` değerleri normalize edilir |
+| `threeDS` | boolean | `true` | 3D Secure işlemleri (`initThreeDSPayment`, `initThreeDSAuthorize`) |
+| `operation` | işlem veya liste | `'authorize'` | `createPayment`, `authorize`, `initThreeDSPayment`, `initThreeDSAuthorize` |
+| `currency` | string veya liste | `'USD'` | Büyük/küçük harf duyarsız ISO kodu |
+| `installment` | sayı veya `{ min, max }` | `{ min: 2 }` | Tam sayı veya kapsayıcı aralık; tek çekim `1`'dir |
+| `amount` | `{ min, max }` | `{ min: '100', max: '5000.00' }` | `request.price` için kapsayıcı sınırlar, ondalık string |
+| `predicate` | `(ctx) => boolean` | `(ctx) => Number(ctx.request.price) > 500` | Kendi koşulunuz |
+
+Bir predicate işlemi, isteği ve çözümlenmiş kart alanlarını (`bin`, `bank`, `cardFamily`, `cardType`, `cardOrigin`, `amount`, `currency`, `installment`, `threeDS`) alır. Bu bağlamı asla log'lamayın: istek kart verisi taşır. Hata fırlatan bir predicate, ödeme sağlayıcıya gitmeden **önce** işlemi `ConfigurationError` ile durdurur; bu, sessizce yanlış POS'a yönlendirmekten daha güvenlidir.
+
+## Hedefler ve ağırlıklı dağıtım [#targets-and-weighted-splits]
+
+`use` ve `default` üç biçim kabul eder:
+
+```typescript
+routing({
+  rules: [
+    { when: { cardFamily: 'Bonus' }, use: 'garanti' },              // one provider
+    { when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },   // ordered: first eligible
+  ],
+  default: { weights: { iyzico: 70, paytr: 30 } },                   // weighted split
+});
+```
+
+Ağırlıklı dağıtım rastgele değil, belirleyicidir. Kova, kararlı bir anahtardan türetilir: önce `conversationId`, sonra `paymentId`, sonra `basketId`, FNV-1a ile hash'lenir. Aynı sipariş her zaman aynı sağlayıcıya düşer, böylece yeniden denemeler sağlayıcı değiştirmez. Her sipariş için benzersiz bir `conversationId` verin; hiçbir id yoksa aynı istekler aynı kovayı paylaşır (yine belirleyici, ama kullanışlı bir trafik dağıtımı değil). Ağırlıklar uygun sağlayıcılar üzerinde yeniden normalize edilir; bir sağlayıcı atlandığında 70/30 dağıtımı yine %100'e tamamlanır.
+
+## Uygunluk ve sağlık [#eligibility-and-health]
+
+Bir sağlayıcı; `betterPayment({ providers })` içinde etkinse, `health` onu kullanılamaz işaretlemiyorsa ve kural koşulları eşleşiyorsa uygundur. Sağlık bilgisi dışarıdan enjekte edilir; plugin sağlayıcıları kendisi ölçmez:
+
+```typescript
+import { routing } from 'better-payment/routing';
+
+routing({
+  default: 'iyzico',
+  health: {
+    // Your failover/circuit state (#171/#247), success-rate window or manual switch
+    isAvailable: (providerId) => providerId !== 'paytr' || paytrCircuit.isClosed(),
+  },
+});
+```
+
+Hata fırlatan `isAvailable`, kullanılamaz sayılır. Tüm adaylar uygun değilse ödeme, sağlığın reddettiği bir sağlayıcıya düşmek yerine hiçbir sağlayıcı çağrılmadan `ConfigurationError` ile durur.
+
+<Callout type="warn">
+  Bu beta, sağlayıcı yetenek verisini (hangi işlemleri ve para birimlerini desteklediğini) yayınlamaz. Bu nedenle uygunluk; etkinlik + sağlık + açık kural koşullarından oluşur. Bir sağlayıcı USD alamıyorsa `currency` koşullarıyla dışlayın veya yetenek tablonuzu `health.isAvailable` içine koyun. İleride bir yetenek API'si bu hook'un yerini alabilir; kurallarınız değişmez.
+</Callout>
+
+## Kararları açıklama [#explain-decisions]
+
+`explain()`, seçilen sağlayıcıyı, eşleşen kuralı, seçilme nedenini ve atlanan sağlayıcıları döndürür. Bu bir kuru çalışmadır: sağlayıcı çağırmaz, sipariş sabitlemez, trafik saymaz ve dinleyicileri bilgilendirmez.
+
+```typescript
+const decision = await payment.routing.explain(request);
+
+console.log(decision.provider);  // 'garanti'
+console.log(decision.rule);      // 'Bonus installments'
+console.log(decision.reason);    // 'rule'
+console.log(decision.skipped);   // [{ provider: 'yapikredi', reason: 'unhealthy' }]
+```
+
+```text
+provider: garanti
+rule: Bonus installments
+reason: rule
+skipped: yapikredi (unhealthy)
+```
+
+`reason` değeri `rule`, `strategy`, `default`, `pinned`, `follow-up`, `unknown-payment` veya `none` olur. 3D Secure veya provizyon kararını açıklamak için ikinci argüman olarak `{ operation: 'initThreeDSPayment' }` verin; varsayılan `createPayment`'tir.
+
+Denetim log'ları ve panolar için `onDecision()` ile kararları dinleyin, son kararı `payment.routing.decision` üzerinden okuyun. Kararlar istek, kart numarası veya BIN içermez.
+
+```typescript
+const off = payment.routing.onDecision((decision) => {
+  audit.log('payment.routed', {
+    provider: decision.provider,
+    rule: decision.rule,
+    reason: decision.reason,
+    skipped: decision.skipped,
+  });
+});
+
+await payment.createPayment(request);
+off();
+```
+
+Dinleyiciler sağlayıcı çağrısından önce çalışır; böylece çağrı hata fırlatsa bile denetim kaydı oluşur. Hata fırlatan bir dinleyici log'lanır ve yok sayılır: denetim log'u ödemenin nereye gittiğini asla değiştiremez. `payment.routing.status()` yönlendirilen ödemeleri sağlayıcıya göre bu süreçte sayar.
+
+## Takip işlemleri [#follow-up-operations]
+
+`refund`, `cancel`, `capture`, `voidAuthorization`, `getPayment` ve `completeThreeDSPayment` ödemeyi alan sağlayıcıya gitmelidir. Plugin her ödemeden sonra `paymentId` ve `conversationId → sağlayıcı` eşlemesini kaydeder; ödeme id'si dönen redler ve kaybolan yanıtlar da buna dahildir. Sağlık bu işlemlerde yok sayılır: sağlıksız bir sağlayıcı parayı hâlâ elinde tutuyor olabilir.
+
+Ödeme bilinmiyorsa plugin çağrıyı başarılı kılmak için başka bir sağlayıcı uydurmaz. `default` hedefine düşer ve `explain()` ile `decision` içinde `reason: 'unknown-payment'` bildirir; varsayılan yoksa kütüphanenin olağan varsayılan sağlayıcı hatası oluşur.
+
+## BIN verisi [#bin-data]
+
+BIN sınıflandırması (#153) bu betanın parçası değildir. Plugin bunu üç yolla kabul eder, öncelik sırasıyla:
+
+1. İstekteki açık alanlar: `binNumber`/`bin`, `bank`/`bankName`, `cardFamily`, `cardType`, `cardOrigin` veya aynı alanlar `card` altında.
+2. `request.paymentCard.cardNumber` değerinin ilk 8 hanesi.
+3. Yukarıdakiler için enjekte edilen `binResolver(bin)`.
+
+```typescript
+import { routing } from 'better-payment/routing';
+
+const binTable: Record<string, { bank?: string; cardFamily?: string; cardOrigin?: 'domestic' | 'foreign' }> = {
+  '552879': { bank: 'Garanti BBVA', cardFamily: 'Bonus', cardOrigin: 'domestic' },
+  '540667': { bank: 'Yapı Kredi', cardFamily: 'World', cardOrigin: 'domestic' },
+};
+
+routing({
+  rules: [{ when: { cardFamily: 'Bonus' }, use: 'garanti' }],
+  default: 'iyzico',
+  binResolver: (bin) => binTable[bin.slice(0, 6)] ?? {},
+});
+```
+
+`binResolver` 6-8 haneli BIN önekini alır ve async olabilir. Plugin BIN verisini asla ağdan çekmez. BIN sağlayıcısı (#153/#252) geldiğinde onu `binResolver` içinden çağırın; kurallar değişmez. Hata fırlatan bir resolver, ödeme hatası değil bilinmeyen kart verisi sayılır. BIN, kart numarası ve resolver sonucu hiçbir zaman karara, dinleyici yüküne veya log mesajına konmaz.
+
+## Store [#store]
+
+Ödeme → sağlayıcı eşlemesi bir anahtar-değer store'unda tutulur. Varsayılan, sınırlı bir bellek içi store'dur (10 000 anahtar, 90 gün TTL) ve yapılandırma gerektirmez. Birden fazla uygulama örneğinde, kütüphanenin idempotency store'uyla aynı biçimde paylaşılan bir store enjekte edin; böylece başka bir örnekte işlenen iade kendi sağlayıcısını bulur:
+
+```typescript
+import { MemoryRoutingStore, routing } from 'better-payment/routing';
+
+routing({
+  default: 'iyzico',
+  store: new MemoryRoutingStore({ maxEntries: 50_000 }),
+  // or your Redis/SQL adapter: get(key), set(key, value, ttlSeconds), delete(key)
+});
+```
+
+Anahtarlar `routing:` önekiyle ad alanına ayrılır. Hata fırlatan bir store log'lanır ve bir ödemeyi asla düşürmez; takip işlemleri o zaman bilinmeyen ödeme gibi davranır ve varsayılana düşer.
+
+## Stratejiler [#strategies]
+
+Bir kural, hedef listesi yeterli olmadığında seçimi bir stratejiye bırakabilir. Strateji yalnızca uygun adayları hedef sırasıyla görür ve bunlardan birini döndürmelidir (veya sıradaki kuralın karar vermesi için `null`).
+
+```typescript
+import { routing, type RoutingStrategy } from 'better-payment/routing';
+
+const cheapest: RoutingStrategy = {
+  id: 'cheapest',
+  choose: async ({ candidates, request }) => {
+    const quotes = await Promise.all(candidates.map((provider) => quote(provider, request)));
+    return quotes.sort((a, b) => a.cost - b.cost)[0]?.provider;
+  },
+};
+
+routing({
+  rules: [{ name: 'Cheapest eligible', when: { currency: 'TRY' }, use: ['iyzico', 'paytr'], strategy: cheapest }],
+  default: 'iyzico',
+});
+```
+
+Stratejiler `strategies` altında adla da kaydedilebilir ve `strategy: 'cheapest'` ile kullanılabilir. Aday olmayan bir sağlayıcı döndürmek `ConfigurationError` fırlatır. Bu, komisyon yönlendiricisinin (#51) kullanacağı ek yerdir: motor değişmeden `strategy: commissionRouter({ ... })` olur; adaptör ayrı bir iş olarak izleniyor (#286).
+
+## Tarifler [#recipes]
+
+### Banka içi taksitler [#on-us-installments]
+
+```typescript
+routing({
+  rules: [
+    { name: 'Bonus on us', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+    { name: 'World on us', when: { cardFamily: 'World', installment: { min: 2 } }, use: 'yapikredi' },
+  ],
+  default: 'iyzico',
+  binResolver: (bin) => binTable[bin.slice(0, 6)] ?? {},
+});
+```
+
+### Yabancı kartlar [#foreign-cards]
+
+```typescript
+routing({
+  rules: [
+    { name: 'Foreign cards', when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },
+    { name: 'Debit cards', when: { cardType: 'debit' }, use: 'paytr' },
+  ],
+  default: 'iyzico',
+});
+```
+
+Her iki koşul da kart verisi ister: `cardOrigin`/`cardType` alanlarını istekte verin veya `binResolver` içinde türetin. Bu veri yoksa kurallar eşleşmez ve varsayılan uygulanır.
+
+### 70/30 trafik dağıtımı [#a-7030-traffic-split]
+
+```typescript
+routing({
+  rules: [
+    { name: 'Bonus on us', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+  ],
+  default: { weights: { iyzico: 70, paytr: 30 } },
+});
+```
+
+Diğer her ödeme `conversationId` değerine göre 70/30 dağıtılır. Aynı sipariş her zaman aynı sağlayıcıya gider; yalnızca yeni siparişler yeni bir kova alır.
+
+## Sınırlar [#limits]
+
+- Komisyon yönlendirici henüz bir stratejiye dönüştürülmedi (#286). Özel `RoutingStrategy` nesneleri bugün çalışır; `commissionRouter()` için `choose()` adaptörü yok.
+- BIN sınıflandırması (#153, PR #252) ve failover devre durumu (#171, PR #247) `beta` üzerinde olmadığı için enjekte edilen hook'lardır (`binResolver`, `health`).
+- Sağlayıcı başına trafik üst sınırı yoktur. `status()` kararları bu süreçte sayar; örnekler arası bir trafik sınırı paylaşılan sayaç gerektirir ve bu kapsam dışıdır.
+- Sağlayıcı yetenek verisi (işlem/para birimi desteği) açık değildir; kural koşullarını veya `health.isAvailable` kullanın.
+- Test paketi canlı sağlayıcı sandbox'larına değil `MockProvider`'a karşı çalışır.

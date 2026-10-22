@@ -410,6 +410,13 @@ export class BetterPaymentHandler {
    * Main request handler
    */
   async handle(request: BetterPaymentRequest): Promise<BetterPaymentResponse> {
+    const path = this.getPath(request.url);
+    if (path !== null && path !== '/health' && path !== '/ok') {
+      const intercepted = await this.core.interceptRequest(request, { path });
+      if (intercepted) {
+        return this.core.respond(intercepted, { request });
+      }
+    }
     return this.core.respond(await this.route(request), { request });
   }
 
@@ -503,6 +510,10 @@ export class BetterPaymentHandler {
   ): Promise<BetterPaymentResponse> {
     if (request.method.toUpperCase() !== endpoint.method) {
       return this.errorResponse(405, 'Method not allowed');
+    }
+    if (endpoint.method === 'POST' && !endpoint.acceptForm && this.isFormRequest(request)) {
+      // A cross-site HTML form can send these without a CORS preflight (CSRF)
+      return this.errorResponse(415, 'Content-Type must be application/json');
     }
     const body = asRecord(this.parseBody(request));
     const ctx: HandlerContext = {
@@ -630,7 +641,7 @@ export class BetterPaymentHandler {
 
   /**
    * Content types a browser form can send cross-site without a CORS preflight.
-   * Only provider callbacks are posted this way.
+   * Only provider callbacks, and plugin endpoints with `acceptForm`, are posted this way.
    */
   private isFormRequest(request: BetterPaymentRequest): boolean {
     const contentType = (this.header(request, 'content-type') || '').toLowerCase();

@@ -1,0 +1,161 @@
+---
+title: "Migrating from iyzipay to Better Payment"
+description: "Using the official iyzipay Node.js package? How to move to Better Payment: side-by-side code, callback verification and a step-by-step checklist."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Node.js, iyzico, Migration]
+---
+
+iyzico's official Node.js package, `iyzipay`, is a callback-based client that mirrors the iyzico API one to one. It works, but it leaves a few jobs to you: checking the callback result, decoding Base64 content, and mapping errors to your own status model. When a second payment provider joins the project, you write all of that again.
+
+[Better Payment](/docs) keeps iyzico's field names, so most of your existing request objects work as they are, and a migration is usually a few hours of work.
+
+## Install
+
+```bash
+npm install better-payment
+```
+
+Better Payment has no runtime dependencies; it only uses `fetch` and WebCrypto, so it also runs on Vercel Edge and Cloudflare Workers.
+
+## The client
+
+**iyzipay:**
+
+```javascript
+const Iyzipay = require('iyzipay');
+
+const iyzipay = new Iyzipay({
+  apiKey: process.env.IYZICO_API_KEY,
+  secretKey: process.env.IYZICO_SECRET_KEY,
+  uri: 'https://sandbox-api.iyzipay.com',
+});
+```
+
+**Better Payment:**
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: 'sandbox', // sandbox URLs; 'production' when live
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+});
+```
+
+## Starting 3D Secure
+
+**iyzipay:**
+
+```javascript
+iyzipay.threedsInitialize.create(
+  {
+    locale: Iyzipay.LOCALE.TR,
+    conversationId: 'ORDER123',
+    price: '100.00',
+    paidPrice: '100.00',
+    currency: Iyzipay.CURRENCY.TRY,
+    installment: '1',
+    basketId: 'B1',
+    paymentChannel: Iyzipay.PAYMENT_CHANNEL.WEB,
+    paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
+    callbackUrl: 'https://yourstore.com/payment/result',
+    paymentCard, buyer, shippingAddress, billingAddress, basketItems,
+  },
+  (err, result) => {
+    if (err || result.status !== 'success') return handleError(err ?? result);
+    const html = Buffer.from(result.threeDSHtmlContent, 'base64').toString('utf8');
+    res.send(html);
+  }
+);
+```
+
+**Better Payment:**
+
+```typescript
+const init = await payment.iyzico.initThreeDSPayment({
+  conversationId: 'ORDER123',
+  price: '100.00',
+  paidPrice: '100.00',
+  currency: 'TRY',
+  installment: 1,
+  basketId: 'B1',
+  callbackUrl: 'https://yourstore.com/api/pay/iyzico/payment/complete-3ds',
+  paymentCard, buyer, shippingAddress, billingAddress, basketItems,
+});
+
+if (init.status === 'pending') res.send(init.threeDSHtmlContent); // already decoded
+```
+
+The differences:
+
+- `locale`, `paymentChannel` and `paymentGroup` are filled in by default.
+- `installment` is a number.
+- `paymentCard`, `buyer`, the addresses and `basketItems` use the same field names.
+- You get a `Promise` instead of a callback, and a result with a `status` instead of a thrown error.
+
+## The callback: the biggest difference
+
+With iyzipay, the callback usually looks like this:
+
+```javascript
+app.post('/payment/result', (req, res) => {
+  iyzipay.threedsPayment.create(
+    {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: req.body.conversationId,
+      paymentId: req.body.paymentId,
+      conversationData: req.body.conversationData,
+    },
+    (err, result) => { /* update the order */ }
+  );
+});
+```
+
+Checking the callback's `status` and `mdStatus`, reading the completion result correctly, and not processing the order twice when the same callback arrives twice are all up to you.
+
+With Better Payment, you pass the callback body as it is:
+
+```typescript
+const result = await payment.iyzico.completeThreeDSPayment(req.body);
+if (result.status === 'success') await markPaid(result.paymentId);
+```
+
+The library checks that 3D authentication succeeded and completes the payment through the iyzico API with your keys. A forged or failed callback always returns `failure`. With the [HTTP handler](/docs/concepts/handler), you don't write this endpoint at all. [Verifying 3D Secure callbacks](/blog/verify-3d-secure-callbacks) explains why this matters.
+
+## Results and errors
+
+| iyzipay | Better Payment |
+|---------|----------------|
+| `result.status === 'success'` / `'failure'` | `success`, `failure`, `pending`, `cancelled` |
+| `result.errorCode` (iyzico code) | `errorCode` (raw code) + `code` (provider-independent, such as `INSUFFICIENT_FUNDS`) |
+| `err` on a network error | `pending` + `NETWORK_ERROR`; the payment may have gone through, check with `getPayment` first |
+
+## Other operations
+
+| iyzipay | Better Payment |
+|---------|----------------|
+| `iyzipay.payment.create` | `payment.iyzico.createPayment` |
+| `iyzipay.payment.retrieve` | `payment.iyzico.getPayment(paymentId)` |
+| `iyzipay.refund.create` | `payment.iyzico.refund({ paymentId, price, currency, ip })` |
+| `iyzipay.cancel.create` | `payment.iyzico.cancel({ paymentId, ip })` |
+| `iyzipay.binNumber.retrieve` | `payment.iyzico.binCheck(bin)` |
+| `iyzipay.checkoutFormInitialize.create` | `payment.iyzico.initCheckoutForm(...)` |
+
+Every method's full signature is on the [iyzico page](/docs/providers/iyzico).
+
+## Migration checklist
+
+1. Install `better-payment` and create the payment object.
+2. Replace the 3D Secure start with `initThreeDSPayment` and delete the Base64 decoding.
+3. Replace your callback endpoint with `completeThreeDSPayment`, or with the HTTP handler.
+4. Move your result checks to `status` and `code`; add a `getPayment` check for `NETWORK_ERROR`.
+5. Test end to end in sandbox with the [test cards](/docs/guides/test-cards), then switch to `mode: 'production'`.
+6. Remove the `iyzipay` package.
+
+After that, adding PayTR, Sipay, Parampos or a bank virtual POS is one more line in `providers`. The rest of your code stays the same.

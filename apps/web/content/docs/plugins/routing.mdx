@@ -1,0 +1,274 @@
+---
+title: Routing
+description: Send each payment to the right provider with rules for card family, card origin, amount, installment and health.
+---
+
+<Since version="0.13.0" />
+
+Most merchants with several virtual POS contracts know the rule before the payment starts: on-us Bonus installments should go to Garanti, World installments to Yapı Kredi, foreign cards to the provider that accepts them. The `routing` plugin turns those rules into code, picks the provider in a before hook, and explains every decision.
+
+Routing is a separate entry point, `better-payment/routing`, not part of the `better-payment/plugins` barrel: an application that does not import it never downloads its engine.
+
+## Setup
+
+```typescript
+import { betterPayment, garanti, iyzico, paytr, yapikredi } from 'better-payment';
+import { routing } from 'better-payment/routing';
+
+const payment = betterPayment({
+  providers: {
+    garanti: garanti({ /* ... */ }),
+    yapikredi: yapikredi({ /* ... */ }),
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+  plugins: [
+    routing({
+      rules: [
+        { name: 'Bonus installments', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+        { name: 'World installments', when: { cardFamily: 'World', installment: { min: 2 } }, use: 'yapikredi' },
+        { name: 'Foreign cards', when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },
+      ],
+      default: { weights: { iyzico: 70, paytr: 30 } },
+    }),
+  ],
+});
+
+const result = await payment.createPayment(request);
+console.log(payment.routing.decision?.provider); // 'garanti' for a 6-installment Bonus card
+```
+
+Routing happens only for calls made on the payment object. A call made on a provider (`payment.iyzico.createPayment()`) or through a provider route of the [HTTP handler](/docs/concepts/handler) is never moved: those calls run on the provider you named.
+
+## Rules
+
+Rules are checked in order. The first rule whose conditions match **and** whose target has at least one eligible provider wins; a rule with only unavailable providers is skipped and the next rule is tried. A rule needs `use` or `strategy`; `name` is optional and appears in `explain()`.
+
+```typescript
+routing({
+  rules: [
+    { name: 'Large tickets', when: { amount: { min: '50000' } }, use: 'akbank' },
+    { name: 'Authorizations', when: { operation: 'authorize' }, use: ['iyzico', 'paytr'] },
+  ],
+  default: 'iyzico',
+});
+```
+
+## Conditions
+
+Every condition that is set must match (AND). An unset condition does not restrict the rule.
+
+| Condition | Type | Example | Meaning |
+| --------- | ---- | ------- | ------- |
+| `bin` | string or list | `'552879'` | BIN prefix(es); any prefix match |
+| `bank` | string or list | `'Garanti BBVA'` | Issuing bank, case-insensitive, exact |
+| `cardFamily` | string or list | `'Bonus'` | Card family/program |
+| `cardType` | `'credit'` or `'debit'` | `'debit'` | `CREDIT_CARD`/`DEBIT_CARD` values are normalized |
+| `cardOrigin` | `'domestic'` or `'foreign'` | `'foreign'` | `international`/`local` values are normalized |
+| `threeDS` | boolean | `true` | 3D Secure operations (`initThreeDSPayment`, `initThreeDSAuthorize`) |
+| `operation` | operation or list | `'authorize'` | `createPayment`, `authorize`, `initThreeDSPayment`, `initThreeDSAuthorize` |
+| `currency` | string or list | `'USD'` | Case-insensitive ISO code |
+| `installment` | number or `{ min, max }` | `{ min: 2 }` | Exact count or inclusive range; single payment is `1` |
+| `amount` | `{ min, max }` | `{ min: '100', max: '5000.00' }` | Inclusive bounds on `request.price`, decimal strings |
+| `predicate` | `(ctx) => boolean` | `(ctx) => Number(ctx.request.price) > 500` | Your own condition |
+
+A predicate gets the operation, the request and the resolved card fields (`bin`, `bank`, `cardFamily`, `cardType`, `cardOrigin`, `amount`, `currency`, `installment`, `threeDS`). Never log that context: the request carries card data. A predicate that throws fails the operation with a `ConfigurationError` **before** the provider is called, which is safer than silently routing to the wrong POS.
+
+## Targets and weighted splits
+
+`use` and `default` accept three shapes:
+
+```typescript
+routing({
+  rules: [
+    { when: { cardFamily: 'Bonus' }, use: 'garanti' },              // one provider
+    { when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },   // ordered: first eligible
+  ],
+  default: { weights: { iyzico: 70, paytr: 30 } },                   // weighted split
+});
+```
+
+A weighted split is deterministic, not random. The bucket comes from a stable key: `conversationId`, then `paymentId`, then `basketId`, hashed with FNV-1a. The same order always lands on the same provider, so retries never move. Set a unique `conversationId` per order; without any id, identical requests share a bucket (still deterministic, but not a useful traffic split). Weights are renormalized over the eligible providers, so a 70/30 split still sums to 100% when one provider is skipped.
+
+## Eligibility and health
+
+A provider is eligible when it is enabled in `betterPayment({ providers })`, is not marked unavailable by `health`, and the rule conditions match. Health is injected; the plugin never measures providers itself:
+
+```typescript
+import { routing } from 'better-payment/routing';
+
+routing({
+  default: 'iyzico',
+  health: {
+    // Your failover/circuit state (#171/#247), success-rate window or manual switch
+    isAvailable: (providerId) => providerId !== 'paytr' || paytrCircuit.isClosed(),
+  },
+});
+```
+
+A throwing `isAvailable` counts as unavailable. If every candidate is ineligible, a charge fails with a `ConfigurationError` before any provider is called instead of falling through to a provider that health rejected.
+
+<Callout type="warn">
+  This beta does not publish provider capability data (which operations or currencies each provider supports). Eligibility is therefore enabled + health + your explicit rule conditions. If a provider cannot take USD, exclude it with `currency` conditions or put your capability table in `health.isAvailable`. A capability API can replace that hook later without changing your rules.
+</Callout>
+
+## Explain decisions
+
+`explain()` returns the provider, the rule that matched, why it was selected and which providers were skipped. It is a dry run: it does not call a provider, pin an order, count traffic or notify listeners.
+
+```typescript
+const decision = await payment.routing.explain(request);
+
+console.log(decision.provider);  // 'garanti'
+console.log(decision.rule);      // 'Bonus installments'
+console.log(decision.reason);    // 'rule'
+console.log(decision.skipped);   // [{ provider: 'yapikredi', reason: 'unhealthy' }]
+```
+
+```text
+provider: garanti
+rule: Bonus installments
+reason: rule
+skipped: yapikredi (unhealthy)
+```
+
+`reason` is one of `rule`, `strategy`, `default`, `pinned`, `follow-up`, `unknown-payment` or `none`. Pass `{ operation: 'initThreeDSPayment' }` as the second argument to explain a 3D Secure or authorization decision; the default is `createPayment`.
+
+For audit logs and dashboards, listen to decisions with `onDecision()` and read the last one from `payment.routing.decision`. Decisions contain no request, no card number and no BIN.
+
+```typescript
+const off = payment.routing.onDecision((decision) => {
+  audit.log('payment.routed', {
+    provider: decision.provider,
+    rule: decision.rule,
+    reason: decision.reason,
+    skipped: decision.skipped,
+  });
+});
+
+await payment.createPayment(request);
+off();
+```
+
+Listeners run before the provider call, so the audit entry exists even when the call throws. A listener that throws is logged and ignored: audit logging can never change where a payment goes. `payment.routing.status()` counts routed charges per provider in this process.
+
+## Follow-up operations
+
+`refund`, `cancel`, `capture`, `voidAuthorization`, `getPayment` and `completeThreeDSPayment` must reach the provider that handled the payment. The plugin records `paymentId` and `conversationId → provider` after every charge, including declines and lost responses that returned a payment id, and looks them up before the call. Health is ignored for these: an unhealthy provider may still hold your money.
+
+If the payment is unknown, the plugin does not guess a different provider to make the call succeed. It falls back to `default` and reports `reason: 'unknown-payment'` in `explain()` and `decision`; with no default, the library's usual no-default error is raised.
+
+## BIN data
+
+BIN classification (#153) is not part of this beta. The plugin accepts it in three ways, in this order of precedence:
+
+1. Explicit fields on the request: `binNumber`/`bin`, `bank`/`bankName`, `cardFamily`, `cardType`, `cardOrigin`, or the same fields under `card`.
+2. The first 8 digits of `request.paymentCard.cardNumber`.
+3. An injected `binResolver(bin)` for both of the above.
+
+```typescript
+import { routing } from 'better-payment/routing';
+
+const binTable: Record<string, { bank?: string; cardFamily?: string; cardOrigin?: 'domestic' | 'foreign' }> = {
+  '552879': { bank: 'Garanti BBVA', cardFamily: 'Bonus', cardOrigin: 'domestic' },
+  '540667': { bank: 'Yapı Kredi', cardFamily: 'World', cardOrigin: 'domestic' },
+};
+
+routing({
+  rules: [{ when: { cardFamily: 'Bonus' }, use: 'garanti' }],
+  default: 'iyzico',
+  binResolver: (bin) => binTable[bin.slice(0, 6)] ?? {},
+});
+```
+
+`binResolver` receives the 6-8 digit BIN prefix and may be async. The plugin never fetches BIN data from the network. When the BIN provider (#153/#252) lands, call it from `binResolver`; the rules do not change. A resolver that throws is treated as unknown card data, not as a payment failure. The BIN, the card number and the resolver result are never put in a decision, a listener payload or a log message.
+
+## Store
+
+The payment → provider mapping lives in a key-value store. The default is a bounded in-memory store (10 000 keys, 90-day TTL) and needs no configuration. With several application instances, inject a shared store, in the same shape as the library's idempotency store, so a refund handled by another instance finds its provider:
+
+```typescript
+import { MemoryRoutingStore, routing } from 'better-payment/routing';
+
+routing({
+  default: 'iyzico',
+  store: new MemoryRoutingStore({ maxEntries: 50_000 }),
+  // or your Redis/SQL adapter: get(key), set(key, value, ttlSeconds), delete(key)
+});
+```
+
+Keys are namespaced with `routing:`. A store that throws is logged and never fails a payment; follow-ups then behave like unknown payments and fall back to the default.
+
+## Strategies
+
+A rule can delegate the choice to a strategy when the target list is not enough. The strategy sees only eligible candidates, in target order, and must return one of them (or `null` to let the next rule decide).
+
+```typescript
+import { routing, type RoutingStrategy } from 'better-payment/routing';
+
+const cheapest: RoutingStrategy = {
+  id: 'cheapest',
+  choose: async ({ candidates, request }) => {
+    const quotes = await Promise.all(candidates.map((provider) => quote(provider, request)));
+    return quotes.sort((a, b) => a.cost - b.cost)[0]?.provider;
+  },
+};
+
+routing({
+  rules: [{ name: 'Cheapest eligible', when: { currency: 'TRY' }, use: ['iyzico', 'paytr'], strategy: cheapest }],
+  default: 'iyzico',
+});
+```
+
+Strategies may also be registered by name under `strategies` and referenced with `strategy: 'cheapest'`. Returning a provider that is not a candidate throws a `ConfigurationError`. This is the seam the commission router (#51) uses: it becomes `strategy: commissionRouter({ ... })` without an engine change; the adapter is tracked separately (#286).
+
+## Recipes
+
+### On-us installments
+
+```typescript
+routing({
+  rules: [
+    { name: 'Bonus on us', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+    { name: 'World on us', when: { cardFamily: 'World', installment: { min: 2 } }, use: 'yapikredi' },
+  ],
+  default: 'iyzico',
+  binResolver: (bin) => binTable[bin.slice(0, 6)] ?? {},
+});
+```
+
+### Foreign cards
+
+```typescript
+routing({
+  rules: [
+    { name: 'Foreign cards', when: { cardOrigin: 'foreign' }, use: ['iyzico', 'paytr'] },
+    { name: 'Debit cards', when: { cardType: 'debit' }, use: 'paytr' },
+  ],
+  default: 'iyzico',
+});
+```
+
+Both conditions need card data: pass `cardOrigin`/`cardType` on the request or derive them in `binResolver`. Without that data the rules simply do not match and the default applies.
+
+### A 70/30 traffic split
+
+```typescript
+routing({
+  rules: [
+    { name: 'Bonus on us', when: { cardFamily: 'Bonus', installment: { min: 2 } }, use: 'garanti' },
+  ],
+  default: { weights: { iyzico: 70, paytr: 30 } },
+});
+```
+
+Every other payment is split 70/30 by its `conversationId`. The same order always goes to the same provider; only new orders get a new bucket.
+
+## Limits
+
+- The commission router is not refactored into a strategy yet (#286). Custom `RoutingStrategy` objects work today; `commissionRouter()` does not have the `choose()` adapter.
+- BIN classification (#153, PR #252) and failover circuit state (#171, PR #247) are injected hooks (`binResolver`, `health`) because those changes are not on `beta` yet.
+- There is no per-provider traffic cap. `status()` counts decisions in this process; a cross-instance traffic cap needs a shared counter and is out of scope here.
+- Provider capability data (operation/currency support) is not exposed; use rule conditions or `health.isAvailable`.
+- The suite runs against `MockProvider`, not live provider sandboxes.

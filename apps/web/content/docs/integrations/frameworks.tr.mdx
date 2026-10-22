@@ -23,6 +23,99 @@ Tüm adapter'lar:
 
 Onları handler'ın `basePath`'i altına bağlayın (varsayılan `/api/pay`). Listede olmayan bir framework için [diğer framework'ler](/docs/concepts/handler#frameworks) bölümüne bakın.
 
+## Express
+
+```typescript
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+```
+
+Adapter ham gövdeyi kendisi okuduğu için ödeme route'larında `express.json()` ya da `express.urlencoded()` kullanmanız gerekmez. Önce bir body parser çalışmışsa onun sonucu kullanılır. Beklenmeyen hatalar `next(error)`'a iletilir.
+
+## Fastify
+
+```typescript
+import Fastify from 'fastify';
+import { toFastifyPlugin } from 'better-payment/fastify';
+
+const app = Fastify();
+await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
+```
+
+Fastify, `application/x-www-form-urlencoded` gövdeleri varsayılan olarak reddeder (415); oysa iyzico, Param, Akbank ve PayTR callback'lerini bu formatta gönderir. Plugin bu formatı yalnızca kendi route'ları için kabul eder; diğer route'larınız Fastify'ın varsayılanlarıyla kalır.
+
+## NestJS
+
+```typescript
+import { All, Controller, Req, Res } from '@nestjs/common';
+import { toNestHandler } from 'better-payment/nestjs';
+import { getPayment } from './payment';
+
+@Controller('api/pay')
+export class PaymentController {
+  // One handler works on both the Express and the Fastify platform
+  private readonly handle = toNestHandler(getPayment);
+
+  @All('*')
+  pay(@Req() req: unknown, @Res() res: unknown): Promise<void> {
+    return this.handle(req, res);
+  }
+}
+```
+
+`better-payment/nestjs`, `@nestjs/*` için bir bağımlılığa sahip değildir: adapter yalnızca Nest'in `@Req()` ve `@Res()` ile enjekte ettiği istek ve yanıt nesnelerini okur ve platformu yanıttan tespit eder. Express platformunda bu bir Express middleware'idir (ham gövdeyi kendisi okur, böylece varsayılan body parser form-urlencoded banka callback'lerini bozmaz); Fastify platformunda Fastify'ın zaten ayrıştırdığı gövdeyi kullanır. Wildcard route'unu handler'ın `basePath`'i altına kaydedin (burada `api/pay`). Adapter handler'ı bir fonksiyon olarak aldığı için tembel başlatma diğer adapter'lardaki gibi çalışır.
+
+## Hono
+
+```typescript
+import { Hono } from 'hono';
+import { toHonoHandler } from 'better-payment/hono';
+
+const app = new Hono();
+app.all('/api/pay/*', toHonoHandler(payment));
+```
+
+Hono, Better Payment gibi Node.js, Bun, Deno ve Cloudflare Workers'da çalışır.
+
+## Elysia
+
+```typescript
+import { Elysia } from 'elysia';
+import { toElysiaHandler } from 'better-payment/elysia';
+
+const app = new Elysia();
+app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
+```
+
+`{ parse: 'none' }` handler'a ham gövdeyi bırakır: banka callback'leri form-urlencoded gelir ve imzaları orijinal alanlarla doğrulanır. Bu ayar olmadan `body` okuyan herhangi bir hook (`onTransform`, `derive`, `onBeforeHandle` ya da bir plugin) Elysia'nın isteği önce tüketmesine yol açar. Elysia Bun için tasarlanmıştır, Node.js'te de çalışır.
+
+## React Router
+
+<Since version="0.8.0" />
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+Default export'u olmayan bir splat resource route'tur (`api.pay.$.ts`, `/api/pay` altındaki her şeyi yakalar): GET istekleri `loader`'a, POST istekleri (banka callback'leri dahil) `action`'a gider. Aynı kod Remix v2'de de çalışır. `routes.ts` yapılandırması kullanıyorsanız `route('api/pay/*', 'routes/api.pay.$.ts')` olarak kaydedin.
+
+## Düz Node.js [#plain-nodejs]
+
+```typescript
+import { createServer } from 'node:http';
+import { toNodeHandler } from 'better-payment/express';
+
+createServer(toNodeHandler(payment)).listen(3000);
+```
+
 ## Tembel başlatma [#lazy-initialization]
 
 Tüm adapter'lar ödeme nesnesini (ya da handler'ını) döndüren bir fonksiyonu da kabul eder. Fonksiyon her istekte çağrılır, böylece örneği ilk kullanımda oluşturabilirsiniz:

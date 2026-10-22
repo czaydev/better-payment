@@ -1,0 +1,140 @@
+---
+title: "Next.js ile iyzico 3D Secure entegrasyonu: adım adım rehber"
+description: "Next.js App Router'da iyzico ile 3D Secure ödeme almak: kurulum, sunucuda istek oluşturma, callback doğrulama ve siparişi güncelleme."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Next.js, iyzico, 3D Secure]
+---
+
+iyzico ile Next.js'te ödeme almak için üç parça gerekir: 3D Secure'u başlatan bir endpoint, bankanın sonucu gönderdiği bir callback endpoint'i ve siparişi güncelleyen kod. Bu rehberde üçünü de [Better Payment](/docs) ile, App Router üzerinde tek bir route dosyasıyla kuruyoruz.
+
+## 1. Paketi kurun ve anahtarları ekleyin
+
+```bash
+npm install better-payment
+```
+
+iyzico sandbox panelinden aldığınız anahtarları `.env.local` dosyasına ekleyin:
+
+```bash
+IYZICO_API_KEY=sandbox-...
+IYZICO_SECRET_KEY=sandbox-...
+APP_URL=http://localhost:3000
+```
+
+## 2. Ödeme nesnesini oluşturun
+
+Ödeme nesnesini tembel (lazy) oluşturun. Modül seviyesinde oluşturursanız `next build` sırasında ortam değişkenleri olmadığında hata alabilirsiniz.
+
+```typescript
+// lib/payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+const createPayment = () =>
+  betterPayment({
+    mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+    providers: {
+      iyzico: iyzico({
+        apiKey: process.env.IYZICO_API_KEY!,
+        secretKey: process.env.IYZICO_SECRET_KEY!,
+      }),
+    },
+    handler: {
+      allowedActions: ['payment/init-3ds', 'payment/complete-3ds'],
+
+      // Tutarları tarayıcıdan değil, siparişinizden alın
+      transformRequest: async (ctx) => {
+        if (ctx.action !== 'payment/init-3ds') return ctx.body;
+        const order = await db.orders.find(ctx.body?.orderId);
+        return {
+          price: order.total,
+          paidPrice: order.total,
+          currency: 'TRY',
+          conversationId: order.id,
+          basketId: order.id,
+          callbackUrl: `${process.env.APP_URL}/api/pay/iyzico/payment/complete-3ds`,
+          paymentCard: ctx.body?.paymentCard,
+          buyer: order.buyer,
+          shippingAddress: order.shippingAddress,
+          billingAddress: order.billingAddress,
+          basketItems: order.items,
+        };
+      },
+
+      // Yalnızca doğrulanmış sonuçlar buraya gelir
+      onCallback: async (result) => {
+        await db.orders.updatePayment(result.paymentId, result.status);
+      },
+
+      // 3D Secure'dan dönen müşteriyi sipariş sayfasına yönlendirin
+      callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+    },
+  });
+
+let instance: ReturnType<typeof createPayment> | undefined;
+export const getBetterPayment = () => (instance ??= createPayment());
+```
+
+`db` burada kendi veritabanı katmanınızı temsil ediyor. `locale`, `paymentChannel` ve `paymentGroup` gibi iyzico alanları sizin yerinize doldurulur.
+
+## 3. Tek bir route dosyası ekleyin
+
+```typescript
+// app/api/pay/[...path]/route.ts
+import { toNextJsHandler } from 'better-payment/next';
+import { getBetterPayment } from '@/lib/payment';
+
+export const { GET, POST } = toNextJsHandler(getBetterPayment);
+```
+
+Bu dosya iki endpoint açar:
+
+- `POST /api/pay/iyzico/payment/init-3ds`: 3D Secure'u başlatır.
+- `POST /api/pay/iyzico/payment/complete-3ds`: bankanın callback'ini karşılar.
+
+## 4. Ödeme formundan 3D Secure'u başlatın
+
+Tarayıcı yalnızca sipariş numarasını ve kart bilgisini gönderir. Tutar sunucuda belirlenir.
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ orderId, paymentCard }),
+});
+
+const result = await res.json();
+if (result.status === 'pending' && result.threeDSHtmlContent) {
+  document.open();
+  document.write(result.threeDSHtmlContent);
+  document.close();
+}
+```
+
+iyzico `threeDSHtmlContent` alanını Base64 olarak döndürür. Better Payment bunu çözüp doğrudan basılabilir HTML olarak verir.
+
+## 5. Callback: doğrulama sizin yerinize yapılır
+
+Müşteri bankada SMS kodunu girdikten sonra banka sonucu `callbackUrl` adresine POST eder. Bu adres herkese açıktır. Bu yüzden gelen `status=success` değerine tek başına güvenilmemelidir.
+
+Handler callback'i şöyle işler:
+
+1. 3D doğrulamasının gerçekten başarılı olduğunu (`mdStatus`) kontrol eder.
+2. Ödemeyi iyzico API'si üzerinden sizin anahtarlarınızla tamamlar.
+3. Sonuç ancak iyzico onaylarsa `success` olur ve `onCallback` çağrılır.
+4. Müşteriyi `callbackRedirect` adresine yönlendirir.
+
+Sahte bir callback her zaman `failure` döner. Ayrıntılar için [3D Secure callback'lerini doğrulama](/blog/verify-3d-secure-callbacks) yazısına bakın.
+
+## 6. Sandbox'ta test edin
+
+iyzico sandbox'ında başarılı ödeme için `5528790000000008` numaralı test kartını kullanabilirsiniz. Diğer senaryolar için [test kartları](/docs/guides/test-cards) sayfasına bakın.
+
+## Canlıya geçerken
+
+- `mode` değerini `production` yapın ve canlı anahtarları girin.
+- `APP_URL` değerini gerçek alan adınız yapın.
+- Sipariş güncellemesini idempotent yazın; aynı callback birden fazla gelebilir.
+- Zaman aşımında sonuç `pending` ve `NETWORK_ERROR` olur. Tekrar denemeden önce `getPayment` ile durumu sorgulayın. Bkz. [zaman aşımları](/blog/payment-timeouts-network-error).
+
+İleride PayTR ya da bir banka sanal POS'u eklemek isterseniz aynı route ve aynı istek yapısı çalışmaya devam eder. Sadece `providers` listesine yeni sağlayıcıyı eklersiniz. [Next.js entegrasyon dokümanı](/docs/integrations/nextjs) ve [iyzico sayfası](/docs/providers/iyzico) bütün seçenekleri anlatır.

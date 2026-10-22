@@ -1,0 +1,140 @@
+---
+title: "iyzico 3D Secure with Next.js: a step-by-step guide"
+description: "Take 3D Secure payments with iyzico in the Next.js App Router: setup, building the request on the server, verifying the callback and updating the order."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Next.js, iyzico, 3D Secure]
+---
+
+Taking iyzico payments in Next.js takes three pieces: an endpoint that starts 3D Secure, an endpoint that receives the bank's callback, and code that updates the order. This guide builds all three with [Better Payment](/docs) and a single App Router route file.
+
+## 1. Install the package and add your keys
+
+```bash
+npm install better-payment
+```
+
+Add the keys from your iyzico sandbox panel to `.env.local`:
+
+```bash
+IYZICO_API_KEY=sandbox-...
+IYZICO_SECRET_KEY=sandbox-...
+APP_URL=http://localhost:3000
+```
+
+## 2. Create the payment object
+
+Create it lazily. A module-level instance can make `next build` fail when the environment variables are not set.
+
+```typescript
+// lib/payment.ts
+import { betterPayment, iyzico } from 'better-payment';
+
+const createPayment = () =>
+  betterPayment({
+    mode: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+    providers: {
+      iyzico: iyzico({
+        apiKey: process.env.IYZICO_API_KEY!,
+        secretKey: process.env.IYZICO_SECRET_KEY!,
+      }),
+    },
+    handler: {
+      allowedActions: ['payment/init-3ds', 'payment/complete-3ds'],
+
+      // Take amounts from your order, never from the browser
+      transformRequest: async (ctx) => {
+        if (ctx.action !== 'payment/init-3ds') return ctx.body;
+        const order = await db.orders.find(ctx.body?.orderId);
+        return {
+          price: order.total,
+          paidPrice: order.total,
+          currency: 'TRY',
+          conversationId: order.id,
+          basketId: order.id,
+          callbackUrl: `${process.env.APP_URL}/api/pay/iyzico/payment/complete-3ds`,
+          paymentCard: ctx.body?.paymentCard,
+          buyer: order.buyer,
+          shippingAddress: order.shippingAddress,
+          billingAddress: order.billingAddress,
+          basketItems: order.items,
+        };
+      },
+
+      // Only verified results reach this hook
+      onCallback: async (result) => {
+        await db.orders.updatePayment(result.paymentId, result.status);
+      },
+
+      // Send the customer back to the order page after 3D Secure
+      callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+    },
+  });
+
+let instance: ReturnType<typeof createPayment> | undefined;
+export const getBetterPayment = () => (instance ??= createPayment());
+```
+
+`db` stands for your own data layer. iyzico fields such as `locale`, `paymentChannel` and `paymentGroup` are filled in for you.
+
+## 3. Add one route file
+
+```typescript
+// app/api/pay/[...path]/route.ts
+import { toNextJsHandler } from 'better-payment/next';
+import { getBetterPayment } from '@/lib/payment';
+
+export const { GET, POST } = toNextJsHandler(getBetterPayment);
+```
+
+This file serves two endpoints:
+
+- `POST /api/pay/iyzico/payment/init-3ds` starts 3D Secure.
+- `POST /api/pay/iyzico/payment/complete-3ds` receives the bank's callback.
+
+## 4. Start 3D Secure from the payment form
+
+The browser sends only the order id and the card. The amount is set on the server.
+
+```typescript
+const res = await fetch('/api/pay/iyzico/payment/init-3ds', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ orderId, paymentCard }),
+});
+
+const result = await res.json();
+if (result.status === 'pending' && result.threeDSHtmlContent) {
+  document.open();
+  document.write(result.threeDSHtmlContent);
+  document.close();
+}
+```
+
+iyzico returns `threeDSHtmlContent` as Base64. Better Payment decodes it, so you can render it as it is.
+
+## 5. The callback is verified for you
+
+After the customer enters the SMS code, the bank POSTs the result to `callbackUrl`. That URL is public, so a `status=success` in the request must never be trusted on its own.
+
+The handler processes the callback in four steps:
+
+1. It checks that 3D authentication really succeeded (`mdStatus`).
+2. It completes the payment through the iyzico API with your keys.
+3. The result is `success` only when iyzico confirms it, and only then is `onCallback` called.
+4. It redirects the customer to `callbackRedirect`.
+
+A forged callback always returns `failure`. See [Verifying 3D Secure callbacks](/blog/verify-3d-secure-callbacks) for the details.
+
+## 6. Test in sandbox
+
+In the iyzico sandbox, the test card `5528790000000008` succeeds. See [test cards](/docs/guides/test-cards) for other scenarios.
+
+## Going live
+
+- Set `mode` to `production` and use your live keys.
+- Set `APP_URL` to your real domain.
+- Make the order update idempotent; the same callback can arrive more than once.
+- On a timeout the result is `pending` with `NETWORK_ERROR`. Check with `getPayment` before you retry. See [payment timeouts](/blog/payment-timeouts-network-error).
+
+When you add PayTR or a bank virtual POS later, the same route and request shape keep working: you add the provider to `providers`. The [Next.js integration docs](/docs/integrations/nextjs) and the [iyzico page](/docs/providers/iyzico) cover every option.

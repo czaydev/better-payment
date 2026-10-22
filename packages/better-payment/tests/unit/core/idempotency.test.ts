@@ -99,18 +99,22 @@ describe('callback deduplication', () => {
 
   it('answers 409 to a duplicate that arrives while the first is in flight', async () => {
     let release!: () => void;
+    let entered!: () => void;
+    // Resolves once the first request reaches the provider (it holds the key by then)
+    const inFlight = new Promise<void>((resolve) => (entered = resolve));
     const { payment } = setup({
       completeThreeDSPayment: vi.fn(
         () =>
           new Promise((resolve) => {
             release = () => resolve({ status: 'success', paymentId: 'O1' });
+            entered();
           })
       ),
     });
     const handler = new BetterPaymentHandler(payment);
 
     const first = handler.handle(post('/api/pay/paytr/callback', notification));
-    await new Promise((r) => setTimeout(r, 0));
+    await inFlight;
     const duplicate = await handler.handle(post('/api/pay/paytr/callback', notification));
     release();
 

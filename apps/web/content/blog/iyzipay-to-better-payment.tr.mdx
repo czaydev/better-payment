@@ -1,0 +1,161 @@
+---
+title: "iyzipay paketinden Better Payment'a geçiş"
+description: "Resmi iyzipay Node.js paketini kullanıyorsanız Better Payment'a nasıl geçersiniz: kod karşılaştırması, callback doğrulama ve adım adım geçiş listesi."
+date: 2026-10-22
+authors: [czaydev]
+tags: [Node.js, iyzico, Geçiş]
+---
+
+iyzico'nun resmi Node.js paketi `iyzipay`, iyzico API'sini birebir yansıtan, callback tabanlı bir istemcidir. İşini görür, ama birkaç işi size bırakır: callback sonucunu kontrol etmek, Base64 içeriği çözmek, hataları kendi durum modelinize çevirmek. Projeye ikinci bir ödeme sağlayıcısı eklendiğinde bu işlerin hepsini yeniden yazmanız gerekir.
+
+[Better Payment](/docs) iyzico'nun alan adlarını korur. Bu yüzden mevcut istek nesnelerinizin büyük kısmı olduğu gibi çalışır ve geçiş genellikle birkaç saatlik bir iştir.
+
+## Kurulum
+
+```bash
+npm install better-payment
+```
+
+Better Payment'ın çalışma zamanı bağımlılığı yoktur; yalnızca `fetch` ve WebCrypto kullanır. Bu sayede Vercel Edge ve Cloudflare Workers'ta da çalışır.
+
+## İstemci
+
+**iyzipay:**
+
+```javascript
+const Iyzipay = require('iyzipay');
+
+const iyzipay = new Iyzipay({
+  apiKey: process.env.IYZICO_API_KEY,
+  secretKey: process.env.IYZICO_SECRET_KEY,
+  uri: 'https://sandbox-api.iyzipay.com',
+});
+```
+
+**Better Payment:**
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+
+export const payment = betterPayment({
+  mode: 'sandbox', // sandbox URL'leri; canlıda 'production'
+  providers: {
+    iyzico: iyzico({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    }),
+  },
+});
+```
+
+## 3D Secure başlatma
+
+**iyzipay:**
+
+```javascript
+iyzipay.threedsInitialize.create(
+  {
+    locale: Iyzipay.LOCALE.TR,
+    conversationId: 'ORDER123',
+    price: '100.00',
+    paidPrice: '100.00',
+    currency: Iyzipay.CURRENCY.TRY,
+    installment: '1',
+    basketId: 'B1',
+    paymentChannel: Iyzipay.PAYMENT_CHANNEL.WEB,
+    paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
+    callbackUrl: 'https://magazaniz.com/odeme/sonuc',
+    paymentCard, buyer, shippingAddress, billingAddress, basketItems,
+  },
+  (err, result) => {
+    if (err || result.status !== 'success') return handleError(err ?? result);
+    const html = Buffer.from(result.threeDSHtmlContent, 'base64').toString('utf8');
+    res.send(html);
+  }
+);
+```
+
+**Better Payment:**
+
+```typescript
+const init = await payment.iyzico.initThreeDSPayment({
+  conversationId: 'ORDER123',
+  price: '100.00',
+  paidPrice: '100.00',
+  currency: 'TRY',
+  installment: 1,
+  basketId: 'B1',
+  callbackUrl: 'https://magazaniz.com/api/pay/iyzico/payment/complete-3ds',
+  paymentCard, buyer, shippingAddress, billingAddress, basketItems,
+});
+
+if (init.status === 'pending') res.send(init.threeDSHtmlContent); // Base64 zaten çözülmüş
+```
+
+Farklar:
+
+- `locale`, `paymentChannel` ve `paymentGroup` varsayılan olarak doldurulur.
+- `installment` sayıdır.
+- `paymentCard`, `buyer`, adresler ve `basketItems` aynı alan adlarını kullanır.
+- Callback yerine `Promise` döner ve hata fırlatmak yerine `status` taşıyan bir sonuç verir.
+
+## Callback: en önemli fark
+
+iyzipay ile callback'te genellikle şuna benzer bir kod yazılır:
+
+```javascript
+app.post('/odeme/sonuc', (req, res) => {
+  iyzipay.threedsPayment.create(
+    {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: req.body.conversationId,
+      paymentId: req.body.paymentId,
+      conversationData: req.body.conversationData,
+    },
+    (err, result) => { /* siparişi güncelle */ }
+  );
+});
+```
+
+Callback isteğinin `status` ve `mdStatus` alanlarını kontrol etmek, ödemeyi tamamlama isteğinin sonucunu doğru yorumlamak ve aynı callback iki kez geldiğinde siparişi iki kez işlememek sizin sorumluluğunuzdadır.
+
+Better Payment'ta callback gövdesini olduğu gibi verirsiniz:
+
+```typescript
+const result = await payment.iyzico.completeThreeDSPayment(req.body);
+if (result.status === 'success') await markPaid(result.paymentId);
+```
+
+Kütüphane 3D doğrulamasının başarılı olduğunu kontrol eder ve ödemeyi iyzico API'si üzerinden sizin anahtarlarınızla tamamlar. Sahte ya da başarısız bir callback her zaman `failure` döner. [HTTP handler](/docs/concepts/handler) kullanırsanız bu endpoint'i de yazmanız gerekmez. Neden önemli olduğunu [3D Secure callback'lerini doğrulama](/blog/verify-3d-secure-callbacks) yazısında anlattık.
+
+## Sonuç ve hata modeli
+
+| iyzipay | Better Payment |
+|---------|----------------|
+| `result.status === 'success'` / `'failure'` | `success`, `failure`, `pending`, `cancelled` |
+| `result.errorCode` (iyzico kodu) | `errorCode` (ham kod) + `code` (sağlayıcıdan bağımsız, örneğin `INSUFFICIENT_FUNDS`) |
+| Ağ hatasında `err` | `pending` + `NETWORK_ERROR`; ödeme gerçekleşmiş olabilir, önce `getPayment` ile sorgulayın |
+
+## Diğer işlemler
+
+| iyzipay | Better Payment |
+|---------|----------------|
+| `iyzipay.payment.create` | `payment.iyzico.createPayment` |
+| `iyzipay.payment.retrieve` | `payment.iyzico.getPayment(paymentId)` |
+| `iyzipay.refund.create` | `payment.iyzico.refund({ paymentId, price, currency, ip })` |
+| `iyzipay.cancel.create` | `payment.iyzico.cancel({ paymentId, ip })` |
+| `iyzipay.binNumber.retrieve` | `payment.iyzico.binCheck(bin)` |
+| `iyzipay.checkoutFormInitialize.create` | `payment.iyzico.initCheckoutForm(...)` |
+
+Her yöntemin tam imzası [iyzico sayfasında](/docs/providers/iyzico) var.
+
+## Geçiş listesi
+
+1. `better-payment` paketini kurun ve ödeme nesnesini oluşturun.
+2. 3D Secure başlatma çağrısını `initThreeDSPayment` ile değiştirin; Base64 çözme kodunu silin.
+3. Callback endpoint'inizi `completeThreeDSPayment` ile ya da doğrudan HTTP handler ile değiştirin.
+4. Sonuç kontrollerinizi `status` ve `code` üzerine taşıyın; `NETWORK_ERROR` için `getPayment` sorgusu ekleyin.
+5. Sandbox'ta [test kartlarıyla](/docs/guides/test-cards) uçtan uca deneyin, sonra `mode: 'production'` yapın.
+6. `iyzipay` paketini kaldırın.
+
+Bundan sonra PayTR, Sipay, Parampos ya da bir banka sanal POS'u eklemek, `providers` listesine bir satır eklemek kadar kolaydır. Kodunuzun geri kalanı aynı kalır.

@@ -1,46 +1,27 @@
 # better-payment
 
-> Unified, type-safe payment gateway for Node.js & TypeScript.
+> One type-safe API for Turkish payments, in Node.js and on the edge.
 
-One API for Turkish payment providers — iyzico, PayTR, Parampos, Sipay, Paratika (VakıfPay, ZiraatPay), Akbank, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks
-(İş Bankası, Ziraat, Halkbank, TEB, Şekerbank).
+Accept cards through iyzico, PayTR, Parampos, Sipay, Paratika (VakıfPay,
+ZiraatPay), Akbank, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB,
+VakıfBank, Albaraka Türk, Denizbank and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank)
+with one config, one result shape and verified 3D Secure callbacks. Switch or add a provider without
+rewriting your checkout.
 
 [![npm](https://img.shields.io/npm/v/better-payment)](https://www.npmjs.com/package/better-payment)
 [![license](https://img.shields.io/npm/l/better-payment)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 
-> **0.0.1 is a fresh start.** The version history was reset on purpose.
-> Releases `1.x`–`3.x` are deprecated. See [What's new in 0.0.1](#whats-new-in-001).
+- **One API, 11 providers.** The same `initThreeDSPayment`, `refund`, `cancel` and `getPayment` calls for every provider.
+- **Callbacks are verified, not trusted.** Every 3D Secure callback and notification is checked with your own credentials.
+- **Clear results.** `success`, `failure`, `pending` or `cancelled`, plus a provider-independent error code.
+- **Zero runtime dependencies.** Node.js 20+, Vercel Edge, Cloudflare Workers, Deno and Bun.
+- **Drop-in HTTP handler** for Next.js, Express, Fastify, Hono, Elysia and React Router.
 
----
-
-## What's new in 0.0.1
-
-`0.0.1` is not a patch on top of `3.x`. It is the first release of a rebuilt
-library. A review found that the old releases had provider integrations that
-did not match the providers' APIs, and callback checks that could be bypassed
-(for example, forging a Parampos "success" callback). Fixing that required
-breaking changes. Rather than stacking another major version on top of those
-releases, we reset the version history. `0.0.1` is the new baseline.
-
-What changed:
-
-- **Callbacks are verified, not trusted.** Every 3D Secure callback and PayTR
-  notification is checked with your own credentials. Parampos payments are
-  finalized with the bank before they count as successful.
-- **Real provider APIs.** PayTR signing, Parampos `TP_WMD_*`, the Akbank Sanal POS
-  JSON API and iyzico payment statuses now match the official specifications.
-- **Clear statuses.** `success`, `failure`, `pending` and `cancelled`. A timeout is
-  `pending` with `NETWORK_ERROR` (the outcome is unknown), never a silent failure.
-  Payments are never retried automatically.
-- **Your order id is the payment id** for PayTR, Parampos and Akbank.
-- **Secure-by-default HTTP handler:** routes are opt-in, sensitive actions require
-  `authorize`, and amounts can be set on the server.
-- **One config per provider**, validated at startup.
-
-Upgrading from `3.x`: `npm install better-payment@latest` (a `^3` range will never
-resolve to `0.0.1`), then follow the
-[migration guide](https://better-payment.czaylabs.com/docs/whats-new).
+[Documentation](https://better-payment.czaylabs.com) ·
+[Quick start](#quick-start) ·
+[Providers](#providers) ·
+[Upgrading from 3.x](#upgrading-from-3x)
 
 ## Install
 
@@ -373,6 +354,33 @@ const payment = betterPayment({
 
 The logger receives method, URL and status only. Request bodies (card data,
 credentials) are never logged.
+
+## Upgrading from 3.x
+
+`0.0.1` is the first release of a rebuilt library, not a patch on top of `3.x`.
+The `1.x`–`3.x` releases are deprecated: a review found provider integrations that
+did not match the providers' APIs and callback checks that could be bypassed (for
+example, forging a Parampos "success" callback). Fixing that required breaking
+changes, so the version history was reset and `0.0.1` became the new baseline.
+
+What changed:
+
+- **Callbacks are verified, not trusted.** Every 3D Secure callback and PayTR
+  notification is checked with your own credentials. Parampos payments are
+  finalized with the bank before they count as successful.
+- **Real provider APIs.** PayTR signing, Parampos `TP_WMD_*`, the Akbank Sanal POS
+  JSON API and iyzico payment statuses now match the official specifications.
+- **Clear statuses.** `success`, `failure`, `pending` and `cancelled`. A timeout is
+  `pending` with `NETWORK_ERROR` (the outcome is unknown), never a silent failure.
+  Payments are never retried automatically.
+- **Your order id is the payment id** for PayTR, Parampos and Akbank.
+- **Secure-by-default HTTP handler:** routes are opt-in, sensitive actions require
+  `authorize`, and amounts can be set on the server.
+- **One config per provider**, validated at startup.
+
+To upgrade, run `npm install better-payment@latest` (a `^3` range will never
+resolve to `0.0.1`), then follow the
+[migration guide](https://better-payment.czaylabs.com/docs/whats-new).
 
 ## Documentation
 

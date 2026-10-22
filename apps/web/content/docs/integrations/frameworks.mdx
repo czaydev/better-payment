@@ -23,6 +23,99 @@ All adapters:
 
 Register them under the handler's `basePath` (default `/api/pay`). For a framework that is not listed, see [other frameworks](/docs/concepts/handler#frameworks).
 
+## Express
+
+```typescript
+import express from 'express';
+import { toExpressHandler } from 'better-payment/express';
+import { payment } from './payment';
+
+const app = express();
+app.all('/api/pay/*path', toExpressHandler(payment)); // Express 4: '/api/pay/*'
+```
+
+You don't need `express.json()` or `express.urlencoded()` for the payment routes, because the adapter reads the raw body. If a body parser runs first, its result is used. Unexpected errors are passed to `next(error)`.
+
+## Fastify
+
+```typescript
+import Fastify from 'fastify';
+import { toFastifyPlugin } from 'better-payment/fastify';
+
+const app = Fastify();
+await app.register(toFastifyPlugin(payment), { prefix: '/api/pay' });
+```
+
+Fastify rejects `application/x-www-form-urlencoded` bodies by default (415), but iyzico, Param, Akbank and PayTR post their callbacks in that format. The plugin accepts it for its own routes only, so your other routes keep Fastify's defaults.
+
+## NestJS
+
+```typescript
+import { All, Controller, Req, Res } from '@nestjs/common';
+import { toNestHandler } from 'better-payment/nestjs';
+import { getPayment } from './payment';
+
+@Controller('api/pay')
+export class PaymentController {
+  // One handler works on both the Express and the Fastify platform
+  private readonly handle = toNestHandler(getPayment);
+
+  @All('*')
+  pay(@Req() req: unknown, @Res() res: unknown): Promise<void> {
+    return this.handle(req, res);
+  }
+}
+```
+
+`better-payment/nestjs` has no dependency on `@nestjs/*`: the adapter only reads the request and response objects Nest injects with `@Req()` and `@Res()`, and detects the platform from the response. On the Express platform it is the Express middleware (it reads the raw body, so the default body parser never breaks the form-urlencoded bank callbacks); on the Fastify platform it uses the body Fastify already parsed. Register the wildcard route under the handler's `basePath` (`api/pay` here). Because the adapter takes the handler as a function, lazy initialization works exactly like the other adapters.
+
+## Hono
+
+```typescript
+import { Hono } from 'hono';
+import { toHonoHandler } from 'better-payment/hono';
+
+const app = new Hono();
+app.all('/api/pay/*', toHonoHandler(payment));
+```
+
+Hono runs on Node.js, Bun, Deno and Cloudflare Workers, like Better Payment.
+
+## Elysia
+
+```typescript
+import { Elysia } from 'elysia';
+import { toElysiaHandler } from 'better-payment/elysia';
+
+const app = new Elysia();
+app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' });
+```
+
+`{ parse: 'none' }` keeps the raw body for the handler: bank callbacks are form-urlencoded and their signatures are checked against the original fields. Without it, any hook that reads `body` (`onTransform`, `derive`, `onBeforeHandle` or a plugin) makes Elysia consume the request first. Elysia is built for Bun and also runs on Node.js.
+
+## React Router
+
+<Since version="0.8.0" />
+
+```typescript
+// app/routes/api.pay.$.ts
+import { toReactRouterHandler } from 'better-payment/react-router';
+import { getBetterPayment } from '~/lib/payment.server';
+
+export const { loader, action } = toReactRouterHandler(getBetterPayment);
+```
+
+A splat resource route (`api.pay.$.ts` matches everything under `/api/pay`) with no default export: GET requests go to `loader`, POST requests (bank callbacks included) to `action`. The same code works in Remix v2. With `routes.ts` config, register it as `route('api/pay/*', 'routes/api.pay.$.ts')`.
+
+## Plain Node.js
+
+```typescript
+import { createServer } from 'node:http';
+import { toNodeHandler } from 'better-payment/express';
+
+createServer(toNodeHandler(payment)).listen(3000);
+```
+
 ## Lazy initialization
 
 Every adapter also accepts a function that returns the payment object (or its handler). The function is called on each request, so you can create the instance on first use:

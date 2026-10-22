@@ -111,7 +111,7 @@ export const menus: Record<MenuKey, { icon: MenuIcon; href: string; groups: read
   },
   resources: {
     icon: "book",
-    href: "/docs/whats-new",
+    href: "/docs/reference/changelog",
     groups: [
       {
         id: "releases",

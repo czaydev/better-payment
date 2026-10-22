@@ -26,6 +26,9 @@
       "better-payment/plugins": [
         "src/plugins/index.ts"
       ],
+      "better-payment/fraud": [
+        "src/plugins/fraud-rules.ts"
+      ],
       "better-payment/next": [
         "src/adapters/next.ts"
       ],
@@ -37,6 +40,9 @@
       ],
       "better-payment/fastify": [
         "src/adapters/fastify.ts"
+      ],
+      "better-payment/nestjs": [
+        "src/adapters/nestjs.ts"
       ],
       "better-payment/elysia": [
         "src/adapters/elysia.ts"

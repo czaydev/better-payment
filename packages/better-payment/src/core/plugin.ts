@@ -20,7 +20,7 @@ import type {
 } from '../types';
 import type { PaymentProvider } from './PaymentProvider';
 import type { BetterPaymentLogger } from './logger';
-import type { PaymentEventListeners } from './events';
+import type { PaymentEventListeners, PaymentEvent } from './events';
 import type {
   BetterPaymentRequest,
   BetterPaymentResponse,
@@ -127,8 +127,10 @@ export interface BeforeHook {
 export interface AfterHook {
   /** Which operations the hook runs for. Default: all. */
   matcher?: (ctx: OperationResultContext) => boolean;
-  /** Return `{ result }` to replace the result */
-  handler: (ctx: OperationResultContext) => Awaitable<{ result: unknown } | void>;
+  /** Return `{ result, request }` to replace the result or the request passed to events */
+  handler: (
+    ctx: OperationResultContext
+  ) => Awaitable<{ result?: unknown; request?: unknown } | void>;
 }
 
 /** What plugins get in `init`, `methods` and endpoints */
@@ -143,6 +145,8 @@ export interface PluginContext {
   readonly logger: BetterPaymentLogger | undefined;
   /** A provider by id. Its operations run with hooks and events. */
   use(providerId: string): PaymentProvider;
+  /** Emits a payment event to registered listeners */
+  emit(event: PaymentEvent): Promise<void>;
   /** The endpoints registered by plugins, without their handlers */
   readonly endpoints: readonly EndpointInfo[];
 }
@@ -200,9 +204,23 @@ export interface PaymentEndpoint {
    * like refunds. The hook runs for every endpoint that has one.
    */
   privileged?: boolean;
+  /**
+   * Accept HTML form bodies (`application/x-www-form-urlencoded`,
+   * `multipart/form-data`, `text/plain`) on a POST endpoint. Off by default: a
+   * cross-site form can send these without a CORS preflight, carrying the
+   * visitor's cookies (CSRF). Turn it on only for an endpoint a third party posts
+   * a form to, like a bank callback, and verify that request yourself.
+   */
+  acceptForm?: boolean;
   /** Optional OpenAPI documentation metadata */
   openapi?: EndpointOpenAPIMetadata;
   handler: (ctx: EndpointContext) => Awaitable<unknown>;
+}
+
+/** What `onRequest` gets besides the request */
+export interface RequestContext {
+  /** Path relative to the handler's basePath, e.g. `/iyzico/payment` */
+  path: string;
 }
 
 /** What `onResponse` gets besides the response */
@@ -244,6 +262,17 @@ export interface BetterPaymentPlugin {
   methods?: (ctx: PluginContext) => Record<string, unknown>;
   /** HTTP routes added to the handler */
   endpoints?: Record<string, PaymentEndpoint>;
+  /**
+   * Runs on every incoming request to the HTTP handler before routing.
+   * Return a response (e.g. 429 Too Many Requests) to short-circuit routing;
+   * that response will still pass through onResponse hooks. A hook that throws
+   * stops the request with 503: a check that could not run (a rate limit whose
+   * store is down) must not let the request through unchecked.
+   */
+  onRequest?: (
+    request: BetterPaymentRequest,
+    ctx: RequestContext
+  ) => Awaitable<BetterPaymentResponse | void>;
   /**
    * Runs on every response of the HTTP handler (also replayed ones) and can
    * return a replacement. If it throws, the error is logged and the response is
