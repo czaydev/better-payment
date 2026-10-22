@@ -11,6 +11,8 @@
     "release": "pnpm build && changeset publish",
     "lint": "pnpm --filter better-payment lint",
     "typecheck": "pnpm --filter better-payment typecheck",
+    "check:workflows": "node scripts/check-workflow-hygiene.mjs",
+    "check:workflows:verify": "node scripts/check-workflow-hygiene.mjs --verify",
     "version-packages": "node scripts/version-packages.mjs"
   },
   "devDependencies": {

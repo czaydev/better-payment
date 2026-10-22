@@ -1,0 +1,51 @@
+# Dependabot version updates.
+# Docs: https://docs.github.com/en/code-security/dependabot/getting-started-with-dependabot/configure-dependabot-version-updates
+#
+# One npm entry, at the pnpm workspace root, because `pnpm-workspace.yaml` and `pnpm-lock.yaml` live
+# there: Dependabot then updates every workspace manifest (`packages/better-payment`, `apps/web`)
+# from that root and rewrites the single lockfile. Adding one entry per workspace directory is the
+# known pnpm misconfiguration: the updater then reports "no changes" (dependabot/dependabot-core#11487).
+#
+# Declarative only: nothing here needs a secret, and version updates run on Dependabot's own
+# infrastructure. Enabling it for a private repository is a repository setting (Settings → Code
+# planning and collaboration → Dependabot); the config file is what it reads.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+      time: '06:00'
+      timezone: Europe/Istanbul
+    # A review backlog of five open PRs is already more than this repository reads
+    open-pull-requests-limit: 5
+    # Keeps the range in package.json and the pin in pnpm-lock.yaml in step
+    versioning-strategy: increase
+    groups:
+      npm-development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      npm-production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+      time: '06:00'
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 3
+    groups:
+      actions-updates:
+        update-types:
+          - minor
+          - patch

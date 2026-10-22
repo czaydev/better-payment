@@ -15,6 +15,7 @@ better-payment projesine katkıda bulunmayı düşündüğünüz için teşekkü
 - [Yeni Provider Ekleme](#yeni-provider-ekleme)
 - [Test Yazma](#test-yazma)
 - [Dokümantasyon Çevirileri](#dokümantasyon-çevirileri)
+- [CI ve Tedarik Zinciri](#ci-ve-tedarik-zinciri)
 - [Sürüm ve Yayın](#sürüm-ve-yayın)
 - [Beta Sürümler](#beta-sürümler)
 
@@ -471,6 +472,68 @@ pnpm --filter web docs:check      # üretilen sayfalar ve public API hedefleri
 Üretim, tanınmayan MDX bileşenlerini veya çalıştırılabilir ifadeleri sessizce atlamak yerine hata verir. Yeni bir doküman bileşeni eklerken `apps/web/scripts/docs-content.mjs` içine açık bir dönüşüm ve test ekleyin. Kod blokları kod olarak korunur, çalıştırılmaz.
 
 **Hata mesajı dilleri** (`localizedErrors`), `packages/better-payment/src/plugins/localized-errors/` altında her dil için bir dosyadır. Mesajları müşteriye doğal gelecek şekilde yazın. Paket boyutu kontrolüne (`pnpm --filter better-payment size`) sığdırmak için asla kısaltmayın: yeni bir dil sınırı aşarsa PR'da belirtin, sınırı bakımcılar yükseltir.
+
+## CI ve Tedarik Zinciri
+
+`better-payment` para taşır ve npm'e CI'dan yayınlanır; yani pipeline ürünün bir parçası. Aşağıdaki
+liste bu deposunun [OpenSSF Scorecard](https://scorecard.dev/) kontrol listesidir: bir PR'ın
+zorlayabildikleri ve yalnızca bir bakıcının repository ayarlarından açabildikleri.
+
+**CI ile zorlananlar** (`node scripts/check-workflow-hygiene.mjs`, CI işi *Supply-chain hygiene*):
+
+| Scorecard kontrolü | Burada nasıl zorlanıyor |
+| ------------------ | ----------------------- |
+| Pinned dependencies | `.github/workflows/*.yml` içindeki her üçüncü taraf `uses:` satırı 40 karakterli tam bir commit SHA'sına, sürümü sondaki yorumda (`# v7.0.1`) duruyor; tag veya branch referansı CI'da patlar. |
+| Token permissions | Her workflow üst seviyede `permissions:` bildirir, her iş de kendi en düşük yetkisini (`contents: read`, gerçekten yazmıyorsa). |
+| Job health | Her işte `timeout-minutes:` var; takılan bir iş runner'ı sonsuza kadar tutamaz. |
+| Provenance | `Publish to NPM`, `npm publish --provenance` ile (SLSA kanıtları) ve npm trusted publishing ile yayınlar (`id-token: write`, `NPM_TOKEN` yok). |
+| Lockfile disiplini | CI `pnpm install --frozen-lockfile` kullanır; `package.json` içindeki `packageManager` pnpm sürümünü sabitler, `pnpm.onlyBuiltDependencies` ise install script çalıştırmasına izin verilen paketlerin allowlist'idir. |
+
+Bir sabitleme, ancak okunduğu tag kadar güvenlidir. Yorumu güvenilir bulmak yerine GitHub'a sorun:
+`--verify` her sürüm tag'ini Git API'sinden çözüp commit'i sabitlenmiş SHA ile karşılaştırır.
+
+```bash
+node scripts/check-workflow-hygiene.mjs            # yapısal kontroller, ağ yok
+node scripts/check-workflow-hygiene.mjs --verify   # her sabit SHA'nın hangi commit olduğunu GitHub'a sorar
+```
+
+Aynı iki komut `pnpm check:workflows` ve `pnpm check:workflows:verify` olarak da çalışır.
+
+**Repository ayarı gerektirenler** — bir PR bunları açamaz, bu yüzden ağaçtaki hiçbir dosya onları
+zorlamaz. *Settings*'de bakımcılar yapar (`@czaydev`, `@poyrazavsever`):
+
+- `main` ve `beta` için branch protection: PR zorunlu, en az bir onaylayan inceleme zorunlu, CI
+  kontrolleri merge'den önce zorunlu, force push ve branch silme kapalı. Bu olmadan "zorunlu inceleme"
+  bir teamül olur, bir kapı değil.
+- Security updates / Dependabot: `.github/dependabot.yml` sadece tanımlayıcıdır. *Settings → Security
+  and integrations → Dependabot* anahtarları (bu repository için version updates, security updates ve
+  istenirse organization varsayılanı) Dependabot'un PR açıp açmayacağını belirler.
+- `SECURITY.md`'nin link verdiği *Private vulnerability reporting* de bir repository ayarıdır.
+- Artifact attestations (`actions/attest-build-provenance`): mevcut workflow'ların sahip olmadığı bir
+  yazma yetkisi ister (`attestations: write`, ayrıca `id-token: write`), bu yüzden bir tedarik zinciri
+  PR'ı onu bilerek eklemez. Açılacaksa bilinçli ve tek seferde açılmalı.
+
+**Scorecard: analiz koşuyor, rozet henüz yok.** `.github/workflows/scorecard.yml` haftada bir ve
+`main`'e her push'ta `ossf/scorecard-action` ile analizi çalıştırıyor, `results.sarif` dosyasını da
+workflow artifact olarak yüklüyor. `publish_results: false` ayarlı: bu haliyle ne bir secret ne de yeni
+bir yazma yetkisi ister, ayrıca OpenSSF ekibinin bu depoyu kendi haftalık taramasının sonuçlarının
+üstüne yazmaz. Bu yüzden `README.md`'de Scorecard rozeti yok: rozet görüntüsü *yayınlanmış*
+sonuçlardan servis ediliyor, yani şimdi eklemek ölü bir link olurdu. Rozeti isteyen bakıcı iki satırı
+değiştirir, başka bir şeye gerek yok:
+
+```yaml
+# .github/workflows/scorecard.yml → iş "analysis"
+permissions:
+  security-events: write
+  id-token: write          # GitHub OIDC token'ına erişmek için gerekiyor
+# "Run analysis" adımı → with:
+  publish_results: true
+```
+
+Sonra <https://scorecard.dev>'deki rozet (`https://api.scorecard.dev/projects/github.com/czaydev/better-payment/badge`)
+çalışır; aynı koşu sonuçları *Security → Code scanning*'e de düşer. Önce `main` üzerinde bir kez
+tamamlanması gerekir.
+- Code scanning / secret scanning push protection, CI'da zorlanacaksa.
 
 ## Sürüm ve Yayın
 

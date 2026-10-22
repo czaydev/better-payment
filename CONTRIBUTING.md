@@ -14,6 +14,7 @@ Thanks for helping! This guide gets you from clone to a merged pull request.
 - [Writing a plugin](#writing-a-plugin)
 - [Tests](#tests)
 - [Translations](#translations)
+- [CI and supply chain](#ci-and-supply-chain)
 - [Releases](#releases)
 - [Beta releases](#beta-releases)
 - [Labels](#labels)
@@ -181,6 +182,67 @@ pnpm --filter web docs:check      # generated pages and public API destinations
 Generation rejects unknown MDX components or executable expressions instead of dropping content. Add an explicit conversion and a test in `apps/web/scripts/docs-content.mjs` when introducing a docs component. Code blocks are kept as code, never evaluated.
 
 **Error message languages** (`localizedErrors`) are one file per language in `packages/better-payment/src/plugins/localized-errors/`. Write messages that read naturally for customers. Never shorten them to fit the bundle size check (`pnpm --filter better-payment size`): if a new language goes over the budget, say so in the pull request and a maintainer raises it.
+
+## CI and supply chain
+
+`better-payment` moves money and publishes itself to npm from CI, so the pipeline is part of the
+product. This is the [OpenSSF Scorecard](https://scorecard.dev/) checklist for this repository, split
+into what a pull request can enforce and what only a maintainer can turn on in the repository settings.
+
+**Enforced by CI** (`node scripts/check-workflow-hygiene.mjs`, the CI job *Supply-chain hygiene*):
+
+| Scorecard check | How it is enforced here |
+| --------------- | ----------------------- |
+| Pinned dependencies | Every third-party `uses:` in `.github/workflows/*.yml` is a full 40-character commit SHA with the release in a trailing comment (`# v7.0.1`); a tag or branch reference fails CI. |
+| Token permissions | Each workflow declares workflow-level `permissions:`, and each job declares its own least-privilege `permissions:` (`contents: read` unless it really writes). |
+| Job health | Every job has a `timeout-minutes:`, so a hung job cannot hold a runner forever. |
+| Provenance | `Publish to NPM` publishes with `npm publish --provenance` (SLSA attestations) and npm trusted publishing (`id-token: write`, no `NPM_TOKEN`). |
+| Lockfile discipline | CI installs with `pnpm install --frozen-lockfile`; `package.json` pins the pnpm version through `packageManager`, and `pnpm.onlyBuiltDependencies` is an allowlist of the only packages allowed to run install scripts. |
+
+A pin is only as good as the tag it was read from. Check it against GitHub rather than trusting the
+comment (`--verify` resolves each version tag through the Git API and compares the commit):
+
+```bash
+node scripts/check-workflow-hygiene.mjs            # structural checks, no network
+node scripts/check-workflow-hygiene.mjs --verify   # asks GitHub which commit each pinned SHA is
+```
+
+The same two commands are `pnpm check:workflows` and `pnpm check:workflows:verify`.
+
+**Needs a repository setting** — a pull request cannot turn these on, so they are not enforced by
+anything in this tree. Do them in *Settings* (owners: `@czaydev`, `@poyrazavsever`):
+
+- Branch protection on `main` and `beta`: require a pull request and at least one approving review,
+  require the CI checks before merging, block force pushes and deletions. Without it, "required
+  reviews" is a convention and not a gate.
+- Security updates / Dependabot: `.github/dependabot.yml` is declarative only. The *Settings →
+  Security and integrations → Dependabot* toggles (version updates for this repository, security
+  updates, and optionally the organization-wide default) decide whether Dependabot opens pull
+  requests at all.
+- *Private vulnerability reporting*, which `SECURITY.md` links to, is a repository toggle as well.
+- Artifact attestations (`actions/attest-build-provenance`): a write permission the current workflows
+  do not have (`attestations: write`, plus `id-token: write`), so it is not added by a supply-chain
+  pull request. Enable it deliberately, once.
+
+**Scorecard: the analysis runs, the badge does not yet.** `.github/workflows/scorecard.yml` runs
+`ossf/scorecard-action` weekly and on every push to `main`, and uploads `results.sarif` as a workflow
+artifact. It sets `publish_results: false`, so it needs no secret and no new write grant, and it does
+not touch the OpenSSF team's own weekly scan of the repository. That is also why `README.md` has no
+Scorecard badge: the badge image is served from the *published* results, so adding one now would be a
+dead link. A maintainer who wants it makes two changes, and nothing else:
+
+```yaml
+# .github/workflows/scorecard.yml → job "analysis"
+permissions:
+  security-events: write
+  id-token: write          # needed to access the GitHub OIDC token
+# step "Run analysis" → with:
+  publish_results: true
+```
+
+Then the badge from <https://scorecard.dev> (`https://api.scorecard.dev/projects/github.com/czaydev/better-payment/badge`)
+resolves, and the same run also lands in *Security → Code scanning*. It has to complete on `main` first.
+- Code scanning / secret scanning push protection, if the plan is to require it in CI.
 
 ## Releases
 

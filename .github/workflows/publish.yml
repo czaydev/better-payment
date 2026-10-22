@@ -26,18 +26,24 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
+# A release publishes to npm, so it is the one workflow that must not widen its token: every job
+# states what it needs and nothing else
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Is there an unreleased version?
     if: github.repository == 'czaydev/better-payment'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
       unreleased: ${{ steps.check.outputs.unreleased }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Look for the version's GitHub release
         id: check
@@ -58,6 +64,7 @@ jobs:
     # By hand it always runs (the release check below stops a real publish of a released version)
     if: github.event_name == 'workflow_dispatch' || needs.check.outputs.unreleased == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       # Pushes have no inputs: publish for real, on the tag the version picks (see "Read version")
@@ -69,13 +76,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -139,10 +146,11 @@ jobs:
         working-directory: packages/better-payment
         run: pnpm build
 
+      # --provenance makes a missing SLSA attestation fail the release instead of publishing silently
       - name: Publish to NPM
         if: env.DRY_RUN != 'true'
         working-directory: packages/better-payment
-        run: npm publish --access public --tag "$NPM_TAG"
+        run: npm publish --access public --tag "$NPM_TAG" --provenance
 
       - name: Dry run publish
         if: env.DRY_RUN == 'true'

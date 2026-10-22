@@ -351,6 +351,24 @@ Contributions are welcome, from a typo fix to a new provider. Start with
 Report security problems privately, as described in
 [SECURITY.md](https://github.com/czaydev/better-payment/blob/main/SECURITY.md).
 
+## Supply chain
+
+Releases are published from GitHub Actions with npm trusted publishing and
+`npm publish --provenance`, so every tarball carries SLSA build provenance:
+
+```bash
+npm view better-payment dist.attestations
+```
+
+The workflows themselves are pinned to full commit SHAs rather than to movable tags, and CI rejects a
+`uses:` line that is not. An [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/czaydev/better-payment)
+analysis of the repository runs weekly and uploads its report as a workflow artifact; there is no
+score badge here yet because the badge needs the report *published*, which is a maintainer setting
+(see [CONTRIBUTING.md](https://github.com/czaydev/better-payment/blob/main/CONTRIBUTING.md) → CI and
+supply chain). Details, and what is still a repository setting rather than a file, are in
+[SECURITY.md](https://github.com/czaydev/better-payment/blob/main/SECURITY.md) and
+[CONTRIBUTING.md](https://github.com/czaydev/better-payment/blob/main/CONTRIBUTING.md).
+
 ## License
 
 MIT
