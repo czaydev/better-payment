@@ -123,3 +123,11 @@ export {
   type McpToolName,
   type McpToolCallInfo,
 } from './mcp';
+export {
+  multiTenant,
+  type MultiTenantOptions,
+  type TenantContext,
+  type TenantResolver,
+  type TenantCredentialsResolver,
+  type TenantPaymentClient,
+} from './multi-tenant';

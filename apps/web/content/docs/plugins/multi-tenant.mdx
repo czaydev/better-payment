@@ -1,0 +1,133 @@
+---
+title: Multi-Tenant Credentials
+description: Dynamic provider credentials per merchant for marketplaces and SaaS platforms.
+---
+
+<Since version="0.12.0" />
+
+Marketplaces, e-commerce builders, and SaaS platforms process payments on behalf of hundreds or thousands of independent merchants. Each merchant holds their own contract and credentials with payment service providers (iyzico, PayTR, Akbank, Sipay, etc.).
+
+Instead of manually constructing and managing thousands of `betterPayment()` instances, the `multiTenant` plugin dynamically resolves credentials per merchant, caches provider instances, and automatically tags operations and events with the originating tenant ID.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+import { multiTenant } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ apiKey: 'fallback', secretKey: 'fallback' }),
+  },
+  plugins: [
+    multiTenant({
+      // Resolves the tenant from state only your server writes
+      tenant: () => tenantStore.getStore()?.id,
+
+      // Loads credentials or provider instances from your database
+      credentials: async (tenantId, provider) => {
+        const merchant = await db.merchants.findById(tenantId);
+        return {
+          apiKey: merchant.iyzicoApiKey,
+          secretKey: merchant.iyzicoSecretKey,
+        };
+      },
+
+      // Factory mapping to instantiate providers from raw credentials
+      providers: {
+        iyzico: (creds) => iyzico(creds),
+      },
+
+      cache: {
+        ttl: '10m', // Cache provider instances for 10 minutes
+        maxSize: 5000,
+      },
+    }),
+  ],
+});
+```
+
+## Using `forTenant`
+
+You can scope any payment operation directly to a specific merchant contract:
+
+```typescript
+// All operations automatically execute with shop-42 credentials
+const result = await payment.forTenant('shop-42').createPayment({
+  price: '150.00',
+  paidPrice: '150.00',
+  currency: 'TRY',
+  paymentCard: { ... },
+});
+
+console.log(result.status);   // 'success'
+console.log(result.tenantId); // 'shop-42'
+```
+
+Supported `forTenant` operations include:
+- `createPayment`, `initThreeDSPayment`, `completeThreeDSPayment`
+- `authorize`, `initThreeDSAuthorize`, `capture`, `voidAuthorization`
+- `refund`, `cancel`, `getPayment`
+- `saveCard`, `listCards`, `deleteCard`, `binCheck`, `installmentInfo`
+
+## 3D Secure Callbacks
+
+For 3D Secure payments, the bank redirects back to your callback URL. That body is written by the browser or the bank, so the plugin never takes the tenant from it: the handler routes that run plugin hooks (`payment/complete-3ds` and `callback`) refuse a body naming a tenant, and a `conversationId` prefix is ignored there. Take the tenant from data you control instead:
+
+```typescript
+// 1. Start the payment on the tenant contract your session resolved
+const init = await payment.forTenant('shop-42').initThreeDSPayment({
+  price: '150.00',
+  paidPrice: '150.00',
+  callbackUrl: 'https://shop.com/api/pay/shop-42/iyzico/callback',
+  conversationId: 'tenant:shop-42:order-987',
+  paymentCard: { ... },
+});
+
+// 2. In the callback route read the tenant from the URL you chose, not from the body
+app.post('/api/pay/:tenant/iyzico/callback', async (req, res) => {
+  const result = await payment
+    .forTenant(req.params.tenant)
+    .completeThreeDSPayment(req.body);
+  res.send(result);
+});
+```
+
+`forTenant` runs the operation on that merchant's contract and tags the response with `tenantId`, so a callback of one merchant can never be verified with another merchant's secret keys.
+
+Reading the tenant out of the body is an opt-in for server-to-server calls your own code makes on the payment object:
+
+```typescript
+multiTenant({
+  // applies only to calls made on the payment object, never to handler requests
+  trustRequestTenant: true,
+  credentials: loadCredentials,
+});
+```
+
+## Cache Management
+
+Cached provider instances can be purged when merchant settings change:
+
+```typescript
+// Clear cache for a specific merchant
+payment.tenants.clearCache('shop-42');
+
+// Clear all cached provider instances
+payment.tenants.clearCache();
+
+// Inspect cache stats
+const stats = payment.tenants.getCacheStats();
+console.log(stats.size, stats.ttl);
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `credentials` | *required* | `(tenantId, provider) => Promise<PaymentProvider \| Record<string, unknown>>` |
+| `tenant` | — | Resolves the tenant from server-side state for calls that do not use `forTenant` |
+| `trustRequestTenant` | `false` | Also reads the tenant from the body of calls made on the payment object; never applies to handler requests |
+| `providers` | — | Map of provider factory functions `(credentials) => PaymentProvider` |
+| `cache.ttl` | `'5m'` | Duration before refreshing cached merchant provider instances |
+| `cache.maxSize` | `1000` | Maximum number of cached instances before LRU eviction |

@@ -22,10 +22,10 @@ const budgets = [
   // notifications plugin, 9 kB with the openAPI plugin, 11 kB with failover. The
   // currencyConversion, redact, threeDSTimeout, captcha, rateLimit, pendingResolver,
   // refundApproval, webhookForwarding, mcp and telemetry plugins take the bundle to
-  // 22.32 / 22.34 kB gzip, so the budget is 23 kB. ESM bundlers drop the plugins an
-  // application does not import.
-  { file: 'dist/plugins/index.mjs', maxGzipKb: 23 },
-  { file: 'dist/plugins/index.js', maxGzipKb: 23 },
+  // 22.32 / 22.34 kB gzip and multiTenant on top of them to 24.32 / 24.35 kB, so the
+  // budget is 25 kB. ESM bundlers drop the plugins an application does not import.
+  { file: 'dist/plugins/index.mjs', maxGzipKb: 25 },
+  { file: 'dist/plugins/index.js', maxGzipKb: 25 },
   // The fraud rules engine is a separate subpath (`better-payment/fraud`); the plugins
   // barrel only re-exports its types, so it costs that entry point nothing. 3.90 kB
   // gzip measured on the merged tree, so its own budget is 4 kB.

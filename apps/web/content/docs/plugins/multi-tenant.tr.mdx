@@ -1,0 +1,133 @@
+---
+title: Çok Kiracılı Kimlik Bilgileri (Multi-Tenant)
+description: Pazaryerleri ve SaaS platformları için satıcı bazlı dinamik POS kimlik bilgileri yönetimi.
+---
+
+<Since version="0.12.0" />
+
+Pazar yerleri, e-ticaret altyapı sağlayıcıları ve SaaS platformları yüzlerce veya binlerce bağımsız mağaza/satıcı adına ödeme alır. Her satıcının ödeme kuruluşlarıyla (iyzico, PayTR, Akbank, Sipay vb.) kendi özel sözleşmesi ve API anahtarları bulunur.
+
+Her mağaza için ayrı bir `betterPayment()` örneği oluşturup yönetmek yerine, `multiTenant` eklentisi satıcı kimlik bilgilerini her istek için dinamik olarak çözer, sağlayıcı örneklerini önbelleğe alır ve tüm işlem ve olayları ilgili satıcı kimliği (`tenantId`) ile etiketler.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+import { multiTenant } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ apiKey: 'fallback', secretKey: 'fallback' }),
+  },
+  plugins: [
+    multiTenant({
+      // Resolves the tenant from state only your server writes
+      tenant: () => tenantStore.getStore()?.id,
+
+      // Loads credentials or provider instances from your database
+      credentials: async (tenantId, provider) => {
+        const merchant = await db.merchants.findById(tenantId);
+        return {
+          apiKey: merchant.iyzicoApiKey,
+          secretKey: merchant.iyzicoSecretKey,
+        };
+      },
+
+      // Factory mapping to instantiate providers from raw credentials
+      providers: {
+        iyzico: (creds) => iyzico(creds),
+      },
+
+      cache: {
+        ttl: '10m', // Cache provider instances for 10 minutes
+        maxSize: 5000,
+      },
+    }),
+  ],
+});
+```
+
+## `forTenant` Kullanımı [#using-fortenant]
+
+Herhangi bir ödeme işlemini doğrudan belirli bir satıcının sözleşmesi üzerinden çalıştırabilirsiniz:
+
+```typescript
+// All operations automatically execute with shop-42 credentials
+const result = await payment.forTenant('shop-42').createPayment({
+  price: '150.00',
+  paidPrice: '150.00',
+  currency: 'TRY',
+  paymentCard: { ... },
+});
+
+console.log(result.status);   // 'success'
+console.log(result.tenantId); // 'shop-42'
+```
+
+Desteklenen `forTenant` metotları:
+- `createPayment`, `initThreeDSPayment`, `completeThreeDSPayment`
+- `authorize`, `initThreeDSAuthorize`, `capture`, `voidAuthorization`
+- `refund`, `cancel`, `getPayment`
+- `saveCard`, `listCards`, `deleteCard`, `binCheck`, `installmentInfo`
+
+## 3D Secure Geri Dönüşleri (Callback) [#3d-secure-callbacks]
+
+3D Secure ödemelerinde banka kullanıcının tarayıcısını callback adresinize yönlendirir. Bu gövdeyi tarayıcı veya banka yazdığı için eklenti mağazayı oradan hiç okumaz: eklenti kancalarını çalıştıran handler rotaları (`payment/complete-3ds` ve `callback`) gövdede mağaza adı veren alanı reddeder, `conversationId` öneki ise orada yok sayılır. Mağazayı kendi verinizden verin:
+
+```typescript
+// 1. Start the payment on the tenant contract your session resolved
+const init = await payment.forTenant('shop-42').initThreeDSPayment({
+  price: '150.00',
+  paidPrice: '150.00',
+  callbackUrl: 'https://shop.com/api/pay/shop-42/iyzico/callback',
+  conversationId: 'tenant:shop-42:order-987',
+  paymentCard: { ... },
+});
+
+// 2. In the callback route read the tenant from the URL you chose, not from the body
+app.post('/api/pay/:tenant/iyzico/callback', async (req, res) => {
+  const result = await payment
+    .forTenant(req.params.tenant)
+    .completeThreeDSPayment(req.body);
+  res.send(result);
+});
+```
+
+`forTenant` işlemi o mağazanın sözleşmesi üzerinden çalıştırır ve sonuca `tenantId` ekler; böylece bir mağazanın callback'i başka bir mağazanın gizli anahtarlarıyla doğrulanamaz.
+
+Gövdeden mağaza okumak, yalnızca kendi kodunuzun ödeme nesnesi üzerinden yaptığı sunucudan sunucuya çağrılar için açık bir seçime bağlıdır:
+
+```typescript
+multiTenant({
+  // applies only to calls made on the payment object, never to handler requests
+  trustRequestTenant: true,
+  credentials: loadCredentials,
+});
+```
+
+## Önbellek Yönetimi [#cache-management]
+
+Mağaza ayarları güncellendiğinde önbellekteki sağlayıcılar temizlenebilir:
+
+```typescript
+// Clear cache for a specific merchant
+payment.tenants.clearCache('shop-42');
+
+// Clear all cached provider instances
+payment.tenants.clearCache();
+
+// Inspect cache stats
+const stats = payment.tenants.getCacheStats();
+console.log(stats.size, stats.ttl);
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `credentials` | *zorunlu* | `(tenantId, provider) => Promise<PaymentProvider \| Record<string, unknown>>` |
+| `tenant` | — | `forTenant` kullanmayan çağrılarda mağazayı sunucu tarafı durumdan çözen fonksiyon |
+| `trustRequestTenant` | `false` | Yalnızca ödeme nesnesi üzerinden yapılan çağrıların gövdesinden de mağaza okur; handler isteklerine asla uygulanmaz |
+| `providers` | — | Sağlayıcı fabrika haritası: `(credentials) => PaymentProvider` |
+| `cache.ttl` | `'5m'` | Önbellekteki sağlayıcı örneklerinin geçerlilik süresi |
+| `cache.maxSize` | `1000` | Önbellekte tutulacak maksimum sağlayıcı sayısı |
