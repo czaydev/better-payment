@@ -21,6 +21,10 @@ import type {
   SubscriptionCardUpdateRequest,
   SubscriptionProductCreateRequest,
   PricingPlanCreateRequest,
+  ApprovePayoutRequest,
+  CreateSubMerchantRequest,
+  RetrieveSubMerchantRequest,
+  UpdateSubMerchantRequest,
 } from '../types';
 import { Iyzico } from '../providers/iyzico';
 import { PayTR } from '../providers/paytr';
@@ -83,7 +87,12 @@ export type BuiltInHandlerAction =
   | 'subscription/retrieve'
   | 'subscription/card-update'
   | 'subscription/product'
-  | 'subscription/pricing-plan';
+  | 'subscription/pricing-plan'
+  | 'marketplace/sub-merchant/create'
+  | 'marketplace/sub-merchant/update'
+  | 'marketplace/sub-merchant/retrieve'
+  | 'marketplace/payout/approve'
+  | 'marketplace/payout/disapprove';
 
 export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
   'payment',
@@ -114,6 +123,11 @@ export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
   'subscription/card-update',
   'subscription/product',
   'subscription/pricing-plan',
+  'marketplace/sub-merchant/create',
+  'marketplace/sub-merchant/update',
+  'marketplace/sub-merchant/retrieve',
+  'marketplace/payout/approve',
+  'marketplace/payout/disapprove',
 ];
 
 /**
@@ -146,6 +160,11 @@ export const PRIVILEGED_HANDLER_ACTIONS: HandlerAction[] = [
   'subscription/card-update',
   'subscription/product',
   'subscription/pricing-plan',
+  'marketplace/sub-merchant/create',
+  'marketplace/sub-merchant/update',
+  'marketplace/sub-merchant/retrieve',
+  'marketplace/payout/approve',
+  'marketplace/payout/disapprove',
 ];
 
 /**
@@ -261,6 +280,10 @@ export const IDEMPOTENT_KEY_ACTIONS: HandlerAction[] = [
   'subscription/card-update',
   'subscription/product',
   'subscription/pricing-plan',
+  'marketplace/sub-merchant/create',
+  'marketplace/sub-merchant/update',
+  'marketplace/payout/approve',
+  'marketplace/payout/disapprove',
 ];
 
 type CallbackRecord =
@@ -340,6 +363,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
  * - POST /:provider/cards/{save,list,delete} -> saveCard() / listCards() / deleteCard()
  * - POST /:provider/installment | bin-check
  * - iyzico only: checkout/*, pwi/*, subscription/*
+ * - providers with a marketplace API (iyzico): marketplace/*
  * - GET  /health
  *
  * Secure by default: only callbacks and card queries are enabled. Enable more
@@ -852,6 +876,36 @@ export class BetterPaymentHandler {
           await this.requireIyzico(ctx).createPricingPlan(
             this.requireBody(ctx) as PricingPlanCreateRequest
           )
+        );
+
+      case 'marketplace/sub-merchant/create':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.createSubMerchant(this.requireBody(ctx) as CreateSubMerchantRequest)
+        );
+
+      case 'marketplace/sub-merchant/update':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.updateSubMerchant(this.requireBody(ctx) as UpdateSubMerchantRequest)
+        );
+
+      case 'marketplace/sub-merchant/retrieve':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.retrieveSubMerchant(this.requireBody(ctx) as RetrieveSubMerchantRequest)
+        );
+
+      case 'marketplace/payout/approve':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.approvePayout(this.requireBody(ctx) as ApprovePayoutRequest)
+        );
+
+      case 'marketplace/payout/disapprove':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.disapprovePayout(this.requireBody(ctx) as ApprovePayoutRequest)
         );
 
       default:

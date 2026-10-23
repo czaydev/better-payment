@@ -7,9 +7,10 @@ import {
 import type { HttpClient, HttpRequestConfig } from '../../core/http';
 import { fromBase64, randomHex } from '../../core/crypto';
 import { PaymentProvider, PaymentProviderConfig } from '../../core/PaymentProvider';
-import { ConfigurationError } from '../../core/errors';
+import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
+import { isValidIban, RequestValidator } from '../../core/validation';
 import { IYZICO_ERROR_CODES } from './error-codes';
 import type { PaymentErrorCode } from '../../core/error-codes';
 import {
@@ -40,6 +41,15 @@ import {
   PWIPaymentRetrieveResponse,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  ApprovePayoutRequest,
+  BasketItem,
+  CreateSubMerchantRequest,
+  PayoutResponse,
+  RetrieveSubMerchantRequest,
+  SubMerchant,
+  SubMerchantResponse,
+  SubMerchantType,
+  UpdateSubMerchantRequest,
   SubscriptionInitializeRequest,
   SubscriptionInitializeResponse,
   SubscriptionCancelRequest,
@@ -79,6 +89,12 @@ import {
   IyzicoCardResponse,
   IyzicoCardListResponse,
   IyzicoResponse,
+  IyzicoBasketItem,
+  IyzicoPayoutRequest,
+  IyzicoPayoutResponse,
+  IyzicoSubMerchantRequest,
+  IyzicoSubMerchantResponse,
+  IyzicoSubMerchantType,
 } from './types';
 
 /**
@@ -110,6 +126,14 @@ const IYZICO_CARD_PAYMENT_RULES: PaymentValidationRules = {
   card: true,
   storedCard: true,
   saveCard: true,
+  // Basket items may name the seller (sub-merchant) that receives their share
+  marketplace: true,
+};
+
+/** Checkout Form payments split the same way; PWI does not */
+const IYZICO_CHECKOUT_FORM_RULES: PaymentValidationRules = {
+  ...IYZICO_ORDER_RULES,
+  marketplace: true,
 };
 
 export interface IyzicoConfig extends PaymentProviderConfig {
@@ -193,7 +217,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   private async sendRequest<T>(
     endpoint: string,
     data: unknown,
-    options: { method?: 'POST' | 'GET' | 'DELETE'; retryable?: boolean } = {}
+    options: { method?: 'POST' | 'PUT' | 'GET' | 'DELETE'; retryable?: boolean } = {}
   ): Promise<T> {
     const method = options.method ?? 'POST';
     const requestBody = JSON.stringify(data ?? {});
@@ -257,6 +281,24 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
       : {};
   }
 
+  /**
+   * Basket items as iyzico expects them. Items that name a seller carry the
+   * seller's key and the amount that settles to it (marketplace split payment).
+   */
+  private mapBasketItems(items: BasketItem[]): IyzicoBasketItem[] {
+    return items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category1: item.category1,
+      category2: item.category2,
+      itemType: item.itemType,
+      price: item.price,
+      ...(item.subMerchant
+        ? { subMerchantKey: item.subMerchant.key, subMerchantPrice: item.subMerchant.price }
+        : {}),
+    }));
+  }
+
   private mapToIyzicoRequest(request: PaymentRequest): IyzicoPaymentRequest {
     return {
       locale: this.config.locale || 'tr',
@@ -296,14 +338,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
         address: request.billingAddress.address,
         zipCode: request.billingAddress.zipCode,
       },
-      basketItems: request.basketItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        category1: item.category1,
-        category2: item.category2,
-        itemType: item.itemType,
-        price: item.price,
-      })),
+      basketItems: this.mapBasketItems(request.basketItems),
     };
   }
 
@@ -349,14 +384,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
         address: request.billingAddress.address,
         zipCode: request.billingAddress.zipCode,
       },
-      basketItems: request.basketItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        category1: item.category1,
-        category2: item.category2,
-        itemType: item.itemType,
-        price: item.price,
-      })),
+      basketItems: this.mapBasketItems(request.basketItems),
     };
   }
 
@@ -640,7 +668,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    */
   async initCheckoutForm(request: CheckoutFormRequest): Promise<CheckoutFormInitResponse> {
     try {
-      this.validatePayment(request as PaymentRequest, IYZICO_ORDER_RULES);
+      this.validatePayment(request as PaymentRequest, IYZICO_CHECKOUT_FORM_RULES);
       const iyzicoRequest = this.mapToIyzicoCheckoutFormRequest(request);
 
       const response = await this.sendRequest<IyzicoCheckoutFormInitResponse>(
@@ -712,6 +740,229 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
     } catch (error) {
       return this.failure(error, 'Retrieve checkout form failed');
     }
+  }
+
+  /**
+   * ===================
+   * MARKETPLACE (SPLIT PAYMENT) METHODS
+   * ===================
+   */
+
+  /** Portable sub-merchant type -> iyzico's enum; undefined for unknown values */
+  private static subMerchantTypeOf(type: SubMerchantType): IyzicoSubMerchantType | undefined {
+    switch (type) {
+      case 'individual':
+      case 'PERSONAL':
+        return 'PERSONAL';
+      case 'private_company':
+      case 'PRIVATE_COMPANY':
+        return 'PRIVATE_COMPANY';
+      case 'limited_or_joint_stock_company':
+      case 'LIMITED_OR_JOINT_STOCK_COMPANY':
+        return 'LIMITED_OR_JOINT_STOCK_COMPANY';
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Checks a sub-merchant request before any HTTP call: required fields, the
+   * fields iyzico requires per seller type, and the IBAN checksum. Returns the
+   * iyzico type. `subMerchantKey` is checked when it is given (update).
+   */
+  private validateSubMerchant(
+    request: CreateSubMerchantRequest,
+    subMerchantKey?: string
+  ): IyzicoSubMerchantType {
+    const v = new RequestValidator();
+    if (subMerchantKey !== undefined && String(subMerchantKey).trim() === '') {
+      v.add('subMerchantKey', 'is required');
+    }
+    const type = Iyzico.subMerchantTypeOf(request?.type);
+    if (!type)
+      v.add('type', 'must be individual, private_company or limited_or_joint_stock_company');
+    if (String(request?.externalId ?? '').trim() === '') {
+      v.add('externalId', 'is required: iyzico identifies the seller by this id');
+    }
+    v.required(request, ['name', 'email', 'gsmNumber', 'address']);
+    if (String(request?.iban ?? '').trim() === '') {
+      v.add('iban', 'is required');
+    } else if (!isValidIban(request.iban)) {
+      v.add('iban', 'is not a valid IBAN (MOD-97 check failed)');
+    }
+    if (type === 'PERSONAL') {
+      if (String(request?.identityNumber ?? '').trim() === '') {
+        v.add('identityNumber', 'is required for individual sellers');
+      }
+    } else if (type) {
+      v.required(request, ['taxOffice', 'taxNumber', 'legalCompanyTitle']);
+    }
+    v.assert('Iyzico');
+    return type as IyzicoSubMerchantType;
+  }
+
+  private mapSubMerchantRequest(
+    request: CreateSubMerchantRequest,
+    type: IyzicoSubMerchantType,
+    subMerchantKey?: string
+  ): IyzicoSubMerchantRequest {
+    return {
+      locale: request.locale || this.config.locale || 'tr',
+      conversationId: request.conversationId,
+      subMerchantExternalId: request.externalId,
+      subMerchantType: type,
+      address: request.address,
+      email: request.email,
+      gsmNumber: request.gsmNumber,
+      name: request.name,
+      iban: request.iban,
+      currency: request.currency || 'TRY',
+      swiftCode: request.swiftCode,
+      identityNumber: request.identityNumber,
+      taxOffice: request.taxOffice,
+      taxNumber: request.taxNumber,
+      legalCompanyTitle: request.legalCompanyTitle,
+      contactName: request.contactName,
+      contactSurname: request.contactSurname,
+      ...(subMerchantKey !== undefined ? { subMerchantKey } : {}),
+    };
+  }
+
+  private mapSubMerchantResponse(response: IyzicoSubMerchantResponse): SubMerchantResponse {
+    const detailed =
+      response.subMerchantExternalId !== undefined ||
+      response.name !== undefined ||
+      response.iban !== undefined;
+    const subMerchant: SubMerchant | undefined = detailed
+      ? {
+          subMerchantKey: response.subMerchantKey ?? '',
+          externalId: response.subMerchantExternalId,
+          type: response.subMerchantType,
+          name: response.name,
+          email: response.email,
+          gsmNumber: response.gsmNumber,
+          address: response.address,
+          iban: response.iban,
+          currency: response.currency,
+          identityNumber: response.identityNumber,
+          taxOffice: response.taxOffice,
+          taxNumber: response.taxNumber,
+          legalCompanyTitle: response.legalCompanyTitle,
+          contactName: response.contactName,
+          contactSurname: response.contactSurname,
+        }
+      : undefined;
+
+    return this.withErrorCode({
+      status: this.mapStatus(response.status),
+      subMerchantKey: response.subMerchantKey,
+      subMerchant,
+      conversationId: response.conversationId,
+      errorCode: response.errorCode,
+      errorMessage: response.errorMessage,
+      rawResponse: response,
+    });
+  }
+
+  /**
+   * Registers a seller (`POST /onboarding/submerchant`). The response carries the
+   * `subMerchantKey` that goes into `BasketItem.subMerchant.key`.
+   */
+  async createSubMerchant(request: CreateSubMerchantRequest): Promise<SubMerchantResponse> {
+    try {
+      const type = this.validateSubMerchant(request);
+      const response = await this.sendRequest<IyzicoSubMerchantResponse>(
+        '/onboarding/submerchant',
+        this.mapSubMerchantRequest(request, type)
+      );
+      return this.mapSubMerchantResponse(response);
+    } catch (error) {
+      return this.failure<SubMerchantResponse>(error, 'Sub-merchant creation failed');
+    }
+  }
+
+  /** Updates a registered seller (`PUT /onboarding/submerchant`) */
+  async updateSubMerchant(request: UpdateSubMerchantRequest): Promise<SubMerchantResponse> {
+    try {
+      const type = this.validateSubMerchant(request, request?.subMerchantKey);
+      const response = await this.sendRequest<IyzicoSubMerchantResponse>(
+        '/onboarding/submerchant',
+        this.mapSubMerchantRequest(request, type, request.subMerchantKey),
+        { method: 'PUT' }
+      );
+      return this.mapSubMerchantResponse(response);
+    } catch (error) {
+      return this.failure<SubMerchantResponse>(error, 'Sub-merchant update failed');
+    }
+  }
+
+  /** Looks a seller up by your own id (`POST /onboarding/submerchant/detail`) */
+  async retrieveSubMerchant(request: RetrieveSubMerchantRequest): Promise<SubMerchantResponse> {
+    try {
+      if (String(request?.externalId ?? '').trim() === '') {
+        throw new ValidationError('externalId is required to retrieve a sub-merchant', 'Iyzico', [
+          { path: 'externalId', message: 'is required' },
+        ]);
+      }
+      const response = await this.sendRequest<IyzicoSubMerchantResponse>(
+        '/onboarding/submerchant/detail',
+        {
+          locale: request.locale || this.config.locale || 'tr',
+          conversationId: request.conversationId,
+          subMerchantExternalId: request.externalId,
+        },
+        { retryable: true }
+      );
+      return this.mapSubMerchantResponse(response);
+    } catch (error) {
+      return this.failure<SubMerchantResponse>(error, 'Sub-merchant lookup failed');
+    }
+  }
+
+  private async payout(
+    path: string,
+    request: ApprovePayoutRequest,
+    fallback: string
+  ): Promise<PayoutResponse> {
+    try {
+      if (String(request?.paymentTransactionId ?? '').trim() === '') {
+        throw new ValidationError(
+          'paymentTransactionId is required for a marketplace payout',
+          'Iyzico',
+          [{ path: 'paymentTransactionId', message: 'is required' }]
+        );
+      }
+      const body: IyzicoPayoutRequest = {
+        locale: request.locale || this.config.locale || 'tr',
+        conversationId: request.conversationId,
+        paymentTransactionId: request.paymentTransactionId,
+      };
+      const response = await this.sendRequest<IyzicoPayoutResponse>(path, body);
+      return this.withErrorCode({
+        status: this.mapStatus(response.status),
+        paymentTransactionId: response.paymentTransactionId ?? request.paymentTransactionId,
+        conversationId: response.conversationId,
+        errorCode: response.errorCode,
+        errorMessage: response.errorMessage,
+        rawResponse: response,
+      });
+    } catch (error) {
+      return this.failure<PayoutResponse>(error, fallback);
+    }
+  }
+
+  /**
+   * Releases one seller's share of a paid basket item
+   * (`POST /payment/iyzipos/item/approve`). Without the approval iyzico does not
+   * transfer the seller's share.
+   */
+  async approvePayout(request: ApprovePayoutRequest): Promise<PayoutResponse> {
+    return this.payout('/payment/iyzipos/item/approve', request, 'Payout approval failed');
+  }
+
+  /** Takes back an approved payout (`POST /payment/iyzipos/item/disapprove`) */
+  async disapprovePayout(request: ApprovePayoutRequest): Promise<PayoutResponse> {
+    return this.payout('/payment/iyzipos/item/disapprove', request, 'Payout disapproval failed');
   }
 
   /**
@@ -1090,14 +1341,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
         address: request.billingAddress.address,
         zipCode: request.billingAddress.zipCode,
       },
-      basketItems: request.basketItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        category1: item.category1,
-        category2: item.category2,
-        itemType: item.itemType,
-        price: item.price,
-      })),
+      basketItems: this.mapBasketItems(request.basketItems),
     };
   }
 

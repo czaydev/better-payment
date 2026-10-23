@@ -17,6 +17,12 @@ import type {
   BinCheckResponse,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  ApprovePayoutRequest,
+  CreateSubMerchantRequest,
+  PayoutResponse,
+  RetrieveSubMerchantRequest,
+  SubMerchantResponse,
+  UpdateSubMerchantRequest,
 } from '../types';
 import type { PaymentProvider } from './PaymentProvider';
 import type { BetterPaymentLogger } from './logger';
@@ -53,6 +59,16 @@ export interface PaymentOperations {
   /** The request is the BIN (first 6-8 digits of the card) */
   binCheck: { request: string; result: BinCheckResponse };
   installmentInfo: { request: InstallmentInfoRequest; result: InstallmentInfoResponse };
+  /** Marketplace: register a seller */
+  createSubMerchant: { request: CreateSubMerchantRequest; result: SubMerchantResponse };
+  /** Marketplace: update a seller */
+  updateSubMerchant: { request: UpdateSubMerchantRequest; result: SubMerchantResponse };
+  /** Marketplace: look a seller up */
+  retrieveSubMerchant: { request: RetrieveSubMerchantRequest; result: SubMerchantResponse };
+  /** Marketplace: release one seller's share of a paid basket item */
+  approvePayout: { request: ApprovePayoutRequest; result: PayoutResponse };
+  /** Marketplace: take back an approved payout */
+  disapprovePayout: { request: ApprovePayoutRequest; result: PayoutResponse };
 }
 
 export type PaymentOperation = keyof PaymentOperations;
@@ -73,6 +89,11 @@ export const PAYMENT_OPERATIONS: readonly PaymentOperation[] = [
   'deleteCard',
   'binCheck',
   'installmentInfo',
+  'createSubMerchant',
+  'updateSubMerchant',
+  'retrieveSubMerchant',
+  'approvePayout',
+  'disapprovePayout',
 ];
 
 /**

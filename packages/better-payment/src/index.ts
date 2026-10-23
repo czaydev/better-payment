@@ -95,6 +95,7 @@ export type {
   BuildBasketOptions,
   BuiltBasket,
 } from './core/basket';
+export { isValidIban } from './core/validation';
 
 export { VERSION } from './version';
 
@@ -131,6 +132,15 @@ export {
   InstallmentInfoResponse,
   InstallmentDetail,
   InstallmentPrice,
+  BasketItemSubMerchant,
+  SubMerchant,
+  SubMerchantType,
+  CreateSubMerchantRequest,
+  UpdateSubMerchantRequest,
+  RetrieveSubMerchantRequest,
+  SubMerchantResponse,
+  ApprovePayoutRequest,
+  PayoutResponse,
   SubscriptionStatus,
   PaymentInterval,
   SubscriptionCustomer,

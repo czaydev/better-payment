@@ -9,6 +9,7 @@ import { PaymentProvider } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
+import { hasSubMerchant } from '../../core/validation';
 import { PAYTR_ERROR_CODES } from './error-codes';
 import type { PaymentErrorCode } from '../../core/error-codes';
 import { generateOrderId, parseAmount } from '../../core/utils';
@@ -132,6 +133,24 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
 
   protected errorCodeTable(): Record<string, PaymentErrorCode> {
     return PAYTR_ERROR_CODES;
+  }
+
+  /**
+   * PayTR has no sub-merchant fields in its payment API: the full amount is
+   * collected by the marketplace, and sellers are paid afterwards through the
+   * Platform Transfer Request API, which needs the seller's IBAN and amount for
+   * every transfer. It also has no public seller-onboarding endpoint, so the
+   * shared split-basket model cannot be honored. See
+   * https://dev.paytr.com/platform-transfer-talebi
+   */
+  protected marketplaceDetail(): string {
+    return (
+      'PayTR does not accept sub-merchant fields in a payment; the whole amount is collected by ' +
+      'the marketplace, and sellers are paid afterwards with the Platform Transfer Request API ' +
+      '(per-transfer IBAN and amount, https://dev.paytr.com/platform-transfer-talebi). ' +
+      'Seller onboarding is done in the PayTR merchant panel, which does not fit the shared ' +
+      'sub-merchant/payout model'
+    );
   }
 
   private failure<T extends FailureResult>(
@@ -730,6 +749,12 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
    * notification URL like any other payment.
    */
   async createPaymentWithToken(request: PayTRTokenPaymentRequest): Promise<ThreeDSInitResponse> {
+    if (hasSubMerchant(request?.basketItems)) {
+      throw this.notSupported(
+        'Marketplace split payments (BasketItem.subMerchant)',
+        this.marketplaceDetail()
+      );
+    }
     let merchantOid: string | undefined;
     try {
       merchantOid = this.resolveMerchantOid(request.conversationId);

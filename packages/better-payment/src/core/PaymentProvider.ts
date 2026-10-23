@@ -19,6 +19,12 @@ import {
   DeleteCardRequest,
   DeleteCardResponse,
   PaymentStatus,
+  ApprovePayoutRequest,
+  CreateSubMerchantRequest,
+  PayoutResponse,
+  RetrieveSubMerchantRequest,
+  SubMerchantResponse,
+  UpdateSubMerchantRequest,
 } from '../types';
 import { BetterPaymentLogger } from './logger';
 import type { RetryConfig } from './retry';
@@ -26,7 +32,9 @@ import { HttpClient } from './http';
 import { BetterPaymentError, ValidationError } from './errors';
 import { PaymentErrorCode, resolveErrorCode } from './error-codes';
 import { NETWORK_ERROR_CODE, type FailureResult } from './failure';
+import { MarketplaceClient } from './marketplace';
 import {
+  hasSubMerchant,
   validateCaptureRequest,
   validatePaymentRequest,
   validateRefundAmount,
@@ -59,6 +67,12 @@ export abstract class PaymentProvider<
 > {
   protected config: TConfig;
 
+  /**
+   * Marketplace (split payment) methods: `payment.<provider>.marketplace.*`.
+   * Providers without a marketplace API throw `NOT_SUPPORTED`.
+   */
+  readonly marketplace: MarketplaceClient = new MarketplaceClient(this);
+
   constructor(config: TConfig) {
     this.config = {
       locale: 'tr',
@@ -83,8 +97,18 @@ export abstract class PaymentProvider<
   /**
    * Throws a ValidationError naming the invalid fields, unless validation is
    * disabled with `validate: false`. Call it before building the provider request.
+   *
+   * A basket that names sub-merchants is rejected with `NOT_SUPPORTED` unless the
+   * provider's rules allow `marketplace`: otherwise the full amount would settle
+   * to the marketplace without the seller's share being recorded anywhere.
    */
   protected validatePayment(request: PaymentRequest, rules: PaymentValidationRules): void {
+    if (!rules.marketplace && hasSubMerchant(request?.basketItems)) {
+      throw this.notSupported(
+        'Marketplace split payments (BasketItem.subMerchant)',
+        this.marketplaceDetail()
+      );
+    }
     if (this.config.validate === false) return;
     validatePaymentRequest(request, rules, this.constructor.name);
   }
@@ -219,6 +243,46 @@ export abstract class PaymentProvider<
       `${feature} is not supported by this provider${detail ? `: ${detail}` : ''}`,
       'NOT_SUPPORTED'
     );
+  }
+
+  /**
+   * Why split payments cannot be offered by this provider. Bank virtual POS
+   * terminals settle the whole amount to the marketplace; PayTR overrides this
+   * with its marketplace (pazaryeri) explanation.
+   */
+  protected marketplaceDetail(): string {
+    return (
+      'the whole amount settles to the marketplace, so record each seller’s share in your own ' +
+      'ledger and pay the sellers yourself (ledger support: issue #116)'
+    );
+  }
+
+  /**
+   * Registers a seller (sub-merchant) with the provider. Only providers with a
+   * marketplace API implement it; the others throw `NOT_SUPPORTED`.
+   */
+  async createSubMerchant(_request: CreateSubMerchantRequest): Promise<SubMerchantResponse> {
+    throw this.notSupported('Marketplace seller registration', this.marketplaceDetail());
+  }
+
+  /** Updates a registered seller */
+  async updateSubMerchant(_request: UpdateSubMerchantRequest): Promise<SubMerchantResponse> {
+    throw this.notSupported('Marketplace seller registration', this.marketplaceDetail());
+  }
+
+  /** Looks a seller up by your own id */
+  async retrieveSubMerchant(_request: RetrieveSubMerchantRequest): Promise<SubMerchantResponse> {
+    throw this.notSupported('Marketplace seller lookup', this.marketplaceDetail());
+  }
+
+  /** Releases one seller's share of a paid basket item */
+  async approvePayout(_request: ApprovePayoutRequest): Promise<PayoutResponse> {
+    throw this.notSupported('Marketplace payouts', this.marketplaceDetail());
+  }
+
+  /** Takes back an approved payout before the seller is paid */
+  async disapprovePayout(_request: ApprovePayoutRequest): Promise<PayoutResponse> {
+    throw this.notSupported('Marketplace payouts', this.marketplaceDetail());
   }
 
   /** Validates a capture request (payment id and amount) */

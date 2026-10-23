@@ -1,4 +1,5 @@
 import type { PaymentProvider } from './PaymentProvider';
+import { MarketplaceClient } from './marketplace';
 import type {
   BetterPaymentOptions,
   ProviderEntry,
@@ -94,6 +95,7 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   private readonly handlerOptions?: BetterPaymentHandlerOptions;
   private readonly providers = new Map<string, PaymentProvider>();
   private readonly proxies = new Map<string, PaymentProvider>();
+  private readonly marketplaces = new Map<string, MarketplaceClient>();
   private readonly plugins: readonly BetterPaymentPlugin[];
   private readonly beforeHooks: BeforeHook[] = [];
   private readonly afterHooks: AfterHook[] = [];
@@ -203,6 +205,7 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   /**
    * A provider whose operations run with the plugin hooks and emit events. Other
    * members (provider-specific methods, MockProvider helpers) are the provider's own.
+   * `marketplace.*` is wrapped so that its calls go through the same operations.
    */
   private proxy(id: string, provider: PaymentProvider): PaymentProvider {
     return new Proxy(provider, {
@@ -210,6 +213,14 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
         if (typeof key === 'string' && OPERATIONS.has(key)) {
           return (request: unknown) =>
             this.run(key as PaymentOperation, id, request, { routable: false });
+        }
+        if (key === 'marketplace') {
+          let client = this.marketplaces.get(id);
+          if (!client) {
+            client = new MarketplaceClient(receiver as PaymentProvider);
+            this.marketplaces.set(id, client);
+          }
+          return client;
         }
         return Reflect.get(target, key, receiver);
       },

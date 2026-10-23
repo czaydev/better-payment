@@ -17,6 +17,12 @@ import {
   BinCheckResponse,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  ApprovePayoutRequest,
+  CreateSubMerchantRequest,
+  PayoutResponse,
+  RetrieveSubMerchantRequest,
+  SubMerchantResponse,
+  UpdateSubMerchantRequest,
 } from '../types';
 import { ProviderType } from '../core/BetterPaymentConfig';
 
@@ -241,6 +247,24 @@ class ProviderClient {
   async installmentInfo(request: InstallmentInfoRequest): Promise<InstallmentInfoResponse> {
     return this.request<InstallmentInfoResponse>('POST', 'installment', request);
   }
+
+  /**
+   * Marketplace (split payment) methods: `client.iyzico.marketplace.*`.
+   * Every route needs `authorize` on the server and a provider with a
+   * marketplace API (iyzico); the others answer `NOT_SUPPORTED`.
+   */
+  readonly marketplace = {
+    createSubMerchant: (request: CreateSubMerchantRequest): Promise<SubMerchantResponse> =>
+      this.request<SubMerchantResponse>('POST', 'marketplace/sub-merchant/create', request),
+    updateSubMerchant: (request: UpdateSubMerchantRequest): Promise<SubMerchantResponse> =>
+      this.request<SubMerchantResponse>('POST', 'marketplace/sub-merchant/update', request),
+    retrieveSubMerchant: (request: RetrieveSubMerchantRequest): Promise<SubMerchantResponse> =>
+      this.request<SubMerchantResponse>('POST', 'marketplace/sub-merchant/retrieve', request),
+    approvePayout: (request: ApprovePayoutRequest): Promise<PayoutResponse> =>
+      this.request<PayoutResponse>('POST', 'marketplace/payout/approve', request),
+    disapprovePayout: (request: ApprovePayoutRequest): Promise<PayoutResponse> =>
+      this.request<PayoutResponse>('POST', 'marketplace/payout/disapprove', request),
+  };
 }
 
 /**

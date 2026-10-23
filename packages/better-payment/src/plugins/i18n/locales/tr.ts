@@ -16,5 +16,7 @@ export const tr: Record<PaymentErrorCode, string> = {
   NETWORK_ERROR: 'Ödemeniz kontrol ediliyor. Lütfen tekrar ödeme yapmayın.',
   INVALID_HASH: 'Ödeme doğrulanamadı.',
   PROVIDER_ERROR: 'Ödeme geçici olarak yapılamıyor. Lütfen daha sonra tekrar deneyin.',
+  NOT_SUPPORTED:
+    'Bu ödeme yöntemi bu sipariş için kullanılamıyor. Lütfen başka bir ödeme yöntemi seçin.',
   UNKNOWN: 'Ödeme başarısız oldu. Tekrar deneyin veya başka bir kart kullanın.',
 };

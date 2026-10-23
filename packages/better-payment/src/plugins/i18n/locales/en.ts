@@ -16,5 +16,7 @@ export const en: Record<PaymentErrorCode, string> = {
   NETWORK_ERROR: "We're checking your payment. Don't pay again.",
   INVALID_HASH: 'Payment could not be verified.',
   PROVIDER_ERROR: 'Payment is temporarily unavailable. Please try again later.',
+  NOT_SUPPORTED:
+    'This payment method is not available for this order. Choose another payment method.',
   UNKNOWN: 'Payment failed. Please try again or use another card.',
 };

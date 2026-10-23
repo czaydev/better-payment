@@ -20,6 +20,8 @@ export interface PaymentValidationRules {
   basketMatchesPrice?: boolean;
   /** At least one basket item */
   basketRequired?: boolean;
+  /** The provider can split the basket between sub-merchants (`BasketItem.subMerchant`) */
+  marketplace?: boolean;
   /** Dotted paths that must be present and non-empty, e.g. `buyer.email` */
   required?: string[];
 }
@@ -63,6 +65,33 @@ function toCents(value: unknown): number | undefined {
   if (typeof text !== 'string' || !DECIMAL.test(text.trim())) return undefined;
   const [whole, fraction = ''] = text.trim().split('.');
   return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+}
+
+/**
+ * IBAN check: 2 letters, 2 check digits, 11-30 alphanumeric characters, and a
+ * MOD-97 remainder of 1. Covers Turkish IBANs (`TR` + 24 digits) and every
+ * other country's format.
+ */
+export function isValidIban(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const iban = value.replace(/[\s-]/g, '').toUpperCase();
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
+  // Move the country code and check digits to the end, then letters become numbers (A=10)
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let remainder = 0;
+  for (const char of rearranged) {
+    const chunk = /[A-Z]/.test(char) ? String(char.charCodeAt(0) - 55) : char;
+    for (const digit of chunk) remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder === 1;
+}
+
+/** True when any basket item names a sub-merchant (a marketplace split payment) */
+export function hasSubMerchant(items: unknown): boolean {
+  return (
+    Array.isArray(items) &&
+    items.some((item) => !!item && typeof item === 'object' && 'subMerchant' in item)
+  );
 }
 
 export class RequestValidator {
@@ -188,6 +217,32 @@ export function validatePaymentRequest(
       'basketItems',
       `prices add up to ${(basketTotal / 100).toFixed(2)} but price is ${(price / 100).toFixed(2)}`
     );
+  }
+
+  // Marketplace split: either every item names its seller or none does, and a
+  // seller's share never exceeds the item it belongs to.
+  if (hasSubMerchant(items)) {
+    items.forEach((item, i) => {
+      const sub = item?.subMerchant;
+      if (!sub || typeof sub !== 'object') {
+        v.add(
+          `basketItems[${i}].subMerchant`,
+          'is required: once one basket item has a sub-merchant, every item needs one'
+        );
+        return;
+      }
+      if (isBlank(sub.key)) v.add(`basketItems[${i}].subMerchant.key`, 'is required');
+      const share = v.amount(sub.price, `basketItems[${i}].subMerchant.price`);
+      const itemCents = toCents(item?.price);
+      if (itemCents === undefined) {
+        v.amount(item?.price, `basketItems[${i}].price`);
+      } else if (share !== undefined && share > itemCents) {
+        v.add(
+          `basketItems[${i}].subMerchant.price`,
+          `must not exceed basketItems[${i}].price (${(itemCents / 100).toFixed(2)})`
+        );
+      }
+    });
   }
 
   if (request.storedCard !== undefined) {

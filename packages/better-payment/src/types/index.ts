@@ -1,4 +1,5 @@
 import type { PaymentErrorCode } from '../core/error-codes';
+import type { BasketItemSubMerchant } from './marketplace';
 export { PaymentStatus } from './common';
 export type { PaymentCard, Address } from './common';
 import { PaymentStatus, PaymentCard, Address } from './common';
@@ -48,6 +49,12 @@ export interface BasketItem {
   category2?: string;
   itemType: BasketItemType | string;
   price: string;
+  /**
+   * Marketplace split payment: the seller that receives (part of) this item's
+   * price. Once one item has a sub-merchant, every item must have one. Providers
+   * without a marketplace API reject it with `NOT_SUPPORTED`.
+   */
+  subMerchant?: BasketItemSubMerchant;
 }
 
 /**
@@ -547,3 +554,5 @@ export interface InstallmentInfoResponse {
 
 // Export subscription types
 export * from './subscription';
+// Export marketplace (split payment) types
+export * from './marketplace';

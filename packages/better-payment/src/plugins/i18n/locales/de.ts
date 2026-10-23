@@ -19,6 +19,8 @@ export const de: Record<PaymentErrorCode, string> = {
   INVALID_HASH: 'Die Zahlung konnte nicht verifiziert werden.',
   PROVIDER_ERROR:
     'Die Zahlung ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.',
+  NOT_SUPPORTED:
+    'Diese Zahlungsmethode ist für diese Bestellung nicht verfügbar. Wählen Sie eine andere Zahlungsmethode.',
   UNKNOWN:
     'Zahlung fehlgeschlagen. Bitte versuchen Sie es erneut oder verwenden Sie eine andere Karte.',
 };

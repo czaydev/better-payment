@@ -33,6 +33,8 @@ export enum PaymentErrorCode {
   INVALID_HASH = 'INVALID_HASH',
   /** Provider, bank or merchant configuration problem (terminal, system error, timeout) */
   PROVIDER_ERROR = 'PROVIDER_ERROR',
+  /** The provider has no equivalent API (e.g. marketplace split payments on a bank POS) */
+  NOT_SUPPORTED = 'NOT_SUPPORTED',
   /** Not mapped yet; see `errorCode` for the provider's raw code */
   UNKNOWN = 'UNKNOWN',
 }
@@ -43,6 +45,7 @@ const INTERNAL_CODES: Record<string, PaymentErrorCode> = {
   INVALID_HASH: PaymentErrorCode.INVALID_HASH,
   INVALID_CALLBACK: PaymentErrorCode.THREEDS_FAILED,
   VALIDATION_ERROR: PaymentErrorCode.INVALID_REQUEST,
+  NOT_SUPPORTED: PaymentErrorCode.NOT_SUPPORTED,
 };
 
 /**

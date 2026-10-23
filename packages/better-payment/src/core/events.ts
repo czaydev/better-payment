@@ -18,6 +18,9 @@ type Awaitable<T> = T | Promise<T>;
  * | `payment.cancelled` | cancel, voidAuthorization: `success`                                    |
  * | `refund.succeeded`  | refund: `success`                                                       |
  * | `refund.failed`     | refund: `failure`                                                       |
+ * | `payout.approved`   | approvePayout: `success` (the seller's share is released)               |
+ * | `payout.disapproved`| disapprovePayout: `success`                                             |
+ * | `payout.failed`     | approvePayout, disapprovePayout: `failure`                              |
  */
 export type PaymentEventType =
   | 'payment.succeeded'
@@ -28,7 +31,10 @@ export type PaymentEventType =
   | 'payment.expired'
   | 'payment.unresolved'
   | 'refund.succeeded'
-  | 'refund.failed';
+  | 'refund.failed'
+  | 'payout.approved'
+  | 'payout.disapproved'
+  | 'payout.failed';
 
 export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.succeeded',
@@ -40,6 +46,9 @@ export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.unresolved',
   'refund.succeeded',
   'refund.failed',
+  'payout.approved',
+  'payout.disapproved',
+  'payout.failed',
 ];
 
 export interface PaymentEvent<T extends PaymentEventType = PaymentEventType> {
@@ -133,6 +142,10 @@ export function eventFor(
   } else if (operation === 'refund') {
     if (status === PaymentStatus.SUCCESS) type = 'refund.succeeded';
     else if (status === PaymentStatus.FAILURE) type = 'refund.failed';
+  } else if (operation === 'approvePayout' || operation === 'disapprovePayout') {
+    if (status === PaymentStatus.SUCCESS) {
+      type = operation === 'approvePayout' ? 'payout.approved' : 'payout.disapproved';
+    } else if (status === PaymentStatus.FAILURE) type = 'payout.failed';
   }
   if (!type) return undefined;
 

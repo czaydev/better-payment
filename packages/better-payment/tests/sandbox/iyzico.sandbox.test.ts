@@ -188,6 +188,57 @@ describe.skipIf(!env)('iyzico sandbox', () => {
     expect(result.token).toBeTruthy();
   });
 
+  it('registers a seller, charges a split basket and approves the payout', async () => {
+    const externalId = orderId('IYZM');
+    const sellerRequest = {
+      type: 'individual' as const,
+      externalId,
+      name: 'Ayşe Yılmaz',
+      email: 'ayse@example.com',
+      gsmNumber: '+905350000000',
+      address: 'Nidakule Göztepe, Merdivenköy Mah. Bora Sok. No:1',
+      iban: 'TR330006100519786457841326',
+      identityNumber: '74300864791',
+    };
+    const seller = await iyzico.marketplace.createSubMerchant(sellerRequest);
+    record('iyzico', 'submerchant-create', seller.rawResponse);
+    expect(seller.status, describeResult(seller)).toBe(PaymentStatus.SUCCESS);
+    expect(seller.subMerchantKey).toBeTruthy();
+
+    const retrieved = await iyzico.marketplace.retrieveSubMerchant({ externalId });
+    record('iyzico', 'submerchant-retrieve', retrieved.rawResponse);
+    expect(retrieved.status, describeResult(retrieved)).toBe(PaymentStatus.SUCCESS);
+
+    const updated = await iyzico.marketplace.updateSubMerchant({
+      ...sellerRequest,
+      name: 'Ayşe Yılmaz G.',
+      subMerchantKey: seller.subMerchantKey!,
+    });
+    record('iyzico', 'submerchant-update', updated.rawResponse);
+    expect(updated.status, describeResult(updated)).toBe(PaymentStatus.SUCCESS);
+
+    const split = paymentRequest(card, { conversationId: orderId('IYZ') });
+    const paid = await withSandboxRetry(() =>
+      iyzico.createPayment({
+        ...split,
+        basketItems: split.basketItems.map((item) => ({
+          ...item,
+          subMerchant: { key: seller.subMerchantKey!, price: item.price },
+        })),
+      })
+    );
+    record('iyzico', 'create-payment-split', paid.rawResponse);
+    expect(paid.status, describeResult(paid)).toBe(PaymentStatus.SUCCESS);
+
+    const raw = paid.rawResponse as { itemTransactions?: { paymentTransactionId: string }[] };
+    const transactionId = raw.itemTransactions?.[0]?.paymentTransactionId;
+    expect(transactionId).toBeTruthy();
+
+    const payout = await iyzico.marketplace.approvePayout({ paymentTransactionId: transactionId! });
+    record('iyzico', 'payout-approve', payout.rawResponse);
+    expect(payout.status, describeResult(payout)).toBe(PaymentStatus.SUCCESS);
+  });
+
   it('looks up BIN and installment information', async () => {
     const bin = await iyzico.binCheck(card.cardNumber.slice(0, 6));
     record('iyzico', 'bin-check', bin.rawResponse);

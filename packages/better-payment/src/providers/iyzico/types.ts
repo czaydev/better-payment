@@ -142,6 +142,10 @@ export interface IyzicoBasketItem {
   category2?: string;
   itemType: string;
   price: string;
+  /** Marketplace: the seller that receives this item's share */
+  subMerchantKey?: string;
+  /** Amount that settles to `subMerchantKey`; at most `price` */
+  subMerchantPrice?: string;
 }
 
 export interface IyzicoPaymentRequest {
@@ -334,4 +338,70 @@ export interface IyzicoInstallmentInfoRequest {
  */
 export interface IyzicoInstallmentInfoResponse extends IyzicoResponse {
   installmentDetails?: IyzicoInstallmentPrice[];
+}
+
+/**
+ * Marketplace (split payment) API types
+ */
+
+/** iyzico sub-merchant types */
+export type IyzicoSubMerchantType =
+  'PERSONAL' | 'PRIVATE_COMPANY' | 'LIMITED_OR_JOINT_STOCK_COMPANY';
+
+/**
+ * Body of POST/PUT /onboarding/submerchant and POST /onboarding/submerchant/detail.
+ * Fields that only apply to one type are left out when they are not sent.
+ */
+export interface IyzicoSubMerchantRequest {
+  locale: string;
+  conversationId?: string;
+  subMerchantExternalId?: string;
+  subMerchantType?: IyzicoSubMerchantType;
+  address?: string;
+  email?: string;
+  gsmNumber?: string;
+  name?: string;
+  iban?: string;
+  swiftCode?: string;
+  currency?: string;
+  identityNumber?: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  legalCompanyTitle?: string;
+  contactName?: string;
+  contactSurname?: string;
+  /** Update only */
+  subMerchantKey?: string;
+}
+
+/** Response of the sub-merchant endpoints; the detail call fills the seller fields */
+export interface IyzicoSubMerchantResponse extends IyzicoResponse {
+  subMerchantKey?: string;
+  subMerchantExternalId?: string;
+  subMerchantType?: string;
+  subMerchantStatus?: string;
+  name?: string;
+  email?: string;
+  gsmNumber?: string;
+  address?: string;
+  iban?: string;
+  swiftCode?: string;
+  currency?: string;
+  identityNumber?: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  legalCompanyTitle?: string;
+  contactName?: string;
+  contactSurname?: string;
+}
+
+/** Body of POST /payment/iyzipos/item/approve and /item/disapprove */
+export interface IyzicoPayoutRequest {
+  locale: string;
+  conversationId?: string;
+  paymentTransactionId: string;
+}
+
+export interface IyzicoPayoutResponse extends IyzicoResponse {
+  paymentTransactionId?: string;
 }

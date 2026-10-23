@@ -9,10 +9,11 @@ const budgets = [
   // 0.8.1 security fixes (Akbank order check, body limits, response filtering),
   // 31 kB since the Kuveyt Türk provider, 34 kB since the EST provider, 38 kB since
   // the Sipay provider, 40 kB since QNB, 42 kB with Yapı Kredi, 44 kB with VakıfBank,
-  // 46 kB with Albaraka Türk, 48 kB with Denizbank, 49 kB with QNBpay, 51 kB with Garanti BBVA alongside the
+  // 46 kB with Albaraka Türk, 48 kB with Denizbank, 49 kB with QNBpay, 51 kB with Garanti BBVA,
+  // 53 kB with marketplace split payments alongside the
   // other providers
-  { file: 'dist/index.mjs', maxGzipKb: 51 },
-  { file: 'dist/index.js', maxGzipKb: 51 },
+  { file: 'dist/index.mjs', maxGzipKb: 53 },
+  { file: 'dist/index.js', maxGzipKb: 53 },
   { file: 'dist/client/index.mjs', maxGzipKb: 2 },
   { file: 'dist/client/index.js', maxGzipKb: 2 },
   { file: 'dist/testing/index.mjs', maxGzipKb: 8 },
@@ -22,10 +23,12 @@ const budgets = [
   // notifications plugin, 9 kB with the openAPI plugin, 11 kB with failover. The
   // currencyConversion, redact, threeDSTimeout, captcha, rateLimit, pendingResolver,
   // refundApproval, webhookForwarding, mcp and telemetry plugins take the bundle to
-  // 22.32 / 22.34 kB gzip, so the budget is 23 kB. ESM bundlers drop the plugins an
-  // application does not import.
-  { file: 'dist/plugins/index.mjs', maxGzipKb: 23 },
-  { file: 'dist/plugins/index.js', maxGzipKb: 23 },
+  // 22.32 / 22.34 kB gzip, so the budget was 23 kB. This branch's sub-merchant error
+  // codes ride in that same bundle as five-language messages: on top of beta, which
+  // builds to 22.96 / 22.98 kB, the entry point measures 23.15 / 23.18 kB gzip, so the
+  // budget is 24 kB. ESM bundlers drop the plugins an application does not import.
+  { file: 'dist/plugins/index.mjs', maxGzipKb: 24 },
+  { file: 'dist/plugins/index.js', maxGzipKb: 24 },
   // The fraud rules engine is a separate subpath (`better-payment/fraud`); the plugins
   // barrel only re-exports its types, so it costs that entry point nothing. 3.90 kB
   // gzip measured on the merged tree, so its own budget is 4 kB.

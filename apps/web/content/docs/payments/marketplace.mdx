@@ -1,0 +1,146 @@
+---
+title: Marketplace split payments
+description: Charge the customer once, split the basket between sellers, and release each seller's share.
+---
+
+<Since version="0.13.0" />
+
+A marketplace charges the customer **once** and pays each seller their share, minus the marketplace's commission. The provider holds and moves the money; better-payment sends it the seller keys and the amount that belongs to each basket item.
+
+```typescript
+import { betterPayment } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: {
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    },
+  },
+});
+
+// 1. Register the seller once; keep the key it returns
+const seller = await payment.iyzico.marketplace.createSubMerchant({
+  type: 'individual',
+  externalId: 'seller-42', // your own id; iyzico looks the seller up by it
+  name: 'Ayşe Yılmaz',
+  email: 'ayse@example.com',
+  gsmNumber: '+905350000000',
+  address: 'Nidakule Göztepe, Merdivenköy Mah. Bora Sok. No:1',
+  iban: 'TR330006100519786457841326',
+  identityNumber: '74300864791',
+});
+
+// 2. Split the basket: every item names its seller and that seller's share
+const paid = await payment.iyzico.createPayment({
+  ...order,
+  basketItems: order.basketItems.map((item) => ({
+    ...item,
+    subMerchant: { key: seller.subMerchantKey!, price: item.price },
+  })),
+});
+
+// 3. After the payment, release each seller's share
+const itemTransactions =
+  (paid.rawResponse as {
+    itemTransactions?: { itemId: string; paymentTransactionId: string }[];
+  }).itemTransactions ?? [];
+
+const soldBySeller = itemTransactions.find((transaction) => transaction.itemId === 'BI101');
+if (soldBySeller) {
+  await payment.iyzico.marketplace.approvePayout({
+    paymentTransactionId: soldBySeller.paymentTransactionId,
+  });
+}
+```
+
+The payment is the same whether or not it is split: `createPayment()`, `initThreeDSPayment()` and `initCheckoutForm()` all carry the split basket. A `success` still means the provider charged the customer; the sellers are paid through the provider's marketplace settlement.
+
+## Register a seller [#register-a-seller]
+
+`marketplace.createSubMerchant()` registers a seller and returns a `subMerchantKey`, which is what basket items reference. The request also needs your `externalId`; iyzico identifies the seller by it, so `retrieveSubMerchant({ externalId })` works without storing the key. `updateSubMerchant()` takes the same fields plus `subMerchantKey`.
+
+| Seller type | Extra required fields |
+| ----------- | --------------------- |
+| `individual` | `identityNumber` |
+| `private_company` | `taxOffice`, `taxNumber`, `legalCompanyTitle` |
+| `limited_or_joint_stock_company` | `taxOffice`, `taxNumber`, `legalCompanyTitle` |
+
+Every seller also needs `name`, `email`, `gsmNumber`, `address` and an `iban`. The IBAN is checked for format and MOD-97 checksum before anything is sent, so a typo cannot register a seller that can never be paid. `currency` defaults to `TRY`; `swiftCode`, `contactName` and `contactSurname` are optional.
+
+## Split the basket [#split-the-basket]
+
+`BasketItem.subMerchant` has two fields:
+
+- `key`: the seller's `subMerchantKey`.
+- `price`: the part of the item's price that belongs to the seller. It must not exceed the item's `price`; the difference is the marketplace's commission.
+
+Once **one** item has a sub-merchant, **every** item must have one. iyzico rejects a basket where only some items name a seller, so the library rejects it before making an HTTP call, together with any share above the item price. Validation errors come back as a `FAILURE` with `errorCode: 'VALIDATION_ERROR'` and the field path in the message.
+
+## Approve payouts [#approve-payouts]
+
+iyzico does not transfer a seller's share until you approve that item. Pass the `paymentTransactionId` of the seller's basket item, which iyzico returns in the payment response (`rawResponse.itemTransactions`). `marketplace.disapprovePayout()` takes it back before the seller is paid.
+
+| Operation | iyzico endpoint |
+| --------- | --------------- |
+| `createSubMerchant` | `POST /onboarding/submerchant` |
+| `updateSubMerchant` | `PUT /onboarding/submerchant` |
+| `retrieveSubMerchant` | `POST /onboarding/submerchant/detail` |
+| `approvePayout` | `POST /payment/iyzipos/item/approve` |
+| `disapprovePayout` | `POST /payment/iyzipos/item/disapprove` |
+
+## Refunds [#refunds]
+
+Refunds keep working as for any payment, and the buyer is always refunded on their card:
+
+- **Whole payment:** `refund()` without `paymentTransactionId` refunds the full payment. iyzico reverses each seller's share and the marketplace commission in its own settlement.
+- **One item:** pass the item's `paymentTransactionId` to `refund()`. The buyer is refunded that item's amount, and iyzico reverses that seller's share. This is why storing the `itemTransactions` of the payment response matters.
+
+```typescript
+// Whole payment
+await payment.iyzico.refund({
+  paymentId: paid.paymentId!,
+  price: order.price,
+  currency: order.currency,
+  ip: order.buyer.ip,
+});
+
+// One seller's item
+await payment.iyzico.refund({
+  paymentId: paid.paymentId!,
+  paymentTransactionId: soldBySeller!.paymentTransactionId,
+  price: '100.00',
+  currency: order.currency,
+  ip: order.buyer.ip,
+});
+```
+
+Who ultimately bears a refund (seller balance, next payout, or marketplace commission) is part of the provider's marketplace agreement, not something this library changes. The tested guarantee is the request: full refunds go by payment id, item refunds by `paymentTransactionId`.
+
+## Providers [#providers]
+
+| Provider | Split basket | Seller onboarding | Item payouts |
+| -------- | ------------ | ----------------- | ------------ |
+| iyzico | yes | `marketplace.*` | approve / disapprove |
+| PayTR | no | panel | not through this API |
+| Parampos, Sipay, Moka, Lidio, bank POS | no | — | — |
+
+**PayTR** has no sub-merchant fields in its payment APIs: the marketplace collects the full amount, and sellers are paid afterwards with the [Platform Transfer Request API](https://dev.paytr.com/platform-transfer-talebi), which needs the seller's IBAN, name and amount on every transfer. Seller onboarding and commission setup happen in the PayTR merchant panel. That flow does not fit the shared sub-merchant and item-payout model, so a split basket is rejected instead of quietly charging the whole amount to the marketplace.
+
+**Parampos, Sipay, Moka, Lidio and every bank virtual POS** settle the whole amount to the marketplace. Sending `BasketItem.subMerchant` fails with `NOT_SUPPORTED` before any request, rather than charging the customer the marketplace's full amount. Record each seller's share in your own ledger and pay sellers yourself. A ledger belongs to [#116](https://github.com/czaydev/better-payment/issues/116); until it lands, the provider's own marketplace product is the alternative.
+
+## HTTP handler [#http-handler]
+
+| Route | Action | Needs `authorize` |
+| ----- | ------ | ----------------- |
+| `POST /:provider/marketplace/sub-merchant/create` | `marketplace/sub-merchant/create` | 🔒 |
+| `POST /:provider/marketplace/sub-merchant/update` | `marketplace/sub-merchant/update` | 🔒 |
+| `POST /:provider/marketplace/sub-merchant/retrieve` | `marketplace/sub-merchant/retrieve` | 🔒 |
+| `POST /:provider/marketplace/payout/approve` | `marketplace/payout/approve` | 🔒 |
+| `POST /:provider/marketplace/payout/disapprove` | `marketplace/payout/disapprove` | 🔒 |
+
+Seller data and payouts are privileged: these actions can only be enabled together with the handler's `authorize` hook, like refunds. The browser client mirrors them under `client.iyzico.marketplace.*`, and `payment.iyzico.marketplace.*` runs the same methods through plugin hooks and events (`payout.approved`, `payout.disapproved`, `payout.failed`).
+
+## Verification [#verification]
+
+The iyzico requests and responses on this page are covered by unit tests with mocked HTTP, against the fields documented by iyzico. They have **not** been run against the iyzico sandbox. PayTR's transfer description follows its published Platform Transfer Request document, but PayTR transfers are not implemented here.

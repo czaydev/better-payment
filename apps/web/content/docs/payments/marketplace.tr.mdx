@@ -1,0 +1,146 @@
+---
+title: Pazaryeri bölüşmeli ödemeler
+description: Müşteriden tek seferde tahsil edin, sepeti satıcılar arasında bölün ve her satıcının hakedişini serbest bırakın.
+---
+
+<Since version="0.13.0" />
+
+Pazaryeri müşteriden **tek seferde** tahsil eder ve her satıcıya payını, pazaryeri komisyonu düşülerek öder. Parayı sağlayıcı tutar ve aktarır; better-payment ona satıcı anahtarlarını ve her sepet kalemine ait tutarı gönderir.
+
+```typescript
+import { betterPayment } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: {
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+    },
+  },
+});
+
+// 1. Register the seller once; keep the key it returns
+const seller = await payment.iyzico.marketplace.createSubMerchant({
+  type: 'individual',
+  externalId: 'seller-42', // your own id; iyzico looks the seller up by it
+  name: 'Ayşe Yılmaz',
+  email: 'ayse@example.com',
+  gsmNumber: '+905350000000',
+  address: 'Nidakule Göztepe, Merdivenköy Mah. Bora Sok. No:1',
+  iban: 'TR330006100519786457841326',
+  identityNumber: '74300864791',
+});
+
+// 2. Split the basket: every item names its seller and that seller's share
+const paid = await payment.iyzico.createPayment({
+  ...order,
+  basketItems: order.basketItems.map((item) => ({
+    ...item,
+    subMerchant: { key: seller.subMerchantKey!, price: item.price },
+  })),
+});
+
+// 3. After the payment, release each seller's share
+const itemTransactions =
+  (paid.rawResponse as {
+    itemTransactions?: { itemId: string; paymentTransactionId: string }[];
+  }).itemTransactions ?? [];
+
+const soldBySeller = itemTransactions.find((transaction) => transaction.itemId === 'BI101');
+if (soldBySeller) {
+  await payment.iyzico.marketplace.approvePayout({
+    paymentTransactionId: soldBySeller.paymentTransactionId,
+  });
+}
+```
+
+Ödeme bölünmüş olsun ya da olmasın aynıdır: `createPayment()`, `initThreeDSPayment()` ve `initCheckoutForm()` bölünmüş sepeti taşır. `success` yine sağlayıcının müşteriden tahsil ettiği anlamına gelir; satıcılara ödeme sağlayıcının pazaryeri mutabakatı üzerinden yapılır.
+
+## Satıcı kaydı [#register-a-seller]
+
+`marketplace.createSubMerchant()` bir satıcı kaydeder ve sepet kalemlerinin başvurduğu `subMerchantKey` değerini döndürür. İstek ayrıca sizin `externalId` değerinizi ister; iyzico satıcıyı bununla tanır, böylece anahtarı saklamadan `retrieveSubMerchant({ externalId })` ile bulabilirsiniz. `updateSubMerchant()` aynı alanları ve ek olarak `subMerchantKey` alır.
+
+| Satıcı tipi | Ek zorunlu alanlar |
+| ----------- | ------------------ |
+| `individual` | `identityNumber` |
+| `private_company` | `taxOffice`, `taxNumber`, `legalCompanyTitle` |
+| `limited_or_joint_stock_company` | `taxOffice`, `taxNumber`, `legalCompanyTitle` |
+
+Her satıcı ayrıca `name`, `email`, `gsmNumber`, `address` ve bir `iban` ister. IBAN, hiçbir istek gönderilmeden önce biçim ve MOD-97 sağlamasıyla denetlenir; böylece hiç ödenemeyecek bir satıcı yanlış yazımla kaydedilemez. `currency` varsayılan olarak `TRY`'dir; `swiftCode`, `contactName` ve `contactSurname` isteğe bağlıdır.
+
+## Sepeti bölme [#split-the-basket]
+
+`BasketItem.subMerchant` iki alan taşır:
+
+- `key`: satıcının `subMerchantKey` değeri.
+- `price`: kalemin fiyatının satıcıya ait kısmı. Kalemin `price` değerini aşamaz; fark pazaryeri komisyonudur.
+
+Bir kaleme sub-merchant eklendiğinde **her** kaleme eklenmelidir. iyzico yalnızca bazı kalemleri satıcıya bağlayan sepeti reddeder; kütüphane de bunu ve kalem fiyatını aşan payı HTTP çağrısı yapmadan reddeder. Doğrulama hataları `errorCode: 'VALIDATION_ERROR'` ile `FAILURE` olarak döner ve hatalı alanın yolu mesajda bulunur.
+
+## Hakediş onayı [#approve-payouts]
+
+iyzico, bir kalemi onaylamadığınız sürece satıcının payını aktarmaz. Satıcının sepet kaleminin `paymentTransactionId` değerini geçin; iyzico bunu ödeme yanıtında (`rawResponse.itemTransactions`) döndürür. Satıcı ödenmeden önce `marketplace.disapprovePayout()` onayı geri alır.
+
+| İşlem | iyzico uç noktası |
+| ----- | ----------------- |
+| `createSubMerchant` | `POST /onboarding/submerchant` |
+| `updateSubMerchant` | `PUT /onboarding/submerchant` |
+| `retrieveSubMerchant` | `POST /onboarding/submerchant/detail` |
+| `approvePayout` | `POST /payment/iyzipos/item/approve` |
+| `disapprovePayout` | `POST /payment/iyzipos/item/disapprove` |
+
+## İadeler [#refunds]
+
+İadeler her ödemede olduğu gibi çalışır ve müşteriye her zaman kartına iade yapılır:
+
+- **Ödemenin tamamı:** `paymentTransactionId` olmadan `refund()` tüm ödemeyi iade eder. iyzico her satıcının payını ve pazaryeri komisyonunu kendi mutabakatında geri alır.
+- **Tek kalem:** kalemin `paymentTransactionId` değerini `refund()`'a geçin. Müşteriye o kalemin tutarı iade edilir ve iyzico o satıcının payını geri alır. Ödeme yanıtının `itemTransactions` kayıtlarını saklamanın nedeni budur.
+
+```typescript
+// Whole payment
+await payment.iyzico.refund({
+  paymentId: paid.paymentId!,
+  price: order.price,
+  currency: order.currency,
+  ip: order.buyer.ip,
+});
+
+// One seller's item
+await payment.iyzico.refund({
+  paymentId: paid.paymentId!,
+  paymentTransactionId: soldBySeller!.paymentTransactionId,
+  price: '100.00',
+  currency: order.currency,
+  ip: order.buyer.ip,
+});
+```
+
+İadenin masrafını nihayetinde kimin taşıyacağı (satıcı bakiyesi, sonraki hakediş veya pazaryeri komisyonu) sağlayıcının pazaryeri sözleşmesinin parçasıdır; kütüphane bunu değiştirmez. Test edilen güvence istektir: tam iadeler ödeme kimliğiyle, kalem iadeleri `paymentTransactionId` ile gider.
+
+## Sağlayıcılar [#providers]
+
+| Sağlayıcı | Bölünmüş sepet | Satıcı kaydı | Kalem hakedişi |
+| --------- | -------------- | ------------- | -------------- |
+| iyzico | evet | `marketplace.*` | onay / geri alma |
+| PayTR | hayır | panel | bu API üzerinden değil |
+| Parampos, Sipay, Moka, Lidio, banka POS | hayır | — | — |
+
+**PayTR**'ın ödeme API'lerinde sub-merchant alanı yoktur: pazaryeri tutarın tamamını tahsil eder ve satıcılara daha sonra her transferde satıcının IBAN'ını, adını ve tutarı isteyen [Platform Transfer Request API](https://dev.paytr.com/platform-transfer-talebi) ile ödeme yapılır. Satıcı kaydı ve komisyon ayarı PayTR satıcı panelinden yapılır. Bu akış ortak sub-merchant ve kalem hakediş modeline uymadığı için bölünmüş sepet, tutarın tamamı sessizce pazaryerine geçirilmek yerine reddedilir.
+
+**Parampos, Sipay, Moka, Lidio ve tüm banka sanal POS'ları** tutarın tamamını pazaryerine aktarır. `BasketItem.subMerchant` göndermek, müşteriden pazaryerinin tam tutarını tahsil etmek yerine hiçbir istek yapılmadan `NOT_SUPPORTED` ile başarısız olur. Her satıcının payını kendi defterinizde kaydedin ve satıcılara kendiniz ödeyin. Defter [#116](https://github.com/czaydev/better-payment/issues/116) kapsamındadır; o gelene kadar alternatif, sağlayıcının kendi pazaryeri ürünüdür.
+
+## HTTP handler [#http-handler]
+
+| Rota | Eylem | `authorize` gerekir |
+| ---- | ------ | ------------------- |
+| `POST /:provider/marketplace/sub-merchant/create` | `marketplace/sub-merchant/create` | 🔒 |
+| `POST /:provider/marketplace/sub-merchant/update` | `marketplace/sub-merchant/update` | 🔒 |
+| `POST /:provider/marketplace/sub-merchant/retrieve` | `marketplace/sub-merchant/retrieve` | 🔒 |
+| `POST /:provider/marketplace/payout/approve` | `marketplace/payout/approve` | 🔒 |
+| `POST /:provider/marketplace/payout/disapprove` | `marketplace/payout/disapprove` | 🔒 |
+
+Satıcı verileri ve hakedişler ayrıcalıklıdır: bu eylemler, iadelerde olduğu gibi yalnızca handler'ın `authorize` kancasıyla birlikte açılabilir. Tarayıcı istemcisi bunları `client.iyzico.marketplace.*` altında yansıtır ve `payment.iyzico.marketplace.*` aynı metotları eklenti kancaları ve olaylarından (`payout.approved`, `payout.disapproved`, `payout.failed`) geçirir.
+
+## Doğrulama [#verification]
+
+Bu sayfadaki iyzico istek ve yanıtları, iyzico'nun belgelediği alanlara karşı sahte HTTP ile yazılmış birim testleriyle kapsanır. iyzico sandbox'ına karşı **çalıştırılmamıştır**. PayTR transfer açıklaması yayımlanmış Platform Transfer Request belgesini izler, ancak PayTR transferleri burada uygulanmamıştır.

@@ -1,6 +1,6 @@
 import { PaymentStatus } from '../types/common';
 import { errorMessage, isNetworkError } from './utils';
-import { ValidationError } from './errors';
+import { BetterPaymentError, ValidationError } from './errors';
 import type { PaymentErrorCode } from './error-codes';
 
 export const NETWORK_ERROR_CODE = 'NETWORK_ERROR';
@@ -92,6 +92,16 @@ export function failureResult<T extends FailureResult>(
     return {
       status: PaymentStatus.FAILURE,
       errorCode: 'VALIDATION_ERROR',
+      errorMessage: error.message,
+      ...extra,
+    } as T;
+  }
+
+  if (error instanceof BetterPaymentError) {
+    // e.g. NOT_SUPPORTED for a split basket sent to a provider without a marketplace API
+    return {
+      status: PaymentStatus.FAILURE,
+      errorCode: error.code,
       errorMessage: error.message,
       ...extra,
     } as T;
