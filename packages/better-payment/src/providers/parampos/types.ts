@@ -6,7 +6,10 @@
  * - 3D payment init:  TP_WMD_UCD (Islem_Guvenlik_Tip = 3D) -> UCD_HTML
  * - 3D completion:    bank POSTs md/mdStatus/orderId/islemGUID/islemHash to the
  *                     callback URL, then TP_WMD_Pay finalizes the payment
- * - Refund / cancel:  TP_Islem_Iptal_Iade_Kismi2 (Durum = IADE / IPTAL)
+ * - Foreign currency: TP_Islem_Odeme_WD (Doviz_Kodu 1001/1002/1003) -> UCD_URL;
+ *                     Param POSTs TURKPOS_RETVAL_* fields, verified by
+ *                     TURKPOS_RETVAL_Hash (no second request)
+ * - Refund / cancel:  TP_Islem_Iptal_Iade_Kismi2 (Durum = IADE / IPTAL), TRY only
  * - Status query:     TP_Islem_Sorgulama4
  * - BIN query:        BIN_SanalPos
  */

@@ -90,6 +90,13 @@ export interface PaymentResponse {
   status: PaymentStatus;
   paymentId?: string;
   conversationId?: string;
+  /**
+   * Amount charged, as reported by the provider in `currency`. Never converted
+   * or normalized by the library.
+   */
+  amount?: string;
+  /** Currency of the payment, as reported by the provider. Never converted implicitly. */
+  currency?: string;
   /** Normalized error code, set on failures */
   code?: PaymentErrorCode;
   /** The provider's raw error code */

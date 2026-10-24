@@ -27,7 +27,7 @@ const payment = betterPayment({
 
 - `price` → `Islem_Tutar`, `paidPrice` → `Toplam_Tutar` (taksit komisyonu dahil çekilen tutar). Tutarlar ondalık virgülle gönderilir.
 - Taksitli ödemede `paidPrice`, Param oranlarınızdaki komisyonu içermelidir. Bunu `calculatePaidPrice()` ile hesaplayın (aşağıda); kütüphane oranları asla tahmin etmez.
-- Yalnızca **TRY** desteklenir (`TP_WMD_UCD`). Diğer para birimleri `failure` döner.
+- TRY `TP_WMD_UCD` kullanır; USD, EUR ve GBP `TP_Islem_Odeme_WD` kullanır (bkz. [Döviz ödemeleri](#foreign-currency-3d-secure)). Diğer para birimleri `failure` döner.
 
 `paymentId` sipariş numaranızdır (`Siparis_ID`): verdiğiniz `conversationId` ya da üretilen alfanümerik bir numara.
 
@@ -58,6 +58,52 @@ const result = await payment.parampos.completeThreeDSPayment(callbackBody);
 1. `islemHash`, **yapılandırmanızdaki GUID** ile doğrulanır. Callback'in içindeki bir GUID yok sayılır.
 2. `mdStatus` `1` olmalıdır.
 3. Ödeme `TP_WMD_Pay` ile tamamlanır. Yalnızca Param bir `Dekont_ID` döndürdüğünde `success` sayılır.
+
+## Döviz ödemeleri (3D Secure) [#foreign-currency-3d-secure]
+
+`TP_WMD_UCD` yalnızca TRY kabul eder. USD, EUR ve GBP ödemeleri `Doviz_Kodu`
+1001, 1002 ve 1003 ile `TP_Islem_Odeme_WD` kullanır ve HTML formu yerine bir
+yönlendirme adresi döner:
+
+```typescript
+const init = await payment.parampos.initThreeDSPayment({
+  ...paymentRequest,
+  currency: 'USD',
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/parampos/payment/complete-3ds',
+});
+
+if (init.redirectUrl) {
+  window.location.assign(init.redirectUrl);
+}
+```
+
+Param sonucu `callbackUrl` adresine `TURKPOS_RETVAL_*` form alanları olarak
+POST eder. `completeThreeDSPayment()`, `TURKPOS_RETVAL_Hash` değerini
+`clientCode` ve GUID'inizle doğrulamadan `success` döndürmez:
+
+```typescript
+const result = await payment.parampos.completeThreeDSPayment(callbackBody);
+// result.amount and result.currency come from the verified callback
+```
+
+- Hash; `CLIENT_CODE`, `TURKPOS_RETVAL_GUID`, `TURKPOS_RETVAL_Dekont_ID`,
+  `TURKPOS_RETVAL_Tahsilat_Tutari`, `TURKPOS_RETVAL_Siparis_ID` ve
+  `TURKPOS_RETVAL_Islem_ID` alanlarını kapsar. GUID, yapılandırmanızdaki değer
+  olmalıdır.
+- `success` ayrıca `TURKPOS_RETVAL_Sonuc` değerinin sıfırdan büyük olmasını,
+  `TURKPOS_RETVAL_Islem_ID` değerinin sıfır olmamasını ve
+  `TURKPOS_RETVAL_Dekont_ID` değerinin pozitif olmasını gerektirir. Yalnızca
+  dönüş adresine gelinmesi bir onay değildir.
+- Tutar bir kez biçimlendirilir; gönderilen ve hash'lenen dize aynıdır
+  (`100` ve `100.00` ikisi de `100,00` olur).
+- Bu ödemelerde taksit desteklenmez (`TP_Islem_Odeme_WD` içinde `Taksit` alanı
+  yoktur); 1'den büyük taksit sayısı reddedilir.
+- İade ve iptal desteklenmez: Param'ın para birimine duyarlı bir iade mesajı
+  yoktur; bu nedenle `refund()` ve `cancel()`, TRY mesajını göndermek yerine
+  hata döner. Döviz ödemelerini Param panelinden iade edin.
+- `cancel()` çağrısında `currency` verilmezse mevcut TRY davranışı korunur;
+  TRY dışındaki her ödeme için `currency` verin ki çağrı reddedilsin.
 
 ## İade, iptal ve durum sorgusu [#refund-cancel--status]
 
