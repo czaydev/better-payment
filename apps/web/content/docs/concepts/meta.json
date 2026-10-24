@@ -5,6 +5,7 @@
     "configuration",
     "handler",
     "plugins",
+    "orchestration",
     "events",
     "testing"
   ]

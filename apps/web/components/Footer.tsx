@@ -23,6 +23,7 @@ function footerLinks(t: Dictionary["footer"]) {
         { label: t.links.introduction, href: "/docs" },
         { label: t.links.installation, href: "/docs/installation" },
         { label: t.links.configuration, href: "/docs/concepts/configuration" },
+        { label: t.links.orchestration, href: "/docs/concepts/orchestration" },
         { label: t.links.apiReference, href: "/docs/reference/types" },
       ],
     },
