@@ -152,6 +152,13 @@ export async function generatePayTRCardDeleteToken(
 /**
  * Verifies the hash PayTR sends to the notification (Bildirim) URL:
  * base64(HMAC-SHA256(merchant_oid + merchant_salt + status + total_amount, merchant_key))
+ *
+ * This is the only confirmation PayTR gives (merchant_ok_url carries no result), so it
+ * is what the pre-authorization flow (#60) would reuse once implemented: a pre-auth
+ * result arrives at the same notification URL and must be accepted here - via this hash
+ * and safeEqual - before any status becomes success/captured. A query flag on the redirect
+ * URL is never confirmation. The pre-auth fields/endpoints themselves are not documented
+ * publicly (needs sandbox verification), so nothing here is pre-auth specific yet.
  */
 export async function verifyPayTRCallback(
   data: { merchant_oid?: string; status?: string; total_amount?: string; hash?: string },

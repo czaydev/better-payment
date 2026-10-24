@@ -243,22 +243,52 @@ describe('iyzico pre-authorization', () => {
 });
 
 describe('PayTR pre-authorization', () => {
-  it('is explicitly not supported yet', async () => {
-    const provider = new PayTR({
+  const provider = () =>
+    new PayTR({
       merchantId: '1',
       merchantKey: 'k',
       merchantSalt: 's',
       baseUrl: 'https://www.paytr.com',
     });
-    await expect(provider.authorize(mockPaymentRequest)).rejects.toMatchObject({
-      code: 'NOT_SUPPORTED',
-      message: expect.stringContaining('issues/60'),
+
+  it('all four methods throw NOT_SUPPORTED (the API is not publicly documented, #60)', async () => {
+    const paytr = provider();
+    const post = vi.fn();
+    (paytr as any).client.post = post;
+
+    for (const call of [
+      () => paytr.authorize(mockPaymentRequest),
+      () => paytr.initThreeDSAuthorize(mockThreeDSPaymentRequest),
+      () => paytr.capture({ paymentId: 'O', amount: '1', ip: '1.1.1.1' }),
+      () => paytr.voidAuthorization({ paymentId: 'O', ip: '1.1.1.1' }),
+    ]) {
+      await expect(call()).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    }
+
+    // Honest NOT_SUPPORTED: it must not invent an undocumented endpoint, so no HTTP call fires.
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('the error points to #60 and names the gating (not documented publicly)', async () => {
+    const err = await provider()
+      .authorize(mockPaymentRequest)
+      .catch((e: unknown) => e as Error);
+    expect(err.message).toContain('issues/60');
+    expect(err.message).toMatch(/not publish|not documented publicly|iletisim|contact us/i);
+  });
+
+  it('a pre-auth can only be confirmed by the verified notification, never a redirect flag', async () => {
+    // The #60 result would arrive at the notification (Bildirim) URL and be accepted only
+    // through completeThreeDSPayment's hash check. A hash signed with a different merchant
+    // key (i.e. a tampered/spoofed notification) must not map to success.
+    const result = await provider().completeThreeDSPayment({
+      merchant_oid: '202606234E4E',
+      status: 'success',
+      total_amount: '1001',
+      hash: 'ZDVOQUw4aDJhNR5dWYBC5bD95bLtSOtj9DzzSQ9sUHs=',
     });
-    await expect(
-      provider.capture({ paymentId: 'O', amount: '1', ip: '1.1.1.1' })
-    ).rejects.toMatchObject({
-      code: 'NOT_SUPPORTED',
-    });
+    expect(result.status).toBe(PaymentStatus.FAILURE);
+    expect(result.errorCode).toBe('INVALID_HASH');
   });
 });
 
