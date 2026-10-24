@@ -3,8 +3,9 @@
 import { Banner } from "fumadocs-ui/components/banner";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n/config";
+import { localeText } from "@/lib/i18n/config";
 
-const LABELS: Record<Locale, { title: string; link: string }> = {
+const LABELS: { en: { title: string; link: string } } & Partial<Record<Locale, { title: string; link: string }>> = {
   en: { title: "You are viewing the beta docs.", link: "Go to the stable docs" },
   tr: { title: "Beta sürümün dokümanını görüntülüyorsunuz.", link: "Stabil dokümana geç" },
 };
@@ -13,7 +14,7 @@ const LABELS: Record<Locale, { title: string; link: string }> = {
 export function BetaBanner({ lang }: { lang: Locale }) {
   // Without the base path, so it is the same page on the stable deployment (a full page load)
   const pathname = usePathname();
-  const t = LABELS[lang];
+  const t = localeText(LABELS, lang);
 
   return (
     // Scrolls away with the page: the site navbar is the sticky bar above the docs

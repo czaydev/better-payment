@@ -35,9 +35,10 @@ Paths in this table are relative to `apps/web`.
 | Homepage and root layout | `app/[lang]/page.tsx`, `app/[lang]/layout.tsx` |
 | Documentation routes | `app/[lang]/docs/` |
 | Shared UI and styles | `components/`, `app/globals.css` |
-| English and Turkish content | `content/docs/<path>.mdx`, `content/docs/<path>.tr.mdx` |
-| Sidebar order and titles | `content/docs/<dir>/meta.json`, `meta.tr.json` |
+| Localized docs content | `content/docs/<path>.mdx` (English), `content/docs/<path>.<code>.mdx` (other languages) |
+| Sidebar order and titles | `content/docs/<dir>/meta.json`, `meta.<code>.json` |
 | Homepage text and docs UI labels | `lib/i18n/dictionary.ts`, `lib/i18n/ui.ts` |
+| Languages (code, names, dir, enabled) | `lib/i18n/locales.json` |
 | Language routing | `proxy.ts`, `lib/i18n/config.ts` |
 | Logos and artwork | `public/brand/` |
 

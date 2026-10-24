@@ -1,4 +1,4 @@
-import type { Locale } from "./config";
+import { DEFAULT_LOCALE, type Locale } from "./config";
 
 const en = {
   accessibility: {
@@ -348,8 +348,8 @@ const en = {
     builtWith: "Built with Next.js, Tailwind CSS & shadcn/ui",
   },
   docs: {
-    fallbackNotice:
-      "This page has not been translated into English yet, so it is shown in Turkish.",
+    fallbackNotice: "This page has not been translated yet, so the English version is shown.",
+    apiReference: "Open the generated API reference",
     betaNotice: {
       title: "You are viewing the beta docs",
       install: "Install the beta with",
@@ -712,6 +712,7 @@ const tr: Dictionary = {
   },
   docs: {
     fallbackNotice: "Bu sayfa henüz Türkçeye çevrilmedi; İngilizce hâli gösteriliyor.",
+    apiReference: "Otomatik API referansını aç (İngilizce)",
     betaNotice: {
       title: "Beta sürümün dokümanını görüntülüyorsunuz",
       install: "Beta sürümü kurmak için",
@@ -723,8 +724,48 @@ const tr: Dictionary = {
   },
 };
 
-const dictionaries: Record<Locale, Dictionary> = { en, tr };
+/**
+ * A dictionary may list only the keys a language has translated so far; every other key
+ * falls back to English. Only the enabled languages with `docs: "required"` in
+ * locales.json must be typed as a full `Dictionary` (like `tr` above) so the compiler
+ * enforces completeness.
+ */
+type DeepPartial<T> = T extends readonly unknown[]
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+/** Locale code -> partial dictionary. A language missing here is served fully in English. */
+export type PartialDictionary = DeepPartial<Dictionary>;
+
+/** Enabled languages with their own copy. A language may be added per key, not all at once. */
+const translations: Partial<Record<Locale, PartialDictionary>> = {
+  tr,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Copies the base record and overwrites every key the patch provides. */
+function merge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    const current = result[key];
+    result[key] = isRecord(current) && isRecord(value) ? merge(current, value) : value;
+  }
+  return result;
+}
+
+const cache = new Map<Locale, Dictionary>();
 
 export function getDictionary(lang: Locale): Dictionary {
-  return dictionaries[lang];
+  const cached = cache.get(lang);
+  if (cached) return cached;
+  const translation = translations[lang];
+  const dictionary =
+    lang === DEFAULT_LOCALE || !translation ? en : (merge(en, translation) as Dictionary);
+  cache.set(lang, dictionary);
+  return dictionary;
 }

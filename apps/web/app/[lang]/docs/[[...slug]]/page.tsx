@@ -10,16 +10,16 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import { getMDXComponents } from "@/lib/mdx-components";
-import { alternates, isLocale, localePath } from "@/lib/i18n/config";
+import { DEFAULT_LOCALE, alternates, isLocale, localeOfPath, localePath } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { Since } from "@/components/docs/Since";
 import { IS_PRERELEASE, PACKAGE_VERSION, releaseStatus } from "@/lib/release";
 import { IS_BETA_DOCS } from "@/lib/base-path";
 
-/** True when the page is shown from the other language because it has no translation */
+/** True when the page is shown from another language because it has no translation */
 function isFallback(page: { path: string }, lang: string): boolean {
-  const translated = /\.([a-z]{2})\.mdx?$/.exec(page.path)?.[1];
-  return lang === "en" ? translated !== undefined : translated !== lang;
+  const translated = localeOfPath(page.path);
+  return lang === DEFAULT_LOCALE ? translated !== null : translated !== lang;
 }
 
 export default async function Page({ params }: PageProps<"/[lang]/docs/[[...slug]]">) {

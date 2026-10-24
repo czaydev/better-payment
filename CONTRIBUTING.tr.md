@@ -445,11 +445,12 @@ yüklenir.
 
 ## Dokümantasyon Çevirileri
 
-Web sitesi ve dokümantasyon İngilizce (varsayılan, `/docs/...`) ve Türkçe (`/tr/docs/...`) yayınlanır. Her `content/docs/<yol>.mdx` sayfasının bir `<yol>.tr.mdx` çevirisi, her `meta.json`'ın bir `meta.tr.json`'ı vardır. Ana sayfa metinleri `apps/web/lib/i18n/dictionary.ts` içindedir.
+Web sitesi ve dokümantasyon İngilizce (varsayılan, `/docs/...`) ve Türkçe (`/tr/docs/...`) yayınlanır. Her `content/docs/<yol>.mdx` sayfasının bir `<yol>.tr.mdx` çevirisi, her `meta.json`'ın bir `meta.tr.json`'ı vardır. Ana sayfa metinleri `apps/web/lib/i18n/dictionary.ts` içindedir. Yeni diller ayar dosyasıyla eklenir: kayıt listesi `apps/web/lib/i18n/locales.json` dosyasındadır ve her dilin kodunu, etiketlerini, metin yönünü ve `enabled` bayrağını tutar. `docs: "optional"` işaretli yeni bir dil hiç çevirilmemiş veya birkaç sayfayla başlayabilir (çevrilmemiş sayfalar uyarı ile İngilizce'ye düşer); içeriği hazır olana kadar `enabled: false` kalır.
 
-- Yalnızca metin çevrilir; kod blokları İngilizce sayfayla birebir aynı kalır.
+- Yalnızca metin çevrilir; kod blokları her dilde İngilizce sayfayla birebir aynı kalır.
 - Başlık yapısı aynı kalır ve her Türkçe başlık İngilizce başlığın id'sini taşır (`## Taksit [#installments]`).
 - Bir İngilizce sayfayı değiştirdiğinizde Türkçesini aynı PR'da güncelleyin.
+- Dil eklemek (kayıt girdisi, kısmi sözlük, `dir` ve `enabled` bayrakları): [apps/web/TRANSLATIONS.md → Adding a language](apps/web/TRANSLATIONS.md#adding-a-language--dil-ekleme) rehberine uyun; bu yalnızca bir ayar değişikliğidir, başka kod düzenlenmesi gerekmez.
 - Kullanıcıya yönelik yeni özellikleri iki dilde de `<Since version="x.y.z" />` ile işaretleyin. Yeni bir provider veya plugin sayfasının frontmatter'ına da `since: x.y.z` ekleyin; aynı rozet başlığın altında, "Beta" rozeti de kenar çubuğunda görünür. Rozet `packages/better-payment/package.json`'u izler: sürüm daha düşükken "Henüz yayınlanmadı", o sürümün prerelease'iyken (`x.y.z-beta.N`, `beta` branch'inde) "Beta", yayınlanınca "x.y.z sürümünde eklendi". Beta stabil olunca elle bir şey silmek gerekmez. Ana sayfadaki yol haritasında (`apps/web/components/Banks.tsx`) yeni provider'a `live: true` yerine `since: "x.y.z"` verin.
 - Beta dokümanı, sitenin `beta`'dan `NEXT_PUBLIC_BASE_PATH=/beta` ile build edilen ikinci bir deployment'ıdır. Ana deployment'ta `BETA_ORIGIN` ayarlıysa aynı alan adında `/beta` altında sunulur (`apps/web/next.config.ts`). Doküman kenar çubuğundaki Stabil / Beta seçicisi ikisi arasında geçiş yapar. `next/link` base path'i kendisi ekler; `public/` içindeki dosyaların yollarını (görseller, videolar) `apps/web/lib/base-path.ts`'teki `withBasePath()` ile sarın.
 - Terimler için sözlüğe uyun (ön provizyon, taksit, sanal POS, …).

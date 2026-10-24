@@ -1,5 +1,14 @@
 import type { NextConfig } from "next";
 import { createMDX } from "fumadocs-mdx/next";
+import locales from "./lib/i18n/locales.json";
+
+/** URL prefixes of the enabled non-default languages ("/", "/tr", …) for the moved-docs redirects */
+const localePrefixes = [
+  "",
+  ...Object.entries(locales.languages)
+    .filter(([code, settings]) => settings.enabled && code !== locales.defaultLanguage)
+    .map(([code]) => `/${code}`),
+];
 
 /** Docs pages that moved when the sidebar was reorganized: old path → new path */
 const movedDocs: Record<string, string> = {
@@ -51,7 +60,7 @@ const nextConfig: NextConfig = {
     // The proxy does not run for the bare base path ("/beta"), and the beta deployment is for docs
     const betaRoot = basePath ? [{ source: "/", destination: "/docs", permanent: false }] : [];
     return [...betaRoot, ...Object.entries(movedDocs).flatMap(([from, to]) =>
-      ["", "/tr"].map((prefix) => ({
+      localePrefixes.map((prefix) => ({
         source: `${prefix}/docs/${from}`,
         destination: `${prefix}/docs/${to}`,
         permanent: true,

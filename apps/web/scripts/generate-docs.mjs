@@ -3,6 +3,9 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Application, ReflectionKind } from "typedoc";
 import { collectPages, siteUrl } from "./docs-content.mjs";
+import { readLocaleRegistry } from "./locales.mjs";
+
+const registry = readLocaleRegistry();
 
 const web = fileURLToPath(new URL("../", import.meta.url));
 const pkg = resolve(web, "../../packages/better-payment");
@@ -81,8 +84,8 @@ const index = [
   `- [Generated API reference](${origin}/api-reference/index.html)`,
   "",
 ];
-for (const lang of ["en", "tr"]) {
-  index.push(`## ${lang === "en" ? "English" : "Turkish"} documentation`, "");
+for (const lang of registry.codes) {
+  index.push(`## ${registry.settings[lang].nativeName} documentation`, "");
   for (const page of pages.filter((p) => p.lang === lang)) {
     const path = `llms/${lang}/${page.slug || "index"}.md`;
     await mkdir(resolve(output, path, ".."), { recursive: true });
@@ -95,7 +98,7 @@ await writeFile(join(output, "llms.txt"), index.join("\n"));
 await writeFile(
   join(output, "llms-full.txt"),
   `# Better Payment ${manifest.version}\n\n${pages
-    .filter((p) => p.lang === "en")
+    .filter((p) => p.lang === registry.defaultLanguage)
     .map((p) => p.markdown)
     .join("\n---\n\n")}`,
 );

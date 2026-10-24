@@ -1,14 +1,15 @@
-import { LOCALE_COOKIE, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
+import { DEFAULT_LOCALE, LOCALE_COOKIE, localePath, stripLocale, type Locale } from "@/lib/i18n/config";
 import { withBasePath } from "@/lib/base-path";
 
 /**
  * URL of the current page in another language: ("en", "/tr/docs/x") → "/en/docs/x".
- * The proxy remembers English for "/en/..." and redirects to the unprefixed URL, so the
- * link also works when opened in a new tab.
+ * The proxy remembers the default language for "/en/..." and redirects to the unprefixed
+ * URL, so the link also works when opened in a new tab. Prefixed URLs behave the same for
+ * every other language: "/de/docs/x".
  */
 export function switchLocalePath(lang: Locale, pathname: string): string {
   const path = stripLocale(pathname || "/");
-  if (lang === "en") return `/en${path === "/" ? "" : path}`;
+  if (lang === DEFAULT_LOCALE) return `/${lang}${path === "/" ? "" : path}`;
   return localePath(lang, path);
 }
 

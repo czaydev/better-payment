@@ -154,11 +154,12 @@ Use `MockProvider` (`better-payment/testing`) or stub `fetch` for provider tests
 
 ## Translations
 
-The website and docs are published in English (`/docs/...`) and Turkish (`/tr/docs/...`). Every `content/docs/<path>.mdx` has a `<path>.tr.mdx`, and every `meta.json` a `meta.tr.json`.
+The website and docs are published in English (`/docs/...`) and Turkish (`/tr/docs/...`). Every `content/docs/<path>.mdx` has a `<path>.tr.mdx`, and every `meta.json` a `meta.tr.json`. More languages can be added by config: the registry is `apps/web/lib/i18n/locales.json` and records each language's code, labels, text direction and `enabled` flag. A new language with `docs: "optional"` may start with zero or a few translated pages (untranslated pages fall back to English with a notice); it stays `enabled: false` until its content lands.
 
-- Translate prose only. Code blocks stay byte-for-byte identical to the English page.
+- Translate prose only. Code blocks stay byte-for-byte identical to the English page, in every language.
 - Keep the headings. Every Turkish heading keeps the English heading's id: `## Taksit [#installments]`.
 - Update both languages in the same pull request.
+- Adding a language (registry entry, partial dictionary, `dir` and `enabled` flags): follow [apps/web/TRANSLATIONS.md → Adding a language](apps/web/TRANSLATIONS.md#adding-a-language--dil-ekleme). It is a config change; no other code should need edits.
 - Mark new user-facing features with `<Since version="x.y.z" />` in both languages. A page for a new provider or plugin also gets `since: x.y.z` in its frontmatter, which puts the same badge under the title and a "Beta" badge in the sidebar. The badge follows `packages/better-payment/package.json`: "Not released yet" while the version is lower, "Beta" while it is a prerelease of that version (`x.y.z-beta.N`, on the `beta` branch), and "Added in x.y.z" once it is released. Nothing has to be removed by hand after a beta becomes stable. On the homepage roadmap (`apps/web/components/Banks.tsx`), give a new provider `since: "x.y.z"` instead of `live: true`.
 - The beta docs are a second deployment of the website, built from `beta` with `NEXT_PUBLIC_BASE_PATH=/beta` and served under `/beta` on the same domain when the main deployment has `BETA_ORIGIN` set (`apps/web/next.config.ts`). A Stable / Beta picker in the docs sidebar switches between them. `next/link` adds the base path itself; wrap paths of files in `public/` (images, videos) with `withBasePath()` from `apps/web/lib/base-path.ts`.
 

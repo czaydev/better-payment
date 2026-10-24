@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Check, ChevronsUpDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n/config";
+import { DEFAULT_LOCALE, localeText } from "@/lib/i18n/config";
 import { PACKAGE_VERSION } from "@/lib/release";
 import { cn } from "@/lib/utils";
 
-const LABELS: Record<Locale, { version: string; stable: string; beta: string; stableHint: string; betaHint: string }> = {
+type Labels = { version: string; stable: string; beta: string; stableHint: string; betaHint: string };
+const LABELS: { en: Labels } & Partial<Record<Locale, Labels>> = {
   en: { version: "Version", stable: "Stable", beta: "Beta", stableHint: "Latest release", betaHint: "Upcoming features" },
   tr: { version: "Sürüm", stable: "Stabil", beta: "Beta", stableHint: "Son sürüm", betaHint: "Yaklaşan özellikler" },
 };
@@ -20,7 +22,7 @@ const LABELS: Record<Locale, { version: string; stable: string; beta: string; st
 export function VersionPicker({ lang, beta }: { lang: Locale; beta: boolean }) {
   // Without the base path: "/tr/docs/x" in both versions
   const pathname = usePathname();
-  const t = LABELS[lang];
+  const t = localeText(LABELS, lang);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -39,7 +41,7 @@ export function VersionPicker({ lang, beta }: { lang: Locale; beta: boolean }) {
     };
   }, [open]);
 
-  const docsHome = lang === "en" ? "/docs" : `/${lang}/docs`;
+  const docsHome = lang === DEFAULT_LOCALE ? "/docs" : `/${lang}/docs`;
   const options = [
     { key: "stable", label: t.stable, hint: t.stableHint, prefix: "", current: !beta },
     { key: "beta", label: t.beta, hint: t.betaHint, prefix: "/beta", current: beta },

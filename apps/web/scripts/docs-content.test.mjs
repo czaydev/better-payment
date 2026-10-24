@@ -7,6 +7,7 @@ import matter from 'gray-matter';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pageRoute, siteUrl, toMarkdown, collectPages } from './docs-content.mjs';
+import { readLocaleRegistry } from './locales.mjs';
 import { fileURLToPath } from 'node:url';
 
 test('routes omit groups/index and preserve locale', () => {
@@ -72,16 +73,22 @@ test('cards without links remain plain text, tables and inline code survive', ()
 });
 
 test('all real docs convert, with matching locale pages and unique routes', async () => {
+  const registry = readLocaleRegistry();
   const pages = await collectPages(
     fileURLToPath(new URL('../content/docs/', import.meta.url)),
     siteUrl(),
   );
-  const english = pages.filter((page) => page.lang === 'en');
+  const english = pages.filter((page) => page.lang === registry.defaultLanguage);
   assert.ok(english.length > 0);
-  assert.equal(pages.length, english.length * 2);
+  // Languages with docs "required" (Turkish today) must mirror every English page;
+  // optional languages may cover any subset of the pages.
+  for (const locale of registry.required.filter((code) => code !== registry.defaultLanguage)) {
+    for (const page of english)
+      assert.ok(pages.some((other) => other.lang === locale && other.slug === page.slug));
+    assert.equal(pages.filter((page) => page.lang === locale).length, english.length);
+  }
+  assert.ok(pages.every((page) => registry.codes.includes(page.lang)));
   assert.equal(new Set(pages.map((page) => page.route)).size, pages.length);
-  for (const page of english)
-    assert.ok(pages.some((other) => other.lang === 'tr' && other.slug === page.slug));
 });
 
 test('every real code example survives conversion unchanged', async () => {

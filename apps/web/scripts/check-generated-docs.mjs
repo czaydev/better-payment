@@ -3,7 +3,9 @@ import { readFile, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { collectPages, siteUrl } from './docs-content.mjs';
+import { readLocaleRegistry } from './locales.mjs';
 
+const registry = readLocaleRegistry();
 const web = fileURLToPath(new URL('../', import.meta.url));
 const output = join(web, 'public');
 const origin = siteUrl(process.env.NEXT_PUBLIC_BASE_PATH);
@@ -14,7 +16,7 @@ for (const page of pages) {
   const path = `llms/${page.lang}/${page.slug || 'index'}.md`;
   assert.ok(index.includes(`${origin}/${path}`), `Missing index entry: ${page.route}`);
   assert.equal(await readFile(join(output, path), 'utf8'), page.markdown);
-  if (page.lang === 'en')
+  if (page.lang === registry.defaultLanguage)
     assert.ok(full.includes(page.markdown), `Missing English content: ${page.route}`);
 }
 const manifest = JSON.parse(
