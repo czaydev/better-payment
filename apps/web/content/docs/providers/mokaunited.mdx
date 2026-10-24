@@ -1,0 +1,108 @@
+---
+title: Moka United
+description: Moka United payment integration reference.
+since: 0.12.0
+---
+
+Uses Moka United's API, documented at [developer.mokaunited.com](https://developer.mokaunited.com).
+Every request is JSON and carries the dealer's `CheckKey`:
+`SHA-256(DealerCode + "MK" + Username + "PD" + Password)`.
+
+<Callout type="warn">
+  Not verified with a test dealer yet: Moka United gives test dealers on request. The test host (`service.refmokaunited.com`) answers in the documented format (`GetDealerIdWithName.UsernameOrPasswordInvalid` for a made-up dealer). Test with a small amount before going live.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, mokaUnited } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    mokaunited: mokaUnited({
+      dealerCode: process.env.MOKA_DEALER_CODE!,
+      username: process.env.MOKA_API_USERNAME!,
+      password: process.env.MOKA_API_PASSWORD!,
+      // software?: string (sent as Software, default 'better-payment')
+      // baseUrl: defaults from mode (service.refmokaunited.com / service.mokaunited.com)
+    }),
+  },
+});
+```
+
+`paymentId` is your order id, sent as `OtherTrxCode`: the `conversationId` you pass, or a generated
+id. Cancels, refunds, captures and status queries use it.
+
+## Non-3D Payment
+
+`createPayment()` uses `DoDirectPayment`. Moka United enables non-3D payments per dealer; otherwise
+it answers `PaymentDealer.DoDirectPayment.ThreeDRequired`.
+
+## 3D Secure
+
+```typescript
+const init = await payment.mokaunited.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/mokaunited/payment/complete-3ds',
+});
+// init.redirectUrl (or init.threeDSHtmlContent) sends the customer to Moka United's 3D page
+// init.codeForHash: store it with ORDER123, server side
+```
+
+`DoDirectPaymentThreeD` returns Moka United's 3D page and a `CodeForHash` for this payment. Keep
+`codeForHash` with the order: Moka United POSTs the result to `callbackUrl` with
+`hashValue = SHA-256(CodeForHash + "T")` on success and `+ "F"` on failure.
+
+```typescript
+// in your own route: the trusted values are a separate argument, never the POST body
+const result = await payment.mokaunited.completeThreeDSPayment(callbackBody, {
+  codeForHash: order.codeForHash, // from your records (required)
+  orderId: order.id,              // optional, preferred over the callback's OtherTrxCode
+  amount: order.total,            // optional, checked against Moka United's record
+});
+```
+
+Complete these payments in your own route: the default handler's callback route passes only the
+POST body, so it has no `codeForHash` and fails with `VALIDATION_ERROR`. Values in the body are
+never used as `codeForHash`, `orderId` or `amount`.
+
+- the call fails without `codeForHash`, and a `hashValue` that matches neither "T" nor "F" is rejected as `INVALID_HASH`;
+- "F" is a failure with the callback's `resultCode`, without ids;
+- on "T", the payment is confirmed with `GetDealerPaymentTrxDetailList`: an approved payment of that order with the callback's `trxCode`, and `amount` when you pass it. Anything else is `INVALID_HASH`.
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.mokaunited.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // DoVoid
+await payment.mokaunited.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // DoCreateRefundRequest
+const status = await payment.mokaunited.getPayment('ORDER123');                                          // GetDealerPaymentTrxDetailList
+// status: 'success' (also after a partial refund), 'cancelled' (voided or fully refunded), 'failure', 'pending'
+```
+
+`cancel()` voids a payment before end of day. Moka United processes refunds as requests, so an
+accepted `refund()` is `pending`, with the request id as `refundId`; `getPayment()` shows when it is
+done.
+
+## Pre-Authorization
+
+```typescript
+const auth = await payment.mokaunited.authorize({ ...paymentRequest, conversationId: 'ORDER123' });
+// or initThreeDSAuthorize() + completeThreeDSPayment() for 3D Secure
+await payment.mokaunited.capture({ paymentId: 'ORDER123', amount: '80.00', ip: '1.2.3.4' }); // DoCapture
+await payment.mokaunited.voidAuthorization({ paymentId: 'ORDER123', ip: '1.2.3.4' });       // DoVoid
+```
+
+A capture may be up to 15% more than the pre-authorization, or any lower amount.
+
+## BIN & Installments
+
+```typescript
+const bin = await payment.mokaunited.binCheck('52691100');
+const options = await payment.mokaunited.installmentInfo({ binNumber: '52691100', price: '100.00' });
+```
+
+`binCheck()` uses `GetBankCardInformation`, which also returns the card program (`BONUS`, `AXESS`,
+`WORLD`, ...). `installmentInfo()` asks `DoCalcPaymentAmount` for each count from 1 to 12 and lists
+the counts it calculates an amount for, with the amount to charge the card. Both need Moka United to
+enable BIN queries for your dealer.
