@@ -16,6 +16,7 @@ export default defineConfig({
     'nestjs/index': 'src/adapters/nestjs.ts',
     'elysia/index': 'src/adapters/elysia.ts',
     'react-router/index': 'src/adapters/react-router.ts',
+    'bin/index': 'src/bin/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: {

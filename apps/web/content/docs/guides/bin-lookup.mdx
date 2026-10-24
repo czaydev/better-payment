@@ -1,0 +1,46 @@
+---
+title: Offline BIN Lookup
+description: Instant offline lookup for Turkish bank cards, card families and programs.
+---
+
+<Since version="0.12.0" />
+
+While providers like iyzico, PayTR and Parampos offer `binCheck()` over network calls, routing commissions and showing instant installment options before selecting a provider requires offline, instant BIN information.
+
+`better-payment/bin` provides an offline, tree-shakable lookup table based on open BKM datasets with zero network latency and zero bundle impact on applications that do not use it.
+
+## Usage
+
+```typescript
+import { lookupBin } from 'better-payment/bin';
+
+const info = lookupBin('552879');
+
+if (info) {
+  console.log(info.bankName);        // "Garanti BBVA"
+  console.log(info.bankCode);        // 62
+  console.log(info.cardFamily);      // "Bonus"
+  console.log(info.cardType);        // "CREDIT_CARD"
+  console.log(info.cardAssociation); // "MASTER_CARD"
+  console.log(info.commercial);      // false
+}
+```
+
+## Features
+
+- **Zero Network Calls**: Runs in-memory in less than a microsecond, ideal for checkout keystroke listeners.
+- **Tree-Shakable**: Shipped as a standalone subpath export (`better-payment/bin`). Applications importing only the core package pay 0 kB in bundle size.
+- **Tolerant Input**: Accepts 6-digit prefixes, 8-digit prefixes, spaces, or full card numbers (`"5528 7912 3456 7890"`).
+- **Turkish Loyalty Programs**: Identifies major Turkish card families: Bonus, World, Maximum, Axess, CardFinans, Paraf, Bankkart Combo, Sağlam Kart, and prepaid cards like Papara and ininal.
+
+## Return Fields
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `binNumber` | `string` | Matched 6 or 8 digit BIN prefix |
+| `bankName` | `string` | Bank name (e.g. `"Garanti BBVA"`, `"Yapı Kredi"`, `"Türkiye İş Bankası"`) |
+| `bankCode` | `number` | Numerical bank code (e.g. `62`, `67`, `64`) |
+| `cardFamily` | `string` | Card loyalty program (e.g. `"Bonus"`, `"World"`, `"Maximum"`, `"Axess"`) |
+| `cardType` | `string` | `'CREDIT_CARD'`, `'DEBIT_CARD'` or `'PREPAID_CARD'` |
+| `cardAssociation` | `string` | `'VISA'`, `'MASTER_CARD'`, `'TROY'` or `'AMERICAN_EXPRESS'` |
+| `commercial` | `boolean` | `true` for commercial / business cards, `false` for personal consumer cards |
