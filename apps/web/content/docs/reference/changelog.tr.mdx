@@ -7,12 +7,16 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
   Sürüm geçmişi sıfırlandı. `0.0.1`, yeniden yazılan paketin ilk sürümüdür. `1.x`–`3.x` sürümlerinde hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri vardı; bunları kullanmayın. Gerekçe ve adım adım geçiş rehberi için [0.0.1'deki yenilikler](/docs/whats-new) sayfasına bakın.
 </Callout>
 
-## 0.12.0-beta.2
+## 0.12.0
 
 ### Eklenenler [#added]
 
+- **[Albaraka Türk sağlayıcısı](/docs/banks/albaraka):** Albaraka'nın Posnet JSON API'si üzerinden 3D'siz satış, 3D Secure, iade, iptal, sipariş sorgusu ve ön provizyon. conversationId verilmediğinde bankaya uygun sipariş kimlikleri üretilir. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Komisyon yönlendirici](/docs/plugins/commission-router):** her ödemeyi kendi oran tablolarınıza göre en ucuz uygun sağlayıcıya yönlendirir; açıklanabilir teklif, eşitlik ve pay üst sınırı politikaları, sipariş bazlı geçersiz kılma ve yalnızca ücret alınmadığında yedek sağlayıcı sunar. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Para birimi çevirme](/docs/plugins/currency-conversion):** Merkez Bankası (TCMB) kurları ile ödeme öncesi tutarları çevirin; kuruş hassasiyetinde sepet dağıtımı ve iade kur koruması sağlar. Teşekkürler [@Enard52](https://github.com/Enard52).
+- **[Denizbank sağlayıcısı](/docs/banks/denizbank):** InterVPos üzerinden 3D'siz satış, 3D Secure (3D Model), iade ve iptal. Callback hash'i `HASHPARAMS` üzerinden yeniden oluşturulur, sonucu bankanın tahsilatı belirler. Teşekkürler [@sizinajans](https://github.com/sizinajans).
+- **[EST Girogate](/docs/banks/est#girogate):** EST ödeme sayfası üzerinden iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly ve diğer alternatif yöntemlerle ödeme; kart yerine `girogate: { method, country }` gönderilir. Teşekkürler [@sizinajans](https://github.com/sizinajans).
+- **[Yeni EST bankaları](/docs/banks/est#banks):** EST sağlayıcısına `akbankest` (Akbank'ın eski sanal POS'u) ve `halkbankmkd` (Halkbank Makedonya, `MKD` ile) eklendi. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Sağlayıcı yedekleme (failover)](/docs/plugins/failover):** sağlayıcı kesintilerinde veya geçici hatalarda ödemeleri devre kesici (circuit breaker) korumasıyla otomatik olarak yedek sağlayıcılara aktarın. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Fraud kuralları](/docs/plugins/fraud-rules):** `fraudRules()` ödeme denemelerini IP, kart, BIN, e-posta veya alıcı bazında sayar; kart testi saldırılarını, engellenmiş BIN aralıklarını ve limitinizin üstündeki tutarları sağlayıcı çağrılmadan reddeder; `FRAUD_BLOCKED` ve `RATE_LIMITED` kodlarını `$ERROR_CODES` üzerinden verir. Sayaç anahtarları tuzlanmış hash'lerden türetilir ve giriş noktası `better-payment/fraud` adındadır. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Garanti BBVA sağlayıcısı](/docs/banks/garanti):** GVP XML API üzerinden 3D'siz ve 3D Secure ödeme (3D, 3D_PAY), [GarantiPay](/docs/banks/garanti#garantipay), iade, iptal ve sipariş sorgusu. 3D callback'leri `hashparams` üzerinden doğrulanır ve bankayla teyit edilir. Teşekkürler [@sizinajans](https://github.com/sizinajans).
@@ -21,55 +25,38 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
 - **[NestJS adapter](/docs/integrations/frameworks#nestjs):** ödeme handler'ını `better-payment/nestjs` ile bir NestJS controller'ına, Express veya Fastify platformunda ve `@nestjs/*` bağımlılığı olmadan bağlayın. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Örnek mağaza](/docs/integrations/next-shop):** sepet, sunucu tarafı tutarlar, 3D Secure, ödeme olayları ve iadeler içeren çalıştırılabilir bir Next.js + Prisma mağazası. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[OpenAPI ve Scalar Referans plugin'i](/docs/plugins/openapi):** Ödeme handler endpoint'leri için OpenAPI 3.1.0 şeması üretir ve etkileşimli Scalar API dokümantasyon sayfası sunar. Teşekkürler [@Enard52](https://github.com/Enard52).
+- **[PayTR Direct API ile 3D Secure](/docs/providers/paytr):** `threeDSMode: 'direct'` ile `initThreeDSPayment()` kartı kendi ödeme formunuzdan alır ve PayTR iFrame'i yerine imzalı bir Direct API formu döndürür. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Bekleyen Ödeme Çözümleyici](/docs/plugins/pending-resolver):** Zaman aşımına uğrayan ödemeleri salt okunur durum sorgularıyla kurtarır; eşzamanlı çözümleyiciler çalışsa bile her ödeme için yalnızca tek bir nihai olay yayınlanır. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Captcha doğrulaması](/docs/plugins/captcha):** `captcha` eklentisi, ödeme çalıştırılmadan önce Cloudflare Turnstile, Google reCAPTCHA v3 veya hCaptcha jetonlarını sunucu tarafında doğrular; kart test eden botlar sağlayıcıya ulaşamadan durdurulur. Callback'ler ve 3DS tamamlama adımları asla engellenmez. Teşekkürler [@Enard52](https://github.com/Enard52).
+- **[QNB sağlayıcısı](/docs/banks/qnb):** PayFor XML API üzerinden 3D'siz satış, 3D Secure (3D Model ve 3D Pay), iade, iptal ve sipariş sorgusu. 3D callback'leri ResponseHash ile doğrulanır ve bankayla teyit edilir. Teşekkürler [@sizinajans](https://github.com/sizinajans).
+- **[QNBpay](/docs/providers/sipay#qnbpay):** Sipay sağlayıcısı üzerinden QNBpay; `qnbpay()` ya da `sipay({ brand: 'qnbpay' })` ile. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Rate Limiting](/docs/plugins/rate-limit):** Yeni `rateLimit` plugin'i handler uç noktalarını rota bazında sınırlandırır; kimlik varsayılan olarak uygulamanın kontrol ettiği bir kaynaktan gelir ve `X-Forwarded-For` yalnızca `trustProxy` etkinken okunur. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Veri maskeleme (PCI DSS & KVKK)](/docs/plugins/redact):** sağlayıcı isteklerine dokunmadan kart hamili verilerini, CVV'yi ve kişisel verileri loglarda ve olaylarda maskeleyin. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[İade onay plugin'i](/docs/plugins/refund-approval):** Belirlenen limitin üzerindeki iade ve iptal işlemlerini yönetici onayına bağlayarak hatalı veya yetkisiz büyük para çıkışlarını önler. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Yönlendirme](/docs/plugins/routing):** her ödemeyi kendi kurallarınıza göre (kart ailesi, kartın menşei, tutar, taksit, sağlık) doğru sağlayıcıya gönderir; kuru çalışan `explain()`, belirleyici 70/30 dağıtımı, denetim dinleyicileri ve her zaman ödemeyi alan sağlayıcıya giden iadeler sunar. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[Telemetri](/docs/plugins/telemetry):** Her sağlayıcı çağrısı için OpenTelemetry uyumlu span ve metrikler; niteliklerde kart verisi yok, bağımlılık yok. Teşekkürler [@Enard52](https://github.com/Enard52).
 - **[3D Secure zaman aşımı](/docs/plugins/three-ds-timeout):** `threeDSTimeout` eklentisi başlatılan 3D Secure akışlarını izler ve müşterinin yarım bıraktıklarını ayarlanabilir süre sonunda düşürür. Her akış önce sağlayıcıdan yeniden sorgulanır, böylece geç gelen başarılı bir bildiri asla yok sayılmaz; `payment.threeDS.expireStale()` metodunu cron görevi veya sunucusuz zamanlı görev içinde çalıştırabilirsiniz. Teşekkürler [@Enard52](https://github.com/Enard52).
+- **[VakıfBank sağlayıcısı](/docs/banks/vakifbank):** 3D'siz satış, 3D Secure (MPI kaydı ve ardından kartı ve tutarı VakıfBank'ın kendi 3D kaydından alan VPOS provizyonu), iade ve iptal. `getPayment()` desteklenmez. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Webhook forwarding plugin'i](/docs/plugins/webhook-forwarding):** Ödeme olaylarını diğer mikroservislere HMAC-SHA256 imzalı, üstel geri çekilmeli ve kart verilerinden arındırılmış webhook'lar olarak iletir. Teşekkürler [@Enard52](https://github.com/Enard52).
+- **[Yapı Kredi sağlayıcısı](/docs/banks/yapikredi):** 3D'siz satış, Posnet OOS ile 3D Secure, iade, iptal ve sipariş durumu sorgusu. 3D ödemeler kendi kayıtlarınızdaki siparişle tamamlanır ve bankayla doğrulanır. conversationId verilmediğinde bankaya uygun sipariş kimlikleri üretilir. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 
 ### Düzeltilenler [#fixed]
 
 - **[Failover](/docs/plugins/failover):** kart çekildikten sonra da gelebilen HTTP 500, 502 ve 504 cevaplarından sonra yedek sağlayıcıya geçilmez, böylece bir gateway hatası müşteriyi iki kez ödetemez.
+- **[PayTR sepet biçimi](/docs/providers/paytr):** Direct API ödemeleri artık sepeti Base64 yerine JSON olarak gönderir. iFrame sepet kodlaması ve token imzaları değişmez. Teşekkürler [@sizinajans](https://github.com/sizinajans).
 - **[Plugin yazma](/docs/guides/writing-plugins):** plugin `POST` endpoint'leri `acceptForm` verilmedikçe form gövdelerini reddeder (CSRF), hata fırlatan bir `onRequest` hook'u 503 döner; [hız sınırı](/docs/plugins/rate-limit) store hata verdiğinde artık sessizce kapanmaz (eski davranış için `passOnStoreError`).
 - **[Veri maskeleme](/docs/plugins/redact):** `fields` ve `custom` varsayılanların yerine geçmek yerine onlara eklenir, kart hamili adı ve sağlayıcı sırları varsayılan olarak maskelenir, kimlikler ve 3D Secure sayfası maskelenmeden döner.
 - **[İade onayı](/docs/plugins/refund-approval):** HTTP uç noktalarında onaylayan, istek gövdesinden değil `getActor` ile oturumunuzdan alınır; iptaller ve okunamayan tutarlar onaya düşer, iki kez onaylanan talep bir kez iade edilir.
 
-## 0.12.0-beta.1
-
-### Eklenenler [#added-1]
-
-- **[QNBpay](/docs/providers/sipay#qnbpay):** Sipay sağlayıcısı üzerinden QNBpay; `qnbpay()` ya da `sipay({ brand: 'qnbpay' })` ile. Teşekkürler [@sizinajans](https://github.com/sizinajans).
-
-## 0.12.0-beta.0
-
-### Eklenenler [#added-2]
-
-- **[Albaraka Türk sağlayıcısı](/docs/banks/albaraka):** Albaraka'nın Posnet JSON API'si üzerinden 3D'siz satış, 3D Secure, iade, iptal, sipariş sorgusu ve ön provizyon. conversationId verilmediğinde bankaya uygun sipariş kimlikleri üretilir.
-- **[Denizbank sağlayıcısı](/docs/banks/denizbank):** InterVPos üzerinden 3D'siz satış, 3D Secure (3D Model), iade ve iptal. Callback hash'i `HASHPARAMS` üzerinden yeniden oluşturulur, sonucu bankanın tahsilatı belirler.
-- **[EST Girogate](/docs/banks/est#girogate):** EST ödeme sayfası üzerinden iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly ve diğer alternatif yöntemlerle ödeme; kart yerine `girogate: { method, country }` gönderilir.
-- **[Yeni EST bankaları](/docs/banks/est):** EST sağlayıcısına `akbankest` (Akbank'ın eski sanal POS'u) ve `halkbankmkd` (Halkbank Makedonya, `MKD` ile) eklendi.
-- **[PayTR Direct API ile 3D Secure](/docs/providers/paytr):** `threeDSMode: 'direct'` ile `initThreeDSPayment()` kartı kendi ödeme formunuzdan alır ve PayTR iFrame'i yerine imzalı bir Direct API formu döndürür.
-- **[QNB sağlayıcısı](/docs/banks/qnb):** PayFor XML API üzerinden 3D'siz satış, 3D Secure (3D Model ve 3D Pay), iade, iptal ve sipariş sorgusu. 3D callback'leri ResponseHash ile doğrulanır ve bankayla teyit edilir.
-- **[VakıfBank sağlayıcısı](/docs/banks/vakifbank):** 3D'siz satış, 3D Secure (MPI kaydı ve ardından kartı ve tutarı VakıfBank'ın kendi 3D kaydından alan VPOS provizyonu), iade ve iptal. `getPayment()` desteklenmez.
-- **[Yapı Kredi sağlayıcısı](/docs/banks/yapikredi):** 3D'siz satış, Posnet OOS ile 3D Secure, iade, iptal ve sipariş durumu sorgusu. 3D ödemeler kendi kayıtlarınızdaki siparişle tamamlanır ve bankayla doğrulanır. conversationId verilmediğinde bankaya uygun sipariş kimlikleri üretilir.
-
-### Düzeltilenler [#fixed-1]
-
-- **[PayTR sepet biçimi](/docs/providers/paytr):** Direct API ödemeleri artık sepeti Base64 yerine JSON olarak gönderir. iFrame sepet kodlaması ve token imzaları değişmez.
-
 ## 0.11.1
 
-### Düzeltilenler [#fixed-2]
+### Düzeltilenler [#fixed-1]
 
 - **[Parampos hata kodları](/docs/reference/error-codes#what-is-mapped):** başarısız Parampos ödemeleri artık `UNKNOWN` yerine belirli bir `code` döndürüyor (önce bankanın `Banka_Sonuc_Kod` alanı, sonra Param'ın `Sonuc` kodu). Tablo `PARAMPOS_ERROR_CODES` olarak dışa açılır.
 
 ## 0.11.0
 
-### Eklenenler [#added-3]
+### Eklenenler [#added-1]
 
 - **[`chaos` plugin'i](/docs/plugins/chaos):** uygulamanızın ret, kaybolan yanıt (`NETWORK_ERROR`) ve gecikmeleri nasıl karşıladığını test etmek için işlemlere bunları enjekte eder. `allowProduction` verilmedikçe `production` modunda çalışmaz.
 - **[EST sağlayıcısı](/docs/banks/est):** İş Bankası, Ziraat Bankası, Halkbank, TEB ve Şekerbank tek bir sağlayıcıyla. 3D'siz ve 3D Secure ödeme (3D, 3D Pay, 3D Host, hash ver3), iade, iptal ve sipariş durumu sorgusu desteklenir. 3D callback'leri bankayla doğrulanır.
@@ -78,23 +65,23 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
 
 ## 0.10.0
 
-### Eklenenler [#added-4]
+### Eklenenler [#added-2]
 
 - **[Kuveyt Türk sağlayıcısı](/docs/banks/kuveytturk):** KT Pay Gate üzerinden 3D Secure ödeme; sipariş bankada kontrol edildikten sonra `Provision` ile tamamlanır. Aynı gün iptal, tam ve kısmi iade ve durum sorgusu da desteklenir.
 
 ## 0.9.0
 
-### Eklenenler [#added-5]
+### Eklenenler [#added-3]
 
 - Handler yanıtları `exposeRawResponse: true` verilmedikçe sağlayıcının `rawResponse` alanını içermez; `idempotency.scope` farklı çağıranların Idempotency-Key yanıtlarını birbirinden ayırır.
 
-### Düzeltilenler [#fixed-3]
+### Düzeltilenler [#fixed-2]
 
 - `buyer.email` doğrulaması boş alan adı bölümlerini reddeder ve artık geri izleme yapan bir düzenli ifade kullanmaz.
 
 ## 0.8.1
 
-### Düzeltilenler [#fixed-4]
+### Düzeltilenler [#fixed-3]
 
 - Framework adapter'ları 1 MiB'tan büyük istek gövdelerini belleğe okumak yerine 413 ile yanıtlar; sınırı `maxBodySize` ile değiştirebilirsiniz.
 - Akbank: 3D Secure callback'leri sipariş geçmişi sorgusuyla doğrulanır; Akbank'taki sipariş kaydıyla eşleşmeyen callback reddedilir.
@@ -106,7 +93,7 @@ description: better-payment'in sürüm geçmişi ve geriye uyumsuz değişiklikl
 
 React Router adaptörü.
 
-### Eklenenler [#added-6]
+### Eklenenler [#added-4]
 
 - **[React Router adaptörü](/docs/integrations/react-router):** `better-payment/react-router`, bir splat resource route için `loader` ve `action` döndürür; React Router v7 ve Remix v2 ile çalışır.
 
@@ -118,26 +105,26 @@ Sepet yardımcısı, Arapça hata mesajları ve iyzico'da `paymentId` ile iade. 
 
 - **[iyzico iadeleri](/docs/providers/iyzico#refund-cancel--status):** `refund()`, `cancel()` ve `getPayment()` gibi ödemenin `paymentId`'sini alır ve ödemenin tamamından bir tutarı iade eder (`/v2/payment/refund`). Tek bir sepet kalemini iade etmek için ayrıca o kalemin `paymentTransactionId`'sini verin. `paymentId` alanına `paymentTransactionId` geçen kodun bu değeri yeni `paymentTransactionId` alanına taşıması gerekir.
 
-### Eklenenler [#added-7]
+### Eklenenler [#added-5]
 
 - **[`buildBasket()`](/docs/payments/basket):** indirimleri ve kargoyu sepet kalemlerine dağıtır; kalemlerin toplamı ödeme tutarını kuruşu kuruşuna tutar.
 - **[Hata mesajları için dil desteği](/docs/plugins/i18n):** Arapça (`ar`). Handler'da `Accept-Language: ar` Arapça'yı seçer. Katkısı için [@poyrazavsever](https://github.com/poyrazavsever)'e teşekkürler.
 
 ## 0.6.0
 
-### Eklenenler [#added-8]
+### Eklenenler [#added-6]
 
 - **[Elysia adapter'ı](/docs/integrations/elysia):** `better-payment/elysia` handler'ı Elysia'ya (Bun) tek satırda bağlar: `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })`. Katkısı için [@ScottHallchico](https://github.com/ScottHallchico)'ya teşekkürler.
 
 ## 0.5.2
 
-### Eklenenler [#added-9]
+### Eklenenler [#added-7]
 
 - **[Hata mesajları için dil desteği](/docs/plugins/i18n):** Rusça (`ru`). Handler'da `Accept-Language: ru-RU` Rusça'yı seçer. Katkısı için [@ius-sharma](https://github.com/ius-sharma)'ya teşekkürler.
 
 ## 0.5.1
 
-### Eklenenler [#added-10]
+### Eklenenler [#added-8]
 
 - **[Hata mesajları için dil desteği](/docs/plugins/i18n):** Almanca (`de`). Handler'da `Accept-Language: de-DE` Almanca'yı seçer. Katkısı için [@ius-sharma](https://github.com/ius-sharma)'ya teşekkürler.
 
@@ -154,7 +141,7 @@ Plugin'ler ve tipli ödeme olayları. **Geriye uyumsuz:** `new BetterPayment()` 
 - `BetterPayment` sınıfının yerini `betterPayment({ providers, plugins })` aldı; sağlayıcılar `iyzico()`, `paytr()`, `akbank()` ve `parampos()` ile oluşturuluyor. `enabled` alanı kaldırıldı.
 - `providers` içindeki her anahtar bir sağlayıcı kimliğidir; `payment.<id>` sağlayıcıya göre tiplidir. `getEnabledProviders()` `string[]` döner.
 
-### Eklenenler [#added-11]
+### Eklenenler [#added-9]
 
 - **[Plugin'ler](/docs/concepts/plugins):** sağlayıcı işlemleri için before/after hook'ları, tipli metotlar, handler endpoint'leri ve hata kodları. [Kendi plugin'inizi](/docs/guides/writing-plugins) birkaç satırda yazın.
 - **[Ödeme olayları](/docs/concepts/events):** her sağlayıcı ve akış için tek bir tipli dinleyici; yalnızca doğrulanmış sonuçlar için yayınlanır.
@@ -165,7 +152,7 @@ Plugin'ler ve tipli ödeme olayları. **Geriye uyumsuz:** `new BetterPayment()` 
 
 Sandbox olmadan test ve tek satırlık framework entegrasyonu. Mevcut 0.3.0 kodu çalışmaya devam eder.
 
-### Eklenenler [#added-12]
+### Eklenenler [#added-10]
 
 - **[`better-payment/testing`](/docs/concepts/testing):** uygulama testleri için kimlik bilgisi ve ağ erişimi gerektirmeyen, bellek içi bir sağlayıcı olan `MockProvider`. Sihirli kart numaraları retleri, 3D Secure hatalarını, kaybolan yanıtları ve başarısız iadeleri kapsar; 3D Secure callback'leri gerçek handler'dan geçer.
 - **[Framework adapter'ları](/docs/integrations/frameworks):** `better-payment/next`, `better-payment/express`, `better-payment/fastify` ve `better-payment/hono` handler'ı tek satırda bağlar; `toFetchHandler` Workers, Deno ve Bun'u kapsar.
@@ -179,7 +166,7 @@ Sandbox olmadan test ve tek satırlık framework entegrasyonu. Mevcut 0.3.0 kodu
 
 Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden çalışmaya devam eder.
 
-### Eklenenler [#added-13]
+### Eklenenler [#added-11]
 
 - **[Edge ortamı desteği](/docs/integrations/edge):** aynı paket Node.js 20+, Vercel Edge, Cloudflare Workers, Deno ve Bun'da çalışır. Yalnızca `fetch` ve WebCrypto kullanır.
 - Özel bir fetch uygulaması (proxy, test stub'ları) için **[`fetch` seçeneği](/docs/concepts/configuration#custom-fetch)**.
@@ -194,7 +181,7 @@ Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden
 
 Ön provizyon ve kayıtlı kartlar. Mevcut 0.1.0 kodu çalışmaya devam eder. İki özellik de her gece gerçek iyzico sandbox'ına karşı test edilir.
 
-### Eklenenler [#added-14]
+### Eklenenler [#added-12]
 
 - **[Ön provizyon](/docs/payments/pre-authorization):** `authorize()` / `initThreeDSAuthorize()` tutarı bloke eder, `capture()` tahsil eder (kısmi capture desteklenir) ve `voidAuthorization()` serbest bırakır. iyzico, Parampos ve Akbank; PayTR henüz desteklenmiyor.
 - **[Kayıtlı kartlar](/docs/payments/stored-cards):** ödeme sırasında `saveCard` ile kartı kaydedin, sonra `storedCard: { customerToken, cardToken }` ile ödeme alın ve kartları `saveCard()`, `listCards()` ve `deleteCard()` ile yönetin. iyzico ve PayTR; Parampos ve Akbank henüz desteklenmiyor.
@@ -209,7 +196,7 @@ Edge ortamları ve sıfır runtime bağımlılığı. Uygulama kodu değişmeden
 
 Sıfırlamadan sonraki ilk özellik sürümü. Mevcut 0.0.1 kodu çalışmaya devam eder; davranış değişiklikleri "Değişenler" altında listelenir. iyzico entegrasyonu artık her gece gerçek iyzico sandbox'ına karşı test ediliyor.
 
-### Eklenenler [#added-15]
+### Eklenenler [#added-13]
 
 - **[Birleşik hata kodları](/docs/reference/error-codes):** her başarısız sonuç bir `code` taşır (`INSUFFICIENT_FUNDS`, `CARD_DECLINED`, `THREEDS_FAILED`, `INVALID_HASH`, ...). `errorCode` sağlayıcının ham kodunu korur.
 - Sağlayıcı çağrılmadan önce **[istek doğrulama](/docs/concepts/configuration#request-validation)**. Geçersiz istekler tüm geçersiz alanları listeleyerek `code: 'INVALID_REQUEST'` döner. `validate: false` ile kapatılabilir.
