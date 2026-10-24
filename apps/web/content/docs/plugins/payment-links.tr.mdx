@@ -1,0 +1,175 @@
+---
+title: Ödeme linkleri
+description: Fatura, serbest çalışanlar ve destek ekipleri için karıştırmaya dayanıklı, imzalı ödeme linkleri oluşturun.
+---
+
+<Since version="0.12.0" />
+
+Serbest çalışanlar, küçük dükkânlar ve müşteri destek ekipleri çoğu zaman müşteriye sabit bir tutarı ödemesi için bir link göndermek ister; özel bir ödeme ekranı geliştirmeden.
+
+`paymentLinks` eklentisi HMAC-SHA256 ile kriptografik olarak imzalanmış linkler üretir, linklerin yaşam döngüsü durumunu (`open`, `paid`, `expired`, `cancelled`) saklar ve çözme ile tahsilat uç noktalarını doğrudan [handler](/docs/concepts/handler) üzerinden sunar. Linkten başlatılan ödemeler 3D Secure ile çalışır; böylece kart sizin sunucunuza düz metin olarak ulaşmaz ve yalnızca link numarasını ele geçirmek bir tahsilat için yeterli olmaz.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { paymentLinks } from 'better-payment/plugins';
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    paymentLinks({
+      secret: process.env.LINK_SECRET!,
+      baseUrl: 'https://shop.example.com/api/pay',
+      threeDSCallbackUrl: 'https://shop.example.com/api/pay/iyzico/payment/complete-3ds',
+      defaultExpiresIn: '7d',
+    }),
+  ],
+});
+```
+
+`threeDSCallbackUrl`, bankanın müşteriyi geri yönlendirdiği adrestir. `/links/pay` varsayılan olarak 3D Secure ödemesi başlattığı için bu alan zorunludur; ödeme handler'ın ilgili sağlayıcı route'unda tamamlanır ve link orada kapatılır.
+
+## Link oluşturma [#creating-a-link]
+
+```typescript
+const link = await payment.links.create({
+  amount: '250.00',
+  currency: 'TRY',
+  description: 'Invoice #42 - Web design',
+  expiresIn: '7d', // e.g. '24h', '7d', or milliseconds
+  singleUse: true, // default: true (marks link 'paid' after first successful charge)
+  maxUses: 1, // optional cap on successful payments
+  provider: 'iyzico', // optional, defaults to the plugin option
+});
+
+console.log(link.url);
+// → https://shop.example.com/api/pay/links/resolve?id=a1b2c3d4&sig=...
+```
+
+`link.url` değerini değiştirmeden gönderin. `sig` sorgu parametresi, `id:amount:currency:expiresAt:singleUse` değerinin HMAC-SHA256 özetidir; tutarı, para birimini, son kullanma tarihini veya kullanım şeklini değiştirmek linki geçersiz kılar. Link kimlikleri 4-64 karakterle ve `A-Z`, `a-z`, `0-9`, `-`, `_` ile sınırlıdır; her ödeme denemesi link kimliğini konuşma numarasının içinde taşır.
+
+## Handler uç noktaları [#handler-endpoints]
+
+Eklenti handler üzerinde iki açık uç nokta kaydeder. İkisi de imzayı ister; yalnızca link kimliğini veren istek `400` ile reddedilir, çünkü kayıttaki imza tek başına hiçbir şey ispatlamaz.
+
+### 1. `GET /links/resolve?id=:id&sig=:sig`
+
+İmzayı kayıtlı linkle doğrular ve ödeme sayfasının göstermesi gereken bilgileri döndürür:
+
+```json
+{
+  "id": "a1b2c3d4",
+  "amount": "250.00",
+  "currency": "TRY",
+  "description": "Invoice #42 - Web design",
+  "status": "open",
+  "expiresAt": 1729800000000,
+  "singleUse": true
+}
+```
+
+### 2. `POST /links/pay`
+
+Kart ve alıcı bilgilerini toplar, ardından ödemeyi başlatır:
+
+```json
+{
+  "linkId": "a1b2c3d4",
+  "sig": "…the signature from link.url…",
+  "paymentCard": { "cardNumber": "...", "expireMonth": "...", "expireYear": "...", "cvc": "..." },
+  "buyer": { "id": "BY1", "name": "Ali", "surname": "Yılmaz", "email": "ali@example.com", "identityNumber": "...", "ip": "...", "city": "...", "country": "...", "gsmNumber": "...", "registrationAddress": "..." },
+  "shippingAddress": { "contactName": "Ali Yılmaz", "city": "Istanbul", "country": "Turkey", "address": "..." },
+  "billingAddress": { "contactName": "Ali Yılmaz", "city": "Istanbul", "country": "Turkey", "address": "..." }
+}
+```
+
+Sağlayıcı, linke kaydedilen (veya eklentinin `provider` seçeneğindeki) sağlayıcıdır. İstek gövdesindeki `provider` yok sayılır — müşteri, ödemenin hangi sanal pos üzerinden geçeceğini seçmemelidir.
+
+Beklemeniz gereken yanıtlar:
+
+| Durum | Anlamı |
+| --- | --- |
+| `200` | Ödeme başladı; gövde 3D Secure başlatma sonucudur |
+| `400` | `linkId` veya `sig` yok ya da imza kayıtlı linkle uyuşmuyor |
+| `404` | Bilinmeyen link kimliği |
+| `409` | Kalan tek kontenjanı başka bir ödeme tutuyor |
+| `410` | Linkin süresi dolmuş, iptal edilmiş, ödemiş ya da ödeme hakkı bitmiş |
+| `429` | Çok fazla ödeme denemesi (`maxAttempts`, varsayılan `5`) |
+| `500` | Linke uyan yapılandırılmış bir sağlayıcı yok |
+
+## 3D Secure ve linkin kapatılması [#3d-secure-and-settling]
+
+Başlatma sonucu `LINK_<linkId>#<deneme>` biçiminde bir konuşma numarası taşır. Banka müşteriyi `threeDSCallbackUrl` adresinize geri gönderdiğinde handler ödemesi tamamlar ve eklenti kendi konuşma numarasını tanıyacağı için link ekstra bir kod yazmadan kapatılır:
+
+```typescript
+// Nothing to write: the provider's complete-3DS route runs the payment,
+// and the plugin's after hook marks the link paid from LINK_<id>#<attempt>.
+const result = await payment.completeThreeDSPayment(callbackData);
+console.log(result.conversationId); // 'LINK_a1b2c3d4#1'
+```
+
+Başarısız tamamlama linki açık bırakır ve aynı ödeme iki kez sayılmaz — link, kapatıldığı `paymentId` değerini de saklar.
+
+## İsteğe bağlı: 3D Secure olmadan tahsilat [#optional-charging-without-3d-secure]
+
+```typescript
+paymentLinks({
+  secret: process.env.LINK_SECRET!,
+  baseUrl: 'https://shop.example.com/api/pay',
+  allowDirectPayment: true,
+});
+```
+
+`allowDirectPayment` açıkken `/links/pay`, 3D Secure başlatmak yerine istekteki kartı doğrudan çeker. Bu seçeneği yalnızca o uç noktayı kendi kimlik doğrulamanızın arkasına koyuyorsanız açın: link herkese açık bir adrestir, dolayısıyla kimliği ve imzasını elinde tutan herkes istediği kartla ödeme denemesi yapabilir. Seçenek açıkken eklenti, sağlayıcıyı çağırmadan önce linke ait bir kontenjanı ayırır ve ödeme reddedilirse geri verir; böylece iki eşzamanlı istek tek kullanımlık linki asla iki kez çekemez.
+
+## Link durumu ve iptal [#link-lifecycle--cancellation]
+
+```typescript
+// Query link status
+const link = await payment.links.get('a1b2c3d4');
+console.log(link?.status);    // 'open' | 'paid' | 'expired' | 'cancelled'
+console.log(link?.useCount);  // successful payments
+console.log(link?.attempts);  // payment attempts, capped by maxAttempts
+
+// Cancel a link
+await payment.links.cancel('a1b2c3d4');
+```
+
+## Depolama [#storage]
+
+Varsayılan `MemoryPaymentLinkStore` tek bir süreç için yeterlidir. Kalıcı bir şey istediğinizde `PaymentLinkStore` arayüzünü uygulayın:
+
+```typescript
+interface PaymentLinkStore {
+  get(id: string): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+  set(link: PaymentLink): Promise<void> | void;
+  update(
+    id: string,
+    patch: Partial<PaymentLink>
+  ): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+  claim?(
+    id: string,
+    patch: Partial<PaymentLink>,
+    expect: Pick<PaymentLink, 'status' | 'useCount'>
+  ): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+}
+```
+
+`claim` seçmeli bir metottur; ödeme sınırını süreçler arasında güvenli kılan da budur. `patch` değerini yalnızca kayıttaki veri `expect` ile hâlâ uyuşuyorsa tek adımda uygular, uyuşmuyorsa `undefined` döndürür. Bu metot yoksa bir kontenjanın dolu olduğunu yalnızca linki elinde tutan süreç anlayabilir — birden çok örneğin aynı veritabanını paylaştığı kurulumlarda `claim` mutlaka uygulanmalı.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `secret` | — | HMAC-SHA256 imzalarını üretmek ve doğrulamak için kullanılan gizli anahtar |
+| `baseUrl` | — | API handler'ınızın temel adresi (ör. `'https://shop.example.com/api/pay'`) |
+| `threeDSCallbackUrl` | — | Bankanın müşteriyi geri yönlendirdiği adres. `allowDirectPayment` seçilmediği sürece zorunlu |
+| `defaultExpiresIn` | `'7d'` | Varsayılan link süresi (`'24h'`, `'7d'` veya ms) |
+| `store` | `MemoryPaymentLinkStore` | `PaymentLinkStore` arayüzünü uygulayan özel depolama katmanı |
+| `provider` | varsayılan sağlayıcı | Link kendi sağlayıcısını belirtmediğinde ödemenin geçtiği sağlayıcı |
+| `maxUses` | sınırsız | Kendi `maxUses` değeri olmayan linkler için izin verilen başarılı ödeme sayısı |
+| `maxAttempts` | `5` | `429` yanıtına geçmeden önce linke izin verilen ödeme denemesi |
+| `allowDirectPayment` | `false` | Karta 3D Secure olmadan doğrudan çekim. Yukarıdaki güvenlik notunu okuyun |

@@ -1,0 +1,175 @@
+---
+title: Payment links
+description: Create tamper-proof signed payment links for invoices, freelancers, and support teams.
+---
+
+<Since version="0.12.0" />
+
+Freelancers, small shops, and customer support teams often need to send customers a link to pay a fixed amount, without building a custom checkout frontend.
+
+The `paymentLinks` plugin creates cryptographically signed links using HMAC-SHA256, stores their lifecycle status (`open`, `paid`, `expired`, `cancelled`), and serves resolution and payment endpoints directly through the [handler](/docs/concepts/handler). Payments started from a link run as 3D Secure, so the card never reaches your server in the clear and a stolen link id alone cannot be charged.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { paymentLinks } from 'better-payment/plugins';
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    paymentLinks({
+      secret: process.env.LINK_SECRET!,
+      baseUrl: 'https://shop.example.com/api/pay',
+      threeDSCallbackUrl: 'https://shop.example.com/api/pay/iyzico/payment/complete-3ds',
+      defaultExpiresIn: '7d',
+    }),
+  ],
+});
+```
+
+`threeDSCallbackUrl` is where the bank returns the customer. It is required because `/links/pay` starts a 3D Secure payment; the handler route of your chosen provider completes it, and the link is settled from there.
+
+## Creating a link
+
+```typescript
+const link = await payment.links.create({
+  amount: '250.00',
+  currency: 'TRY',
+  description: 'Invoice #42 - Web design',
+  expiresIn: '7d', // e.g. '24h', '7d', or milliseconds
+  singleUse: true, // default: true (marks link 'paid' after first successful charge)
+  maxUses: 1, // optional cap on successful payments
+  provider: 'iyzico', // optional, defaults to the plugin option
+});
+
+console.log(link.url);
+// → https://shop.example.com/api/pay/links/resolve?id=a1b2c3d4&sig=...
+```
+
+Send `link.url` as it is. The `sig` query parameter is the HMAC-SHA256 of `id:amount:currency:expiresAt:singleUse`, so changing the amount, the currency, the expiry, or the usage mode invalidates the link. Link ids are limited to 4-64 characters of `A-Z`, `a-z`, `0-9`, `-` and `_`, because each payment attempt carries the id inside its conversation id.
+
+## Handler endpoints
+
+The plugin registers two public endpoints on your handler. Both demand the signature; a request that names only the link id is refused with `400`, because a stored signature proves nothing on its own.
+
+### 1. `GET /links/resolve?id=:id&sig=:sig`
+
+Verifies the signature against the stored record and returns the link a checkout page should show:
+
+```json
+{
+  "id": "a1b2c3d4",
+  "amount": "250.00",
+  "currency": "TRY",
+  "description": "Invoice #42 - Web design",
+  "status": "open",
+  "expiresAt": 1729800000000,
+  "singleUse": true
+}
+```
+
+### 2. `POST /links/pay`
+
+Collects card and buyer information, then starts the payment:
+
+```json
+{
+  "linkId": "a1b2c3d4",
+  "sig": "…the signature from link.url…",
+  "paymentCard": { "cardNumber": "...", "expireMonth": "...", "expireYear": "...", "cvc": "..." },
+  "buyer": { "id": "BY1", "name": "Ali", "surname": "Yılmaz", "email": "ali@example.com", "identityNumber": "...", "ip": "...", "city": "...", "country": "...", "gsmNumber": "...", "registrationAddress": "..." },
+  "shippingAddress": { "contactName": "Ali Yılmaz", "city": "Istanbul", "country": "Turkey", "address": "..." },
+  "billingAddress": { "contactName": "Ali Yılmaz", "city": "Istanbul", "country": "Turkey", "address": "..." }
+}
+```
+
+The provider is the one stored on the link (or the plugin's `provider` option). A `provider` in the request body is ignored — the customer must not choose whose acquirer runs the payment.
+
+Responses you should handle:
+
+| Status | Meaning |
+| --- | --- |
+| `200` | The payment started; the body is the 3D Secure init result |
+| `400` | Missing `linkId` or `sig`, or the signature does not match the stored link |
+| `404` | Unknown link id |
+| `409` | Another payment already holds the single remaining slot |
+| `410` | Link expired, cancelled, already paid, or out of allowed payments |
+| `429` | Too many payment attempts (`maxAttempts`, `5` by default) |
+| `500` | No configured provider matches the link |
+
+## 3D Secure and settling
+
+The init result carries the conversation id `LINK_<linkId>#<attempt>`. When the bank returns to your `threeDSCallbackUrl`, the handler completes the payment and the plugin recognises its own conversation id, so the link is settled without any extra wiring:
+
+```typescript
+// Nothing to write: the provider's complete-3DS route runs the payment,
+// and the plugin's after hook marks the link paid from LINK_<id>#<attempt>.
+const result = await payment.completeThreeDSPayment(callbackData);
+console.log(result.conversationId); // 'LINK_a1b2c3d4#1'
+```
+
+A completion that does not succeed leaves the link open, and the same payment is never counted twice — the link records the `paymentId` it was settled with.
+
+## Optional: charging without 3D Secure
+
+```typescript
+paymentLinks({
+  secret: process.env.LINK_SECRET!,
+  baseUrl: 'https://shop.example.com/api/pay',
+  allowDirectPayment: true,
+});
+```
+
+With `allowDirectPayment`, `/links/pay` charges the card in the request instead of starting 3D Secure. Only turn this on if you put that endpoint behind your own authentication: the link is a public URL, so anyone who has the id and its signature can then attempt payments with any card they own. When it is on, the plugin takes a slot before calling the provider and gives it back if the charge is refused, so two concurrent requests can never both charge a single-use link.
+
+## Link lifecycle & cancellation
+
+```typescript
+// Query link status
+const link = await payment.links.get('a1b2c3d4');
+console.log(link?.status);    // 'open' | 'paid' | 'expired' | 'cancelled'
+console.log(link?.useCount);  // successful payments
+console.log(link?.attempts);  // payment attempts, capped by maxAttempts
+
+// Cancel a link
+await payment.links.cancel('a1b2c3d4');
+```
+
+## Storage
+
+`MemoryPaymentLinkStore` is the default and fine for a single process. For anything durable, implement `PaymentLinkStore`:
+
+```typescript
+interface PaymentLinkStore {
+  get(id: string): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+  set(link: PaymentLink): Promise<void> | void;
+  update(
+    id: string,
+    patch: Partial<PaymentLink>
+  ): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+  claim?(
+    id: string,
+    patch: Partial<PaymentLink>,
+    expect: Pick<PaymentLink, 'status' | 'useCount'>
+  ): Promise<PaymentLink | undefined> | PaymentLink | undefined;
+}
+```
+
+`claim` is optional but is what makes the payment limit safe across processes: it applies `patch` only if the stored record still matches `expect`, in one atomic step, and returns `undefined` when it does not. Without it, only the process holding the link can tell that a slot is taken — implement it when several instances share one database.
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `secret` | — | Secret string used to compute and verify HMAC-SHA256 signatures |
+| `baseUrl` | — | Base URL of your API handler (e.g. `'https://shop.example.com/api/pay'`) |
+| `threeDSCallbackUrl` | — | Where the bank returns the customer. Required unless `allowDirectPayment` is set |
+| `defaultExpiresIn` | `'7d'` | Default link duration (`'24h'`, `'7d'`, or ms) |
+| `store` | `MemoryPaymentLinkStore` | Custom storage backend implementing `PaymentLinkStore` |
+| `provider` | default provider | Provider that runs link payments, unless a link carries its own |
+| `maxUses` | unlimited | Successful payments per link for links that do not set their own |
+| `maxAttempts` | `5` | Payment attempts per link before `429` |
+| `allowDirectPayment` | `false` | Charge the card in the request without 3D Secure. Read the security note above |
