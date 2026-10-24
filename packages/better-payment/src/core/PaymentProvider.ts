@@ -4,6 +4,8 @@ import {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -179,6 +181,27 @@ export abstract class PaymentProvider<
   /** Charges (all or part of) a pre-authorized amount */
   async capture(_request: CaptureRequest): Promise<PaymentResponse> {
     throw this.notSupported('Capture');
+  }
+
+  /**
+   * Hosted checkout: creates the provider's payment page. The request carries no
+   * card data; the customer enters it on the hosted page. Providers without a
+   * verifiable hosted page throw `NOT_SUPPORTED`.
+   */
+  async createCheckout(_request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    throw this.notSupported(
+      'Hosted checkout',
+      'this provider has no hosted payment page, use createPayment()/initThreeDSPayment()'
+    );
+  }
+
+  /**
+   * The result of a hosted checkout, verified against the provider. Only a
+   * `success` here (or a verified provider callback) may mark an order as paid;
+   * the customer's return to your `returnUrl` is not a confirmation.
+   */
+  async getCheckoutResult(_token: string): Promise<PaymentResponse> {
+    throw this.notSupported('Hosted checkout result lookup');
   }
 
   /** Releases a pre-authorization; nothing is charged */

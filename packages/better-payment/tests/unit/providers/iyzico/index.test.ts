@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Iyzico } from '../../../../src/providers/iyzico';
 import { PaymentStatus } from '../../../../src/types';
+import { mockCheckoutRequest } from '../../../fixtures/payment-data';
 
 describe('Iyzico Provider - Unit Tests', () => {
   let iyzico: Iyzico;
@@ -209,9 +210,7 @@ describe('Iyzico Provider - Unit Tests', () => {
             bankName: 'Akbank',
             commercial: 1, // Commercial card
             force3ds: 1, // 3DS required
-            installmentPrices: [
-              { installmentNumber: 1, totalPrice: 100, installmentPrice: 100 },
-            ],
+            installmentPrices: [{ installmentNumber: 1, totalPrice: 100, installmentPrice: 100 }],
           },
         ],
       };
@@ -259,9 +258,7 @@ describe('Iyzico Provider - Unit Tests', () => {
         installmentDetails: [],
       };
 
-      const sendRequestSpy = vi
-        .spyOn(iyzico as any, 'sendRequest')
-        .mockResolvedValue(mockResponse);
+      const sendRequestSpy = vi.spyOn(iyzico as any, 'sendRequest').mockResolvedValue(mockResponse);
 
       await iyzico.installmentInfo({
         binNumber: '552879',
@@ -281,9 +278,7 @@ describe('Iyzico Provider - Unit Tests', () => {
     });
 
     it('should handle network errors', async () => {
-      vi.spyOn(iyzico as any, 'sendRequest').mockRejectedValue(
-        new Error('Network error')
-      );
+      vi.spyOn(iyzico as any, 'sendRequest').mockRejectedValue(new Error('Network error'));
 
       const result = await iyzico.installmentInfo({
         binNumber: '552879',
@@ -292,6 +287,77 @@ describe('Iyzico Provider - Unit Tests', () => {
 
       expect(result.status).toBe(PaymentStatus.FAILURE);
       expect(result.errorMessage).toBe('Network error');
+    });
+  });
+
+  describe('createCheckout / getCheckoutResult', () => {
+    it('maps the order to the checkout form and returns the hosted page', async () => {
+      const send = vi.spyOn(iyzico as any, 'sendRequest').mockResolvedValue({
+        status: 'success',
+        token: 'TOKEN1',
+        paymentPageUrl: 'https://sandbox.iyzipay.com/checkout/TOKEN1',
+        checkoutFormContent: '<script src="https://static.iyzipay.com/checkout.js"></script>',
+        tokenExpireTime: 1234,
+        conversationId: '123456789',
+      });
+
+      const result = await iyzico.createCheckout(mockCheckoutRequest);
+
+      expect(send.mock.calls[0][0]).toBe('/payment/iyzipos/checkoutform/initialize/auth/ecom');
+      expect(send.mock.calls[0][1]).toMatchObject({
+        callbackUrl: 'https://shop.example/return',
+        enabledInstallments: [1, 3, 6],
+        locale: 'en',
+      });
+      expect(JSON.stringify(send.mock.calls[0][1])).not.toMatch(/cardNumber|cvc|4242424242424242/);
+      // The init call's success only means the page is ready
+      expect(result).toMatchObject({
+        status: PaymentStatus.PENDING,
+        redirectUrl: 'https://sandbox.iyzipay.com/checkout/TOKEN1',
+        iframeUrl: 'https://sandbox.iyzipay.com/checkout/TOKEN1',
+        html: '<script src="https://static.iyzipay.com/checkout.js"></script>',
+        token: 'TOKEN1',
+        tokenExpireTime: 1234,
+        conversationId: '123456789',
+      });
+    });
+
+    it('getCheckoutResult confirms the payment and returns tokens of a saved card', async () => {
+      const send = vi.spyOn(iyzico as any, 'sendRequest').mockResolvedValue({
+        status: 'success',
+        paymentStatus: 'SUCCESS',
+        paymentId: 'PAY1',
+        conversationId: '123456789',
+        cardUserKey: 'CU1',
+        cardToken: 'CT1',
+        lastFourDigits: '4242',
+      });
+
+      const result = await iyzico.getCheckoutResult('TOKEN1');
+
+      expect(send.mock.calls[0][0]).toBe('/payment/iyzipos/checkoutform/auth/ecom/detail');
+      expect(send.mock.calls[0][1]).toMatchObject({ token: 'TOKEN1' });
+      expect(result).toMatchObject({
+        status: PaymentStatus.SUCCESS,
+        paymentId: 'PAY1',
+        conversationId: '123456789',
+        storedCard: { customerToken: 'CU1', cardToken: 'CT1' },
+      });
+    });
+
+    it('getCheckoutResult does not return card tokens for a failed payment', async () => {
+      vi.spyOn(iyzico as any, 'sendRequest').mockResolvedValue({
+        status: 'success',
+        paymentStatus: 'FAILURE',
+        paymentId: 'PAY1',
+        cardUserKey: 'CU1',
+        cardToken: 'CT1',
+      });
+
+      const result = await iyzico.getCheckoutResult('TOKEN1');
+
+      expect(result.status).toBe(PaymentStatus.FAILURE);
+      expect(result.storedCard).toBeUndefined();
     });
   });
 });

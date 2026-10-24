@@ -3,6 +3,8 @@ import {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -146,6 +148,36 @@ class ProviderClient {
    */
   async completeThreeDSPayment(callbackData: Record<string, unknown>): Promise<PaymentResponse> {
     return this.request<PaymentResponse>('POST', 'payment/complete-3ds', callbackData);
+  }
+
+  /**
+   * Hosted checkout page (`POST /:provider/checkout/init`). The request has no
+   * card data; redirect the customer to `redirectUrl`, embed `iframeUrl`, or
+   * render `html`.
+   *
+   * @example
+   * ```typescript
+   * const checkout = await client.iyzico.createCheckout({
+   *   price: '100.00',
+   *   paidPrice: '100.00',
+   *   currency: 'TRY',
+   *   returnUrl: 'https://shop.example/orders/42',
+   *   // ... order fields (buyer, addresses, basketItems)
+   * });
+   * window.location.href = checkout.redirectUrl!;
+   * ```
+   */
+  async createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    return this.request<CheckoutInitResponse>('POST', 'checkout/init', request);
+  }
+
+  /**
+   * The verified result of a hosted checkout (`POST /:provider/checkout/retrieve`,
+   * needs `authorize` on the server). Only a `success` here may mark an order as
+   * paid; the customer's return to your `returnUrl` is not a confirmation.
+   */
+  async getCheckoutResult(token: string): Promise<PaymentResponse> {
+    return this.request<PaymentResponse>('POST', 'checkout/retrieve', { token });
   }
 
   /**

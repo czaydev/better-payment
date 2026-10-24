@@ -11,13 +11,15 @@ import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
 import { ISO8583_ERROR_CODES, PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId } from '../../core/utils';
+import { generateOrderId, maxInstallment } from '../../core/utils';
 import type { XmlValue } from '../parampos/utils';
 import {
   PaymentRequest,
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -419,6 +421,90 @@ export class Est extends PaymentProvider<EstConfig> {
       return reached && result.status === PaymentStatus.PENDING
         ? { ...result, paymentId: orderId, conversationId: orderId }
         : result;
+    }
+  }
+
+  /**
+   * Hosted checkout: the bank's own card page (`3d_host` / `3d_pay_hosting`).
+   * Other store types (`3d`, `3d_pay`) collect the card in the request, so they
+   * cannot power a hosted page and report `NOT_SUPPORTED`.
+   *
+   * The result is the auto-submitting form to the bank's 3D gate (`html`);
+   * `returnUrl` becomes `okUrl` and `failUrl` (default `returnUrl`) `failUrl`.
+   * The bank POSTs the signed result there; process it with
+   * `completeThreeDSPayment()` (the handler's `payment/complete-3ds` route).
+   * `token` is the order id (`oid`) for `getCheckoutResult()`.
+   */
+  async createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    if (!isEstHostedStoreType(this.storeType)) {
+      throw this.notSupported(
+        'Hosted checkout',
+        `EST storeType '${this.storeType}' collects the card in the request; use 3d_host or 3d_pay_hosting`
+      );
+    }
+    const init = await this.initThreeDSPayment({
+      price: request.price,
+      paidPrice: request.paidPrice,
+      currency: request.currency,
+      basketId: request.basketId,
+      buyer: request.buyer,
+      shippingAddress: request.shippingAddress,
+      billingAddress: request.billingAddress,
+      basketItems: request.basketItems,
+      conversationId: request.conversationId,
+      callbackUrl: request.returnUrl,
+      failUrl: request.failUrl,
+      installment: maxInstallment(request.installments),
+    });
+
+    return this.withErrorCode({
+      status: init.status,
+      html: init.threeDSHtmlContent,
+      token: init.paymentId,
+      paymentId: init.paymentId,
+      conversationId: init.conversationId,
+      code: init.code,
+      errorCode: init.errorCode,
+      errorMessage: init.errorMessage,
+      providerMessage: init.providerMessage,
+      rawResponse: init.rawResponse,
+    });
+  }
+
+  /**
+   * The result of a hosted checkout, asked from the bank (`ORDERSTATUS`).
+   * `token` is the order id. An order the bank has no record of yet is
+   * `pending`, never a failure: the customer may still be on the bank's page.
+   * A `success` requires a captured sale at the bank; with `3d_host` that means
+   * the callback was processed (the merchant charges the card there), while
+   * `3d_pay_hosting` is charged by the bank itself.
+   */
+  async getCheckoutResult(token: string): Promise<PaymentResponse> {
+    try {
+      const inquiry = await this.orderStatus(token);
+      const { fields, extra } = inquiry;
+      if (!extra.TRANS_STAT) {
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          paymentId: token,
+          conversationId: token,
+          errorMessage: 'The bank has no confirmed payment for this order yet',
+          rawResponse: inquiry,
+        });
+      }
+      const status = estOrderStatus(inquiry);
+      return this.withErrorCode({
+        status,
+        paymentId: token,
+        conversationId: token,
+        ...(status === PaymentStatus.FAILURE ? Est.errorOf(fields) : {}),
+        rawResponse: inquiry,
+      });
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, 'Checkout result lookup failed', {
+        paymentId: token,
+        conversationId: token,
+      });
     }
   }
 

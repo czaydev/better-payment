@@ -11,7 +11,7 @@ import { errorMessage } from './utils';
 import { NETWORK_ERROR_CODE } from './failure';
 import { fingerprint, MemoryIdempotencyStore, type IdempotencyStore } from './idempotency';
 import type {
-  CheckoutFormRequest,
+  CheckoutRequest,
   PWIPaymentRequest,
   InstallmentInfoRequest,
   SubscriptionInitializeRequest,
@@ -140,6 +140,7 @@ export const PRIVILEGED_HANDLER_ACTIONS: HandlerAction[] = [
   'cards/list',
   'cards/delete',
   'payment/get',
+  'checkout/retrieve',
   'subscription/cancel',
   'subscription/upgrade',
   'subscription/retrieve',
@@ -339,7 +340,10 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
  * - POST /:provider/capture | void         -> capture() / voidAuthorization()
  * - POST /:provider/cards/{save,list,delete} -> saveCard() / listCards() / deleteCard()
  * - POST /:provider/installment | bin-check
- * - iyzico only: checkout/*, pwi/*, subscription/*
+ * - POST /:provider/checkout/init          -> createCheckout() (all providers)
+ * - POST /:provider/checkout/retrieve      -> getCheckoutResult() (privileged:
+ *   it exposes payment status, so it requires `authorize`)
+ * - iyzico only: pwi/*, subscription/*
  * - GET  /health
  *
  * Secure by default: only callbacks and card queries are enabled. Enable more
@@ -771,17 +775,16 @@ export class BetterPaymentHandler {
       case 'checkout/init':
         this.requireMethod(ctx, 'POST');
         return this.resultResponse(
-          await this.requireIyzico(ctx).initCheckoutForm(
-            this.requireBody(ctx) as CheckoutFormRequest
-          )
+          await provider.createCheckout(this.requireBody<CheckoutRequest>(ctx))
         );
 
       case 'checkout/retrieve': {
         this.requireMethod(ctx, 'POST');
-        const { token, conversationId } = this.requireBody<TokenBody>(ctx);
-        return this.resultResponse(
-          await this.requireIyzico(ctx).retrieveCheckoutForm(token, conversationId)
-        );
+        const { token } = this.requireBody<TokenBody>(ctx);
+        if (typeof token !== 'string' || !token) {
+          throw new HttpError(400, 'token must be a non-empty string');
+        }
+        return this.resultResponse(await provider.getCheckoutResult(token));
       }
 
       case 'pwi/init':

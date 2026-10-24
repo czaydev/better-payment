@@ -13,7 +13,9 @@ import { VERSION } from '../../../src/version';
 function buildMockPayment(providerOverrides: Record<string, any> = {}, enabled = true) {
   const mockProvider: Record<string, any> = {
     createPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1' }),
-    initThreeDSPayment: vi.fn().mockResolvedValue({ status: 'pending', threeDSHtmlContent: '<form>' }),
+    initThreeDSPayment: vi
+      .fn()
+      .mockResolvedValue({ status: 'pending', threeDSHtmlContent: '<form>' }),
     completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1' }),
     refund: vi.fn().mockResolvedValue({ status: 'success' }),
     cancel: vi.fn().mockResolvedValue({ status: 'success' }),
@@ -56,7 +58,9 @@ describe('BetterPaymentHandler', () => {
 
     it('does not treat /:provider/.../health as the health check', async () => {
       const { payment } = buildMockPayment();
-      const res = await new BetterPaymentHandler(payment).handle(req('GET', '/api/pay/iyzico/payment/health'));
+      const res = await new BetterPaymentHandler(payment).handle(
+        req('GET', '/api/pay/iyzico/payment/health')
+      );
       expect(res.status).not.toBe(200);
     });
   });
@@ -73,7 +77,9 @@ describe('BetterPaymentHandler', () => {
     it('supports absolute URLs, query strings and trailing slashes', async () => {
       const { payment, mockProvider } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment, allowAll);
-      const res = await handler.handle(req('POST', 'https://shop.example/api/pay/iyzico/payment/?x=1', { price: '1' }));
+      const res = await handler.handle(
+        req('POST', 'https://shop.example/api/pay/iyzico/payment/?x=1', { price: '1' })
+      );
       expect(res.status).toBe(200);
       expect(mockProvider.createPayment).toHaveBeenCalledWith({ price: '1' });
     });
@@ -88,33 +94,46 @@ describe('BetterPaymentHandler', () => {
 
     it('returns 400 when the provider is not enabled', async () => {
       const { payment } = buildMockPayment({}, false);
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('POST', '/api/pay/paytr/payment', {}));
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/paytr/payment', {})
+      );
       expect(res.status).toBe(400);
     });
 
     it('routes GET /payment/:id to getPayment (URL-decoded)', async () => {
       const { payment, mockProvider } = buildMockPayment();
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('GET', '/api/pay/iyzico/payment/ORD%201'));
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('GET', '/api/pay/iyzico/payment/ORD%201')
+      );
       expect(res.status).toBe(200);
       expect(mockProvider.getPayment).toHaveBeenCalledWith('ORD 1');
     });
 
     it('returns 405 for wrong methods', async () => {
       const { payment } = buildMockPayment();
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('GET', '/api/pay/iyzico/payment'));
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('GET', '/api/pay/iyzico/payment')
+      );
       expect(res.status).toBe(405);
     });
 
     it('returns 400 when the body is missing', async () => {
       const { payment } = buildMockPayment();
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('POST', '/api/pay/iyzico/payment'));
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/iyzico/payment')
+      );
       expect(res.status).toBe(400);
     });
   });
 
   describe('secure defaults', () => {
     it('only exposes callbacks and card queries by default', async () => {
-      expect(DEFAULT_HANDLER_ACTIONS).toEqual(['payment/complete-3ds', 'callback', 'installment', 'bin-check']);
+      expect(DEFAULT_HANDLER_ACTIONS).toEqual([
+        'payment/complete-3ds',
+        'callback',
+        'installment',
+        'bin-check',
+      ]);
       const { payment, mockProvider } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment);
 
@@ -131,20 +150,31 @@ describe('BetterPaymentHandler', () => {
       }
       expect(mockProvider.refund).not.toHaveBeenCalled();
 
-      const res = await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' }));
+      const res = await handler.handle(
+        req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' })
+      );
       expect(res.status).toBe(200);
     });
 
     it('refuses to enable privileged actions without an authorize hook', () => {
       const { payment } = buildMockPayment();
-      expect(() => new BetterPaymentHandler(payment, { allowedActions: ['refund'] })).toThrow(/authorize/);
-      expect(() => new BetterPaymentHandler(payment, { allowedActions: 'all' })).toThrow(/authorize/);
-      expect(() => new BetterPaymentHandler(payment, { allowedActions: ['payment/init-3ds'] })).not.toThrow();
+      expect(() => new BetterPaymentHandler(payment, { allowedActions: ['refund'] })).toThrow(
+        /authorize/
+      );
+      expect(() => new BetterPaymentHandler(payment, { allowedActions: 'all' })).toThrow(
+        /authorize/
+      );
+      expect(
+        () => new BetterPaymentHandler(payment, { allowedActions: ['payment/init-3ds'] })
+      ).not.toThrow();
     });
 
     it('returns 403 when authorize rejects or throws', async () => {
       const { payment, mockProvider } = buildMockPayment();
-      const deny = new BetterPaymentHandler(payment, { allowedActions: ['refund'], authorize: () => false });
+      const deny = new BetterPaymentHandler(payment, {
+        allowedActions: ['refund'],
+        authorize: () => false,
+      });
       expect((await deny.handle(req('POST', '/api/pay/iyzico/refund', {}))).status).toBe(403);
 
       const boom = new BetterPaymentHandler(payment, {
@@ -174,19 +204,30 @@ describe('BetterPaymentHandler', () => {
         allowedActions: ['payment/init-3ds'],
         transformRequest: (ctx) => ({ ...ctx.body, price: '100.00', paidPrice: '100.00' }),
       });
-      await handler.handle(req('POST', '/api/pay/iyzico/payment/init-3ds', { orderId: 'o1', price: '0.01' }));
-      expect(mockProvider.initThreeDSPayment).toHaveBeenCalledWith({ orderId: 'o1', price: '100.00', paidPrice: '100.00' });
+      await handler.handle(
+        req('POST', '/api/pay/iyzico/payment/init-3ds', { orderId: 'o1', price: '0.01' })
+      );
+      expect(mockProvider.initThreeDSPayment).toHaveBeenCalledWith({
+        orderId: 'o1',
+        price: '100.00',
+        paidPrice: '100.00',
+      });
     });
 
     it('does not leak internal error messages by default', async () => {
-      const { payment } = buildMockPayment({ createPayment: vi.fn().mockRejectedValue(new Error('db password wrong')) });
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('POST', '/api/pay/iyzico/payment', {}));
+      const { payment } = buildMockPayment({
+        createPayment: vi.fn().mockRejectedValue(new Error('db password wrong')),
+      });
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/iyzico/payment', {})
+      );
       expect(res.status).toBe(500);
       expect(res.body.message).toBe('Internal server error');
 
-      const exposed = await new BetterPaymentHandler(payment, { ...allowAll, exposeErrors: true }).handle(
-        req('POST', '/api/pay/iyzico/payment', {})
-      );
+      const exposed = await new BetterPaymentHandler(payment, {
+        ...allowAll,
+        exposeErrors: true,
+      }).handle(req('POST', '/api/pay/iyzico/payment', {}));
       expect(exposed.body.message).toBe('db password wrong');
     });
   });
@@ -196,7 +237,9 @@ describe('BetterPaymentHandler', () => {
       const { payment } = buildMockPayment({
         createPayment: vi.fn().mockResolvedValue({ status: 'failure', errorMessage: 'declined' }),
       });
-      const res = await new BetterPaymentHandler(payment, allowAll).handle(req('POST', '/api/pay/iyzico/payment', {}));
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/iyzico/payment', {})
+      );
       expect(res.status).toBe(422);
       expect(res.body.errorMessage).toBe('declined');
     });
@@ -210,10 +253,17 @@ describe('BetterPaymentHandler', () => {
     });
 
     it('validates binNumber and maps bin-check errors to 422', async () => {
-      const { payment } = buildMockPayment({ binCheck: vi.fn().mockRejectedValue(new Error('not supported')) });
+      const { payment } = buildMockPayment({
+        binCheck: vi.fn().mockRejectedValue(new Error('not supported')),
+      });
       const handler = new BetterPaymentHandler(payment);
-      expect((await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: 'abc' }))).status).toBe(400);
-      const res = await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' }));
+      expect(
+        (await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: 'abc' })))
+          .status
+      ).toBe(400);
+      const res = await handler.handle(
+        req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' })
+      );
       expect(res.status).toBe(422);
     });
   });
@@ -223,13 +273,17 @@ describe('BetterPaymentHandler', () => {
 
     it('leaves out rawResponse by default', async () => {
       const { payment } = buildMockPayment({
-        createPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
+        createPayment: vi
+          .fn()
+          .mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
         binCheck: vi.fn().mockResolvedValue({ binNumber: '454360', rawResponse: raw }),
       });
       const handler = new BetterPaymentHandler(payment, allowAll);
       const res = await handler.handle(req('POST', '/api/pay/iyzico/payment', {}));
       expect(res.body).toEqual({ status: 'success', paymentId: 'PMT-1' });
-      const bin = await handler.handle(req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' }));
+      const bin = await handler.handle(
+        req('POST', '/api/pay/iyzico/bin-check', { binNumber: '454360' })
+      );
       expect(bin.body).toEqual({ binNumber: '454360' });
     });
 
@@ -245,10 +299,14 @@ describe('BetterPaymentHandler', () => {
     it('passes rawResponse to onCallback', async () => {
       const onCallback = vi.fn();
       const { payment } = buildMockPayment({
-        completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
+        completeThreeDSPayment: vi
+          .fn()
+          .mockResolvedValue({ status: 'success', paymentId: 'PMT-1', rawResponse: raw }),
       });
       const handler = new BetterPaymentHandler(payment, { onCallback });
-      const res = await handler.handle(req('POST', '/api/pay/iyzico/payment/complete-3ds', { paymentId: 'PMT-1' }));
+      const res = await handler.handle(
+        req('POST', '/api/pay/iyzico/payment/complete-3ds', { paymentId: 'PMT-1' })
+      );
       expect(res.body.rawResponse).toBeUndefined();
       expect(onCallback.mock.calls[0][0].rawResponse).toEqual(raw);
     });
@@ -285,11 +343,20 @@ describe('BetterPaymentHandler', () => {
     it('parses form-urlencoded callbacks', async () => {
       const { payment, mockProvider } = buildMockPayment();
       await new BetterPaymentHandler(payment).handle(
-        req('POST', '/api/pay/iyzico/payment/complete-3ds', 'status=success&paymentId=1&mdStatus=1', {
-          'content-type': 'application/x-www-form-urlencoded',
-        })
+        req(
+          'POST',
+          '/api/pay/iyzico/payment/complete-3ds',
+          'status=success&paymentId=1&mdStatus=1',
+          {
+            'content-type': 'application/x-www-form-urlencoded',
+          }
+        )
       );
-      expect(mockProvider.completeThreeDSPayment).toHaveBeenCalledWith({ status: 'success', paymentId: '1', mdStatus: '1' });
+      expect(mockProvider.completeThreeDSPayment).toHaveBeenCalledWith({
+        status: 'success',
+        paymentId: '1',
+        mdStatus: '1',
+      });
     });
 
     it.each(['application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'text/plain'])(
@@ -297,7 +364,9 @@ describe('BetterPaymentHandler', () => {
       async (contentType) => {
         const { payment, mockProvider } = buildMockPayment();
         const res = await new BetterPaymentHandler(payment, allowAll).handle(
-          req('POST', '/api/pay/iyzico/refund', 'paymentId=1&price=100', { 'content-type': contentType })
+          req('POST', '/api/pay/iyzico/refund', 'paymentId=1&price=100', {
+            'content-type': contentType,
+          })
         );
         expect(res.status).toBe(415);
         expect(mockProvider.refund).not.toHaveBeenCalled();
@@ -307,9 +376,14 @@ describe('BetterPaymentHandler', () => {
     it('rejects form bodies already parsed by a body parser on non-callback actions', async () => {
       const { payment, mockProvider } = buildMockPayment();
       const res = await new BetterPaymentHandler(payment, allowAll).handle(
-        req('POST', '/api/pay/iyzico/refund', { paymentId: '1', price: '100' }, {
-          'content-type': 'application/x-www-form-urlencoded',
-        })
+        req(
+          'POST',
+          '/api/pay/iyzico/refund',
+          { paymentId: '1', price: '100' },
+          {
+            'content-type': 'application/x-www-form-urlencoded',
+          }
+        )
       );
       expect(res.status).toBe(415);
       expect(mockProvider.refund).not.toHaveBeenCalled();
@@ -317,7 +391,9 @@ describe('BetterPaymentHandler', () => {
 
     it('answers PayTR notifications with plain "OK" and calls onCallback', async () => {
       const { payment } = buildMockPayment({
-        completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'failure', paymentId: 'O1', errorMessage: 'declined' }),
+        completeThreeDSPayment: vi
+          .fn()
+          .mockResolvedValue({ status: 'failure', paymentId: 'O1', errorMessage: 'declined' }),
       });
       const onCallback = vi.fn();
       const res = await new BetterPaymentHandler(payment, { onCallback }).handle(
@@ -334,10 +410,14 @@ describe('BetterPaymentHandler', () => {
 
     it('does not acknowledge PayTR notifications with a bad hash and skips onCallback', async () => {
       const { payment } = buildMockPayment({
-        completeThreeDSPayment: vi.fn().mockResolvedValue({ status: 'failure', errorCode: 'INVALID_HASH' }),
+        completeThreeDSPayment: vi
+          .fn()
+          .mockResolvedValue({ status: 'failure', errorCode: 'INVALID_HASH' }),
       });
       const onCallback = vi.fn();
-      const res = await new BetterPaymentHandler(payment, { onCallback }).handle(req('POST', '/api/pay/paytr/callback', {}));
+      const res = await new BetterPaymentHandler(payment, { onCallback }).handle(
+        req('POST', '/api/pay/paytr/callback', {})
+      );
       expect(res.status).toBe(400);
       expect(res.body).not.toBe('OK');
       expect(onCallback).not.toHaveBeenCalled();
@@ -381,13 +461,13 @@ describe('BetterPaymentHandler', () => {
     it('iyzico-only routes return 400 for other providers', async () => {
       const { payment } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment, allowAll);
-      expect((await handler.handle(req('POST', '/api/pay/paytr/checkout/init', {}))).status).toBe(400);
-      expect((await handler.handle(req('POST', '/api/pay/paytr/subscription/initialize', {}))).status).toBe(400);
+      expect((await handler.handle(req('POST', '/api/pay/paytr/pwi/init', {}))).status).toBe(400);
+      expect(
+        (await handler.handle(req('POST', '/api/pay/paytr/subscription/initialize', {}))).status
+      ).toBe(400);
     });
 
     it.each([
-      ['checkout/init', 'initCheckoutForm'],
-      ['checkout/retrieve', 'retrieveCheckoutForm'],
       ['pwi/init', 'initPWIPayment'],
       ['pwi/retrieve', 'retrievePWIPayment'],
       ['subscription/initialize', 'initializeSubscription'],
@@ -407,12 +487,68 @@ describe('BetterPaymentHandler', () => {
       expect(fn).toHaveBeenCalled();
     });
 
+    it('checkout/init runs createCheckout for every provider', async () => {
+      const createCheckout = vi.fn().mockResolvedValue({
+        status: 'pending',
+        redirectUrl: 'https://hosted.example/pay',
+        token: 'T1',
+      });
+      const { payment } = buildMockPayment({ createCheckout });
+      const handler = new BetterPaymentHandler(payment, allowAll);
+      const res = await handler.handle(
+        req('POST', '/api/pay/paytr/checkout/init', { returnUrl: 'https://shop/x' })
+      );
+      expect(res.status).toBe(200);
+      expect(createCheckout).toHaveBeenCalledWith({ returnUrl: 'https://shop/x' });
+      expect((await handler.handle(req('POST', '/api/pay/iyzico/checkout/init', {}))).status).toBe(
+        200
+      );
+    });
+
+    it('checkout/init answers 400 when the provider has no hosted page', async () => {
+      const { payment } = buildMockPayment();
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/paytr/checkout/init', {})
+      );
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/not supported/i);
+    });
+
+    it('checkout/retrieve is privileged and passes the token to getCheckoutResult', async () => {
+      const getCheckoutResult = vi.fn().mockResolvedValue({ status: 'success', paymentId: 'O1' });
+      const { payment } = buildMockPayment({ getCheckoutResult });
+      expect(
+        () => new BetterPaymentHandler(payment, { allowedActions: ['checkout/retrieve'] })
+      ).toThrow(/authorize/);
+      const res = await new BetterPaymentHandler(payment, allowAll).handle(
+        req('POST', '/api/pay/paytr/checkout/retrieve', { token: 'O1' })
+      );
+      expect(res.status).toBe(200);
+      expect(getCheckoutResult).toHaveBeenCalledWith('O1');
+    });
+
+    it('checkout/retrieve requires a non-empty token', async () => {
+      const { payment } = buildMockPayment({ getCheckoutResult: vi.fn() });
+      const handler = new BetterPaymentHandler(payment, allowAll);
+      expect(
+        (await handler.handle(req('POST', '/api/pay/paytr/checkout/retrieve', {}))).status
+      ).toBe(400);
+      expect(
+        (await handler.handle(req('POST', '/api/pay/paytr/checkout/retrieve', { token: '' })))
+          .status
+      ).toBe(400);
+    });
+
     it('token payments require provider support', async () => {
       const { payment } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment, allowAll);
-      expect((await handler.handle(req('POST', '/api/pay/iyzico/payment/token', {}))).status).toBe(400);
+      expect((await handler.handle(req('POST', '/api/pay/iyzico/payment/token', {}))).status).toBe(
+        400
+      );
 
-      const withToken = buildMockPayment({ createPaymentWithToken: vi.fn().mockResolvedValue({ status: 'pending' }) });
+      const withToken = buildMockPayment({
+        createPaymentWithToken: vi.fn().mockResolvedValue({ status: 'pending' }),
+      });
       const res = await new BetterPaymentHandler(withToken.payment, allowAll).handle(
         req('POST', '/api/pay/paytr/payment/token', { utoken: 'u' })
       );

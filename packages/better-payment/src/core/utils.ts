@@ -45,6 +45,15 @@ export function formatDecimal(
 }
 
 /**
+ * Highest allowed installment count from a list such as `[1, 3, 6]`
+ * (providers that only take a maximum), or undefined when nothing is allowed.
+ */
+export function maxInstallment(installments?: number[]): number | undefined {
+  if (!installments?.length) return undefined;
+  return Math.max(1, ...installments.filter((n) => Number.isInteger(n) && n > 1));
+}
+
+/**
  * Returns an error message safe to expose (never undefined).
  */
 export function errorMessage(error: unknown, fallback: string): string {

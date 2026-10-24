@@ -4,6 +4,7 @@ import type {
   RefundRequest,
   CancelRequest,
   CheckoutFormRequest,
+  CheckoutRequest,
   PaymentCard,
   Buyer,
   Address,
@@ -121,4 +122,20 @@ export const mockCheckoutFormRequest: CheckoutFormRequest = {
   basketItems: mockBasketItems,
   conversationId: '123456789',
   enabledInstallments: [2, 3, 6, 9],
+};
+
+export const mockCheckoutRequest: CheckoutRequest = {
+  price: '1',
+  paidPrice: '1.2',
+  currency: Currency.TRY,
+  basketId: 'B67832',
+  buyer: mockBuyer,
+  shippingAddress: mockShippingAddress,
+  billingAddress: mockBillingAddress,
+  basketItems: mockBasketItems,
+  conversationId: '123456789',
+  returnUrl: 'https://shop.example/return',
+  failUrl: 'https://shop.example/fail',
+  installments: [1, 3, 6],
+  locale: 'en',
 };

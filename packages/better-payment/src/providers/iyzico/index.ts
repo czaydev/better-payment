@@ -34,6 +34,8 @@ import {
   CheckoutFormRequest,
   CheckoutFormInitResponse,
   CheckoutFormRetrieveResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   BinCheckResponse,
   PWIPaymentRequest,
   PWIPaymentInitResponse,
@@ -312,7 +314,7 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    */
   private mapToIyzicoCheckoutFormRequest(request: CheckoutFormRequest): IyzicoCheckoutFormRequest {
     return {
-      locale: this.config.locale || 'tr',
+      locale: request.locale || this.config.locale || 'tr',
       conversationId: request.conversationId,
       price: request.price,
       paidPrice: request.paidPrice,
@@ -712,6 +714,79 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
     } catch (error) {
       return this.failure(error, 'Retrieve checkout form failed');
     }
+  }
+
+  /**
+   * Hosted checkout: iyzico's Checkout Form. The card is entered on iyzico's
+   * page, so card data never touches your server. `returnUrl` becomes iyzico's
+   * `callbackUrl`: the customer's browser returns there with UNSIGNED query
+   * parameters — it is not a payment confirmation. iyzico has no separate
+   * failure URL, so `failUrl` is ignored. Verify with `getCheckoutResult(token)`
+   * or the checkout form's callback POST processed through the handler's
+   * verified-callback flow.
+   */
+  async createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    const form = await this.initCheckoutForm({
+      price: request.price,
+      paidPrice: request.paidPrice,
+      currency: request.currency,
+      basketId: request.basketId,
+      callbackUrl: request.returnUrl,
+      enabledInstallments: request.installments,
+      locale: request.locale,
+      buyer: request.buyer,
+      shippingAddress: request.shippingAddress,
+      billingAddress: request.billingAddress,
+      basketItems: request.basketItems,
+      conversationId: request.conversationId,
+    });
+
+    return this.withErrorCode({
+      // The init call's `success` means the page is ready, not that the customer paid
+      status: form.status === PaymentStatus.SUCCESS ? PaymentStatus.PENDING : form.status,
+      redirectUrl: form.paymentPageUrl,
+      iframeUrl: form.paymentPageUrl,
+      html: form.checkoutFormContent,
+      token: form.token,
+      tokenExpireTime: form.tokenExpireTime,
+      conversationId: form.conversationId,
+      code: form.code,
+      errorCode: form.errorCode,
+      errorMessage: form.errorMessage,
+      providerMessage: form.providerMessage,
+      rawResponse: form.rawResponse,
+    });
+  }
+
+  /**
+   * The result of a hosted checkout, asked from iyzico directly
+   * (`/payment/iyzipos/checkoutform/auth/ecom/detail`). `success` only when
+   * iyzico reports the payment as SUCCESS; an unknown or still-open token is
+   * never success. When the customer saved their card on the form, its tokens
+   * come back in `storedCard`.
+   */
+  async getCheckoutResult(token: string): Promise<PaymentResponse> {
+    const retrieved = await this.retrieveCheckoutForm(token);
+    const succeeded = retrieved.status === PaymentStatus.SUCCESS;
+
+    return this.withErrorCode({
+      status: retrieved.status,
+      paymentId: retrieved.paymentId,
+      conversationId: retrieved.conversationId,
+      code: retrieved.code,
+      errorCode: retrieved.errorCode,
+      errorMessage: retrieved.errorMessage,
+      providerMessage: retrieved.providerMessage,
+      ...(succeeded && retrieved.cardUserKey
+        ? {
+            storedCard: {
+              customerToken: retrieved.cardUserKey,
+              cardToken: retrieved.cardToken,
+            },
+          }
+        : {}),
+      rawResponse: retrieved.rawResponse,
+    });
   }
 
   /**

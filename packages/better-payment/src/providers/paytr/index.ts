@@ -11,13 +11,15 @@ import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
 import { PAYTR_ERROR_CODES } from './error-codes';
 import type { PaymentErrorCode } from '../../core/error-codes';
-import { generateOrderId, parseAmount } from '../../core/utils';
+import { generateOrderId, maxInstallment, parseAmount } from '../../core/utils';
 import { randomHex } from '../../core/crypto';
 import {
   PaymentRequest,
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -388,6 +390,91 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
       ...(approved ? PayTR.savedCardOf(callbackData) : {}),
       rawResponse: callbackData,
     });
+  }
+
+  /**
+   * Hosted checkout: PayTR's iFrame page, where the card is entered. It needs
+   * the iFrame mode (`threeDSMode: 'iframe'`, the default); with `'direct'`
+   * PayTR expects the card in the request, so a hosted page is not available.
+   *
+   * `returnUrl` becomes `merchant_ok_url` and `failUrl` (default `returnUrl`)
+   * `merchant_fail_url`. They only decide where the customer's browser goes;
+   * the payment result is sent server-to-server to the notification URL in the
+   * PayTR panel and must be processed with `completeThreeDSPayment()`.
+   * `installments` is reduced to its highest value (`max_installment`).
+   * `token` is the order id (merchant_oid) for `getCheckoutResult()`; the iFrame
+   * token itself is only part of the URL.
+   */
+  async createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    if (this.config.threeDSMode === 'direct') {
+      throw this.notSupported(
+        'Hosted checkout',
+        "PayTR threeDSMode is 'direct'; createCheckout() needs the iFrame mode"
+      );
+    }
+    const init = await this.initThreeDSPayment({
+      price: request.price,
+      paidPrice: request.paidPrice,
+      currency: request.currency,
+      basketId: request.basketId,
+      buyer: request.buyer,
+      shippingAddress: request.shippingAddress,
+      billingAddress: request.billingAddress,
+      basketItems: request.basketItems,
+      conversationId: request.conversationId,
+      callbackUrl: request.returnUrl,
+      failUrl: request.failUrl,
+      installment: maxInstallment(request.installments),
+    });
+
+    return this.withErrorCode({
+      status: init.status,
+      redirectUrl: init.redirectUrl,
+      iframeUrl: init.redirectUrl,
+      html: init.threeDSHtmlContent,
+      token: init.paymentId,
+      paymentId: init.paymentId,
+      conversationId: init.conversationId,
+      code: init.code,
+      errorCode: init.errorCode,
+      errorMessage: init.errorMessage,
+      providerMessage: init.providerMessage,
+      rawResponse: init.rawResponse,
+    });
+  }
+
+  /**
+   * The result of a hosted checkout, asked from PayTR's status endpoint
+   * (`/odeme/durum-sorgu`, `token` = merchant_oid). PayTR answers `success`
+   * only for a payment it has; anything else is NOT a decline but an
+   * unconfirmed order, so it stays `pending` (the notification is the
+   * authoritative failure signal). A `success` here is a verified payment.
+   */
+  async getCheckoutResult(token: string): Promise<PaymentResponse> {
+    try {
+      const data = await this.queryStatus(token);
+      if (data.status !== 'success') {
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          paymentId: token,
+          conversationId: token,
+          errorCode: data.err_no,
+          errorMessage: data.err_msg || 'PayTR has not confirmed this payment yet',
+          rawResponse: data,
+        });
+      }
+      return this.withErrorCode({
+        status: PaymentStatus.SUCCESS,
+        paymentId: token,
+        conversationId: token,
+        rawResponse: data,
+      });
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, 'Checkout result lookup failed', {
+        paymentId: token,
+        conversationId: token,
+      });
+    }
   }
 
   /**
