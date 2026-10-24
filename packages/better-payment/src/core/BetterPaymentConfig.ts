@@ -19,6 +19,10 @@ export enum ProviderType {
   ALBARAKA = 'albaraka',
   /** QNBpay, on Sipay's platform: `sipay({ brand: 'qnbpay' })` or `qnbpay()` */
   QNBPAY = 'qnbpay',
+  /** Payten (Paratika) brands, all created with `paratika({ brand })` */
+  PARATIKA = 'paratika',
+  VAKIFPAY = 'vakifpay',
+  ZIRAATPAY = 'ziraatpay',
   /** EST (Asseco) banks, all created with `est({ bank })` */
   ISBANK = 'isbank',
   ZIRAAT = 'ziraat',
@@ -155,6 +159,18 @@ export const PROVIDER_DEFAULT_URLS: Record<
   [ProviderType.QNBPAY]: {
     sandbox: 'https://test.qnbpay.com.tr',
     production: 'https://portal.qnbpay.com.tr',
+  },
+  [ProviderType.PARATIKA]: {
+    sandbox: 'https://entegrasyon.paratika.com.tr/paratika/api/v2',
+    production: 'https://vpos.paratika.com.tr/paratika/api/v2',
+  },
+  [ProviderType.VAKIFPAY]: {
+    sandbox: 'https://testpos.vakifpays.com.tr/vakifpays/api/v2',
+    production: 'https://pos.vakifpays.com.tr/vakifpays/api/v2',
+  },
+  [ProviderType.ZIRAATPAY]: {
+    sandbox: 'https://test.ziraatpay.com.tr/ziraatpay/api/v2',
+    production: 'https://vpos.ziraatpay.com.tr/ziraatpay/api/v2',
   },
   // The EST banks share Asseco's test host
   [ProviderType.ISBANK]: {

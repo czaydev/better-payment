@@ -2,7 +2,8 @@
 
 > One type-safe API for Turkish payments, in Node.js and on the edge.
 
-Accept cards through iyzico, PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB,
+Accept cards through iyzico, PayTR, Parampos, Sipay, Paratika (VakıfPay,
+ZiraatPay), Akbank, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB,
 VakıfBank, Albaraka Türk, Denizbank and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank)
 with one config, one result shape and verified 3D Secure callbacks. Switch or add a provider without
 rewriting your checkout.
@@ -121,6 +122,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Parampos     | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay        | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | QNBpay ³     | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| Paratika ⁴   | ✓                         | ✓ Direct POST 3D            |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Akbank       | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk  | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | Garanti BBVA | ✓                         | ✓ 3D / 3D_PAY / GarantiPay  |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
@@ -135,6 +137,7 @@ this id to `refund`, `cancel` and `getPayment`.
 Halkbank Macedonia, with `est({ bank })`.
 ² Albaraka Türk. `paymentId` is the bank's ReferenceCode; the 3D completion needs the order id, amount and currency from your records. `getPayment()` takes the order id.
 ³ QNBpay runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })`. Not verified with a test merchant yet.
+⁴ Paratika, VakıfPay and ZiraatPay (Payten), with `paratika({ brand })`. `paymentId` is the pgTranId.
 
 ### 3D Secure completion
 
@@ -175,12 +178,16 @@ Halkbank Macedonia, with `est({ bank })`.
   `completeThreeDSPayment(callbackBody, { orderId, amount, currency })`; `3D_PAY` and
   GarantiPay are checked with an order inquiry. An unsigned callback is only ever a
   failure, without ids.
+- **Paratika / VakıfPay / ZiraatPay:** the customer's browser posts the card straight to
+  Paratika (Direct POST 3D), which POSTs the result to your `callbackUrl`. The `sdSha512`
+  hash is verified when `secretKey` is set, and the payment is always confirmed with
+  `QUERYTRANSACTION`.
 - **PayTR:** `callbackUrl` is only where the customer's browser returns. The
   result is sent to the **notification URL** set in the PayTR panel. Point it at
   `/api/pay/paytr/callback`; the handler verifies the notification and replies
   `OK`.
 
-Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank and Albaraka Türk:
+Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Paratika, Akbank and Albaraka Türk:
 `authorize()` / `initThreeDSAuthorize()`, then `capture({ paymentId, amount, ip })` or
 `voidAuthorization({ paymentId, ip })`. See the
 [pre-authorization guide](https://better-payment.czaylabs.com/docs/payments/pre-authorization).
