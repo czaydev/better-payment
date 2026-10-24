@@ -415,3 +415,6 @@ export class BetterPaymentClient {
 export function createBetterPaymentClient(config: BetterPaymentClientConfig): BetterPaymentClient {
   return new BetterPaymentClient(config);
 }
+
+export { buildInstallmentTable } from '../core/installments';
+export type { InstallmentTableRow, BuildInstallmentTableOptions } from '../core/installments';

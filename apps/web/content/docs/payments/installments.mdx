@@ -1,0 +1,92 @@
+---
+title: Installment table helper
+description: Transform installment query responses into clean, formatted tables for checkout pages.
+---
+
+<Since version="0.12.0" />
+
+`installmentInfo()` returns the raw installment options from providers like iyzico, PayTR, Parampos and Sipay. Every checkout page needs to display these options in a clear, formatted comparison table (e.g. "3 x 340,00 TL, total 1.020,00 TL").
+
+`buildInstallmentTable()` is a pure, isomorphic helper exported from both `better-payment` and `better-payment/client`. It computes exact kuruş differences from single payments, sorts options by installment count, and formats amounts with `Intl.NumberFormat`.
+
+```typescript
+import { buildInstallmentTable } from 'better-payment';
+// or in client-side code:
+// import { buildInstallmentTable } from 'better-payment/client';
+
+const info = await payment.iyzico.installmentInfo({
+  binNumber: '552879',
+  price: '100.00',
+});
+
+const table = buildInstallmentTable(info);
+```
+
+## Table rows
+
+Each item in the returned array represents one installment row:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `count` | `number` | Installment count (1 = single payment, 2, 3, 6, 12, etc.) |
+| `monthlyAmount` | `number` | Raw monthly amount as a number (e.g. `34.5`) |
+| `formattedMonthlyAmount` | `string` | Formatted monthly amount (e.g. `₺34,50`) |
+| `total` | `number` | Raw total amount to be charged (e.g. `103.5`) |
+| `formattedTotal` | `string` | Formatted total amount (e.g. `₺103,50`) |
+| `difference` | `number` | Difference from single payment total (`0` for single payment) |
+| `formattedDifference` | `string` | Formatted difference (e.g. `₺0,00` or `₺3,50`) |
+| `isSinglePayment` | `boolean` | `true` when `count === 1` |
+| `commissionRate` | `number \| undefined` | Commission percentage when reported by provider |
+| `cardFamily` | `string \| undefined` | Card program name (e.g. `Bonus`, `Maximum`, `Axess`) |
+| `bankName` | `string \| undefined` | Bank name (e.g. `Garanti`, `İş Bankası`, `Akbank`) |
+| `bankCode` | `number \| undefined` | Bank code |
+
+Compatibility aliases `installmentNumber`, `installmentPrice`, and `totalPrice` are also provided on each row.
+
+## Options
+
+`buildInstallmentTable(response, options)` accepts the following configuration:
+
+```typescript
+const table = buildInstallmentTable(info, {
+  locale: 'tr-TR', // default: 'tr-TR'
+  currency: 'TRY', // default: 'TRY'
+  cardFamily: 'Bonus', // select a specific card family if response contains multiple
+  bankCode: 46, // or filter by bank code
+  allDetails: false, // true to combine rows from all returned card programs
+  singlePaymentTotal: 100, // optional baseline if the provider omitted count 1
+});
+```
+
+### Rendering in React / UI
+
+```tsx
+import { buildInstallmentTable } from 'better-payment/client';
+
+function InstallmentTable({ info }) {
+  const rows = buildInstallmentTable(info);
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Installments</th>
+          <th>Monthly</th>
+          <th>Total</th>
+          <th>Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.count} className={row.isSinglePayment ? 'single-payment' : ''}>
+            <td>{row.isSinglePayment ? 'Single payment' : `${row.count} installments`}</td>
+            <td>{row.formattedMonthlyAmount}</td>
+            <td>{row.formattedTotal}</td>
+            <td>{row.difference > 0 ? `+${row.formattedDifference}` : 'No interest'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+```

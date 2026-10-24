@@ -1,0 +1,92 @@
+---
+title: Taksit tablosu yardımcısı
+description: Taksit sorgusu yanıtlarını ödeme sayfaları için hazır, biçimlendirilmiş tablolara dönüştürün.
+---
+
+<Since version="0.12.0" />
+
+`installmentInfo()`, iyzico, PayTR, Parampos ve Sipay gibi sağlayıcılardan ham taksit seçeneklerini döner. Her ödeme sayfası bu seçenekleri anlaşılır bir karşılaştırma tablosunda göstermek zorundadır ("3 x 340,00 TL, toplam 1.020,00 TL").
+
+`buildInstallmentTable()`, hem `better-payment` hem de `better-payment/client` üzerinden dışa aktarılan saf ve izomorfik bir yardımcı fonksiyondur. Tek çekim tutarına göre kuruş farkını hesaplar, taksit seçeneklerini taksit sayısına göre sıralar ve tutarları `Intl.NumberFormat` ile biçimlendirir.
+
+```typescript
+import { buildInstallmentTable } from 'better-payment';
+// or in client-side code:
+// import { buildInstallmentTable } from 'better-payment/client';
+
+const info = await payment.iyzico.installmentInfo({
+  binNumber: '552879',
+  price: '100.00',
+});
+
+const table = buildInstallmentTable(info);
+```
+
+## Tablo satırları [#table-rows]
+
+Dönen dizideki her öğe bir taksit satırını temsil eder:
+
+| Özellik | Tip | Açıklama |
+| --- | --- | --- |
+| `count` | `number` | Taksit sayısı (1 = tek çekim, 2, 3, 6, 12 vb.) |
+| `monthlyAmount` | `number` | Sayısal aylık taksit tutarı (örn. `34.5`) |
+| `formattedMonthlyAmount` | `string` | Biçimlendirilmiş aylık tutar (örn. `₺34,50`) |
+| `total` | `number` | Çekilecek sayısal toplam tutar (örn. `103.5`) |
+| `formattedTotal` | `string` | Biçimlendirilmiş toplam tutar (örn. `₺103,50`) |
+| `difference` | `number` | Tek çekim toplamına göre fark (tek çekimde `0`) |
+| `formattedDifference` | `string` | Biçimlendirilmiş fark (örn. `₺0,00` veya `₺3,50`) |
+| `isSinglePayment` | `boolean` | `count === 1` olduğunda `true` |
+| `commissionRate` | `number \| undefined` | Sağlayıcı bildirdiğinde komisyon oranı yüzdesi |
+| `cardFamily` | `string \| undefined` | Kart programı adı (örn. `Bonus`, `Maximum`, `Axess`) |
+| `bankName` | `string \| undefined` | Banka adı (örn. `Garanti`, `İş Bankası`, `Akbank`) |
+| `bankCode` | `number \| undefined` | Banka kodu |
+
+Her satırda sağlayıcı uyumluluğu için `installmentNumber`, `installmentPrice` ve `totalPrice` takma adları da mevcuttur.
+
+## Seçenekler [#options]
+
+`buildInstallmentTable(response, options)` aşağıdaki yapılandırmayı kabul eder:
+
+```typescript
+const table = buildInstallmentTable(info, {
+  locale: 'tr-TR', // default: 'tr-TR'
+  currency: 'TRY', // default: 'TRY'
+  cardFamily: 'Bonus', // select a specific card family if response contains multiple
+  bankCode: 46, // or filter by bank code
+  allDetails: false, // true to combine rows from all returned card programs
+  singlePaymentTotal: 100, // optional baseline if the provider omitted count 1
+});
+```
+
+### React / Arayüzde Kullanım [#rendering-in-react--ui]
+
+```tsx
+import { buildInstallmentTable } from 'better-payment/client';
+
+function InstallmentTable({ info }) {
+  const rows = buildInstallmentTable(info);
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Installments</th>
+          <th>Monthly</th>
+          <th>Total</th>
+          <th>Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.count} className={row.isSinglePayment ? 'single-payment' : ''}>
+            <td>{row.isSinglePayment ? 'Single payment' : `${row.count} installments`}</td>
+            <td>{row.formattedMonthlyAmount}</td>
+            <td>{row.formattedTotal}</td>
+            <td>{row.difference > 0 ? `+${row.formattedDifference}` : 'No interest'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+```
