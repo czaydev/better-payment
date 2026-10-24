@@ -1,0 +1,67 @@
+{
+  "name": "better-payment-cli",
+  "version": "0.0.0",
+  "description": "Command line tools for better-payment: init, doctor and a local 3D Secure callback listener",
+  "type": "module",
+  "bin": {
+    "better-payment": "dist/bin.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests --ext .ts",
+    "format": "prettier --write \"{src,tests}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,tests}/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "payment",
+    "gateway",
+    "cli",
+    "iyzico",
+    "paytr",
+    "parampos",
+    "akbank",
+    "3d-secure",
+    "webhook",
+    "callback",
+    "turkey",
+    "typescript"
+  ],
+  "author": "Better Pay Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/czaydev/better-payment.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/czaydev/better-payment/issues"
+  },
+  "homepage": "https://better-payment.czaylabs.com",
+  "dependencies": {
+    "better-payment": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.9.10",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.11"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ]
+}

@@ -1,0 +1,97 @@
+---
+title: Komut Satırı Arayüzü (CLI)
+description: better-payment CLI entegrasyonunuzu iskeletler, sandbox kimlik bilgilerini doğrular ve sağlayıcı callback'lerini güvenle günlüğe kaydeder.
+---
+
+`better-payment-cli` paketi, bir entegrasyonun çevresindeki üç iş için bağımlılıksız küçük bir CLI sunar: dosyaları üretmek, sandbox kurulumunu doğrulamak ve geliştirme sırasında callback'leri izlemek.
+
+`npx` ile çalıştırın (Node.js 20+):
+
+```bash
+npx better-payment-cli --help
+npx better-payment-cli init --help
+npx better-payment-cli doctor --help
+npx better-payment-cli listen --help
+```
+
+---
+
+## init: entegrasyon dosyalarını üretin [#init-generate-the-integration-files]
+
+`init` framework'ünüzü, paket yöneticinizi ve TypeScript kurulumunuzu algılar, sonra üç dosya yazar:
+
+| Dosya | Amaç |
+| --- | --- |
+| `lib/payment.ts` | Tembel `betterPayment()` singleton'ı ve dışa aktarılan `handlerOptions` |
+| route handler | Handler'ı bağlayan framework'e özel route (Next.js App Router için `app/api/pay/[...payment]/route.ts`) |
+| `.env.example` | Yalnızca değişken adları — asla bir kimlik bilgisi değeri değil |
+
+Mevcut dosyalar `--force` olmadan asla üzerine yazılmaz ve `--install` geçmedikçe hiçbir kurulum komutu çalışmaz.
+
+```bash
+# Detect everything, ask for the providers
+npx better-payment-cli init
+
+# Scripted: Next.js App Router with iyzico and PayTR
+npx better-payment-cli init --framework next-app --provider iyzico,paytr --yes --no-install
+```
+
+Desteklenen framework'ler: `next-app`, `next-pages`, `express`, `fastify`, `hono`, `elysia`, `react-router`, `node`. Desteklenen sağlayıcılar: `iyzico`, `paytr`, `parampos`, `akbank`.
+
+Üretilen config [Next.js entegrasyon rehberini](/docs/integrations/nextjs) izler: `next build`'in kimlik bilgisi olmadan çalışması için tembel singleton, callback'lerin `allowedActions` içinde erişilebilir kalması ve `doctor` için dışa aktarılan `handlerOptions`.
+
+---
+
+## doctor: sandbox kurulumunu doğrulayın [#doctor-verify-the-sandbox-setup]
+
+`doctor`, her ilk entegrasyonda saatler yakan üç soruyu yanıtlar: kimlik bilgileri doğru mu, mod doğru mu ve handler güvenli mi?
+
+```bash
+# Read credentials from the environment
+npx better-payment-cli doctor
+
+# With the generated config module
+npx better-payment-cli doctor --config lib/payment.ts
+```
+
+Her sağlayıcı için bir **salt okunur sorgu** çalıştırır — BIN sorgusu (iyzico, PayTR, Parampos) ya da var olamayacak bir sipariş kimliğiyle sipariş sorgusu (Akbank). Ödeme oluşturulmaz, kart verisi gönderilmez ve kimlik bilgisi değerleri asla yazdırılmaz.
+
+Sonuç, en sık yapılan iki hatayı ayırt eder:
+
+- **401/403 veya bir kimlik doğrulama mesajı** → kimlik bilgileri reddedildi (yanlış anahtar).
+- **404/405, bir HTML sayfası ya da yanıt yok** → mod/base URL yanlış (anahtar hiç kontrol edilmedi).
+
+Ayrıca handler'ı denetler: açığa çıkan `allowedActions`, ayrıcalıklı işlemlerin bir `authorize` kancası arkasında olup olmadığı, callback tekilleştirmesi ve config ödeme nesnesini dışa aktarıyorsa `GET <basePath>/health` turu.
+
+Makine tarafından okunabilir çıktı için `--json` kullanın, örneğin CI'da.
+
+---
+
+## listen: genel bir URL ve güvenli callback günlükleri [#listen-a-public-url-and-safe-callback-logs]
+
+Callback'ler genel bir HTTPS URL'si ister; yerel geliştirmenin hiçbiri yoktur. `listen`, yerel bir günlükleme proxy'si üzerinden bir Cloudflare quick tunnel açar ve sağlayıcı panellerinize yapıştıracağınız URL'leri yazdırır:
+
+```bash
+npx better-payment-cli listen --port 3000
+```
+
+```text
+local    http://localhost:3000 (proxy 127.0.0.1:54123)
+health   https://random-words.trycloudflare.com/api/pay/health
+
+callbackUrl (3D Secure): https://random-words.trycloudflare.com/api/pay/<provider>/payment/complete-3ds
+PayTR notification URL:  https://random-words.trycloudflare.com/api/pay/paytr/callback
+```
+
+Her callback yalnızca sağlayıcı, route, metot, durum ve süre olarak günlüğe kaydedilir. Gövdeler, başlıklar, çerezler, sorgu dizeleri, imzalar ve kart verileri asla okunmaz veya yazdırılmaz.
+
+- Önce [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) kurun veya `--url https://your-tunnel.example.com` ile mevcut bir tüneli göstererek atlayın.
+- Proxy istek gövdelerine dokunmadan iletir; günlük satırını etiketlemek için yalnızca URL yolunu okur.
+
+---
+
+## CLI'nin asla yapmadıkları [#what-the-cli-never-does]
+
+- Asla ödeme, iade veya kart verisi göndermez (`doctor` sorguları salt okunurdur).
+- Asla bir kimlik bilgisi değeri yazdırmaz veya yazmaz (`.env.example` adları tutar, `doctor` sırları maskeler).
+- `--install` geçmedikçe asla bir paket yöneticisi çalıştırmaz.

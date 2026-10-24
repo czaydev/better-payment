@@ -2,6 +2,7 @@
   "title": "Rehberler",
   "icon": "guides",
   "pages": [
+    "cli",
     "writing-plugins",
     "custom-providers",
     "test-cards",
