@@ -3,6 +3,8 @@ import {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  VerifyCardRequest,
+  VerifyCardInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -161,6 +163,15 @@ class ProviderClient {
    */
   async initThreeDSAuthorize(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     return this.request<ThreeDSInitResponse>('POST', 'authorize/init-3ds', request);
+  }
+
+  /**
+   * Verifies a card with a small 3D Secure pre-authorization
+   * (`POST /:provider/verify-card/init-3ds`). The hold is released after the
+   * 3D Secure callback succeeds.
+   */
+  async verifyCard(request: VerifyCardRequest): Promise<VerifyCardInitResponse> {
+    return this.request<VerifyCardInitResponse>('POST', 'verify-card/init-3ds', request);
   }
 
   /**

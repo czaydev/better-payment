@@ -18,6 +18,8 @@ type Awaitable<T> = T | Promise<T>;
  * | `payment.cancelled` | cancel, voidAuthorization: `success`                                    |
  * | `refund.succeeded`  | refund: `success`                                                       |
  * | `refund.failed`     | refund: `failure`                                                       |
+ * | `verification.*`    | verifyCard and the callback of a verification (see below)               |
+ * | `verification.void_failed` | the automatic void after a successful verification failed        |
  */
 export type PaymentEventType =
   | 'payment.succeeded'
@@ -28,7 +30,11 @@ export type PaymentEventType =
   | 'payment.expired'
   | 'payment.unresolved'
   | 'refund.succeeded'
-  | 'refund.failed';
+  | 'refund.failed'
+  | 'verification.succeeded'
+  | 'verification.pending'
+  | 'verification.failed'
+  | 'verification.void_failed';
 
 export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.succeeded',
@@ -40,6 +46,10 @@ export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.unresolved',
   'refund.succeeded',
   'refund.failed',
+  'verification.succeeded',
+  'verification.pending',
+  'verification.failed',
+  'verification.void_failed',
 ];
 
 export interface PaymentEvent<T extends PaymentEventType = PaymentEventType> {
@@ -119,9 +129,15 @@ export function eventFor(
   const status = field(result, 'status');
   // A forged callback is not a payment outcome
   if (field(result, 'errorCode') === 'INVALID_HASH') return undefined;
+  // verifyCard() results, and the callback that completes them, are verifications
+  const verification = operation === 'verifyCard' || field(result, 'verification') === 'card';
 
   let type: PaymentEventType | undefined;
-  if (PAYMENT_OPERATIONS.has(operation)) {
+  if (verification) {
+    if (status === PaymentStatus.SUCCESS) type = 'verification.succeeded';
+    else if (status === PaymentStatus.PENDING) type = 'verification.pending';
+    else if (status === PaymentStatus.FAILURE) type = 'verification.failed';
+  } else if (PAYMENT_OPERATIONS.has(operation)) {
     if (status === PaymentStatus.SUCCESS) {
       type = operation === 'authorize' ? 'payment.authorized' : 'payment.succeeded';
     } else if (status === PaymentStatus.PENDING) type = 'payment.pending';
@@ -137,17 +153,23 @@ export function eventFor(
   if (!type) return undefined;
 
   const code = field(result, 'code') as PaymentErrorCode | undefined;
+  // Never put card data into events (verifyCard requests carry a card)
+  if (verification && request && typeof request === 'object') {
+    request = { ...(request as Record<string, unknown>) };
+    delete (request as Record<string, unknown>).paymentCard;
+  }
   return {
     type,
     provider,
     operation,
     paymentId: field(result, 'paymentId') ?? field(request, 'paymentId'),
     conversationId: field(result, 'conversationId') ?? field(request, 'conversationId'),
-    amount:
-      operation === 'capture'
+    amount: verification
+      ? (field(result, 'amount') ?? field(request, 'price'))
+      : operation === 'capture'
         ? field(request, 'amount')
         : (field(request, 'paidPrice') ?? field(request, 'price')),
-    currency: field(request, 'currency'),
+    currency: field(result, 'currency') ?? field(request, 'currency'),
     ...(code ? { code } : {}),
     result,
     request,

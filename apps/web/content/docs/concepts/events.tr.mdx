@@ -8,16 +8,16 @@ description: Ödeme sonuçlarına, hangi sağlayıcı ya da akıştan gelirse ge
 Bir ödemeyi değiştiren her işlem bir olay yayınlar: bir 3D Secure callback'i, bir PayTR bildirimi, yönetim panelinizden yapılan bir iade. Her sonucu tek tek kontrol etmek yerine olayları dinleyin ve siparişlerinizi tek bir yerde güncelleyin.
 
 ```typescript
-payment.on('payment.succeeded', async (event) => {
+payment.on("payment.succeeded", async (event) => {
   await orders.markPaid(event.conversationId, event.paymentId);
 });
 
-payment.on('refund.succeeded', async (event) => {
+payment.on("refund.succeeded", async (event) => {
   await orders.addRefund(event.paymentId, event.amount);
 });
 
 // Every event
-const off = payment.on('*', (event) => console.log(event.type, event.provider));
+const off = payment.on("*", (event) => console.log(event.type, event.provider));
 off(); // removes the listener
 ```
 
@@ -25,36 +25,42 @@ Olaylar her sağlayıcı için yayınlanır; çağrı ödeme nesnesinde, bir sa�
 
 ## Olaylar [#events]
 
-| Olay | Ne zaman yayınlanır |
-| ---- | ------------------- |
-| `payment.succeeded` | `createPayment`, `completeThreeDSPayment` ya da `capture` başarılı olduğunda |
-| `payment.authorized` | `authorize` başarılı olduğunda: tutar kartta bloke edilmiştir |
-| `payment.pending` | `createPayment`, `completeThreeDSPayment`, `authorize` ya da `capture` `pending` döndüğünde, örneğin `NETWORK_ERROR` ile |
-| `payment.failed` | bir ödeme işlemi, `initThreeDSPayment` ya da `initThreeDSAuthorize` başarısız olduğunda |
-| `payment.cancelled` | `cancel` ya da `voidAuthorization` başarılı olduğunda |
-| `refund.succeeded` | `refund` başarılı olduğunda |
-| `refund.failed` | `refund` başarısız olduğunda |
+| Olay                       | Ne zaman yayınlanır                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `payment.succeeded`        | `createPayment`, `completeThreeDSPayment` ya da `capture` başarılı olduğunda                                             |
+| `payment.authorized`       | `authorize` başarılı olduğunda: tutar kartta bloke edilmiştir                                                            |
+| `payment.pending`          | `createPayment`, `completeThreeDSPayment`, `authorize` ya da `capture` `pending` döndüğünde, örneğin `NETWORK_ERROR` ile |
+| `payment.failed`           | bir ödeme işlemi, `initThreeDSPayment` ya da `initThreeDSAuthorize` başarısız olduğunda                                  |
+| `payment.cancelled`        | `cancel` ya da `voidAuthorization` başarılı olduğunda                                                                    |
+| `refund.succeeded`         | `refund` başarılı olduğunda                                                                                              |
+| `refund.failed`            | `refund` başarısız olduğunda                                                                                             |
+| `verification.pending`     | `verifyCard()` ya da callback'i `pending` döndüğünde                                                                     |
+| `verification.succeeded`   | kart doğrulama callback'i başarılı olduğunda ve bloke serbest bırakıldığında                                             |
+| `verification.failed`      | `verifyCard()` ya da callback'i başarısız olduğunda                                                                      |
+| `verification.void_failed` | doğrulama başarılı oldu ama otomatik bloke serbest bırakma başarısız olduğunda                                           |
 
-3D Secure ön provizyon `completeThreeDSPayment` ile tamamlanır; bu yüzden tutar bloke edildiğinde `payment.succeeded` yayınlar. Durum sorguları (`getPayment`) ve kart işlemleri olay yayınlamaz.
+3D Secure ön provizyon `completeThreeDSPayment` ile tamamlanır; bu yüzden tutar bloke edildiğinde `payment.succeeded` yayınlar. Bir `verifyCard()` oturumu aynı callback'i kullanır ama onun yerine `verification.*` olayları yayınlar. Durum sorguları (`getPayment`) ve kart işlemleri olay yayınlamaz.
 
 <Callout type="info">
-  Olaylar yalnızca sağlayıcının doğruladığı sonuçlar için yayınlanır. Sahte ya da değiştirilmiş bir callback (`errorCode: 'INVALID_HASH'`) hiçbir olay yayınlamaz.
+  Olaylar yalnızca sağlayıcının doğruladığı sonuçlar için yayınlanır. Sahte ya
+  da değiştirilmiş bir callback (`errorCode: 'INVALID_HASH'`) hiçbir olay
+  yayınlamaz.
 </Callout>
 
 ## Olay nesnesi [#the-event]
 
 ```typescript
 interface PaymentEvent {
-  type: PaymentEventType;       // 'payment.succeeded', ...
-  provider: string;             // the provider id, e.g. 'iyzico'
-  operation: PaymentOperation;  // 'createPayment', 'completeThreeDSPayment', ...
-  paymentId?: string;           // the provider's payment id, when known
-  conversationId?: string;      // your order id, when known
-  amount?: string;              // charged or refunded amount, from the request
+  type: PaymentEventType; // 'payment.succeeded', ...
+  provider: string; // the provider id, e.g. 'iyzico'
+  operation: PaymentOperation; // 'createPayment', 'completeThreeDSPayment', ...
+  paymentId?: string; // the provider's payment id, when known
+  conversationId?: string; // your order id, when known
+  amount?: string; // charged or refunded amount, from the request
   currency?: string;
-  code?: PaymentErrorCode;      // normalized error code of failures
-  result: unknown;              // the result returned to the caller
-  request: unknown;             // the request (the callback data for 3D Secure completions)
+  code?: PaymentErrorCode; // normalized error code of failures
+  result: unknown; // the result returned to the caller
+  request: unknown; // the request (the callback data for 3D Secure completions)
 }
 ```
 
@@ -67,15 +73,15 @@ Belirli bir olayın dinleyicisi daraltılmış tipi alır: `payment.on('payment.
 Dinleyiciler işlemden sonra sırayla çalışır ve beklenir. Biri hata fırlatırsa işlem bir `EventListenerError` fırlatır. Ödemenin kendisi gerçekleşmiştir, bu yüzden hata sonucu taşır:
 
 ```typescript
-import { EventListenerError } from 'better-payment';
+import { EventListenerError } from "better-payment";
 
 try {
   await payment.createPayment(request);
 } catch (error) {
   if (error instanceof EventListenerError) {
     error.result; // the payment result
-    error.event;  // the event whose listener failed
-    error.cause;  // what the listener threw
+    error.event; // the event whose listener failed
+    error.cause; // what the listener threw
   }
 }
 ```
@@ -92,16 +98,18 @@ Dinleyicileri iki kez çalışmaları zarar vermeyecek şekilde yazın; örneği
 Bir plugin dinleyicilerini `events` içinde tanımlar. Her olayda önce o olayın dinleyicileri, sonra `*` dinleyicileri çalışır. İki grupta da plugin dinleyicileri plugin sırasıyla ve `payment.on()` ile eklenen dinleyicilerden önce çalışır:
 
 ```typescript
-import { definePlugin } from 'better-payment';
+import { definePlugin } from "better-payment";
 
 export const slackAlerts = (webhookUrl: string) =>
   definePlugin({
-    id: 'slack-alerts',
+    id: "slack-alerts",
     events: {
-      'payment.failed': async (event) => {
+      "payment.failed": async (event) => {
         await fetch(webhookUrl, {
-          method: 'POST',
-          body: JSON.stringify({ text: `Payment failed on ${event.provider}: ${event.code}` }),
+          method: "POST",
+          body: JSON.stringify({
+            text: `Payment failed on ${event.provider}: ${event.code}`,
+          }),
         });
       },
     },

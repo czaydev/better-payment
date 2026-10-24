@@ -33,11 +33,15 @@ import {
   type PaymentEventListener,
   type PaymentEventName,
 } from './events';
+import { PaymentStatus } from '../types';
 import type {
   PaymentRequest,
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  VerifyCardRequest,
+  VerifyCardInitResponse,
+  VerifyCardResult,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -81,6 +85,20 @@ interface RunOptions {
   emit?: boolean;
 }
 
+/** @internal A verifyCard() 3D Secure session waiting for its callback */
+interface PendingVerification {
+  /** The buyer's IP, needed to void; no card data is kept */
+  ip: string;
+  paymentId?: string;
+  conversationId?: string;
+  amount?: string;
+  currency?: string;
+  createdAt: number;
+}
+
+/** How long a pending verification is kept without a callback */
+const VERIFICATION_TTL_MS = 60 * 60 * 1000;
+
 function isProviderInstance(entry: ProviderEntry): entry is PaymentProvider {
   return typeof (entry as Partial<PaymentProvider>).createPayment === 'function';
 }
@@ -106,6 +124,7 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
     hook: NonNullable<BetterPaymentPlugin['onResponse']>;
   }[] = [];
   private readonly listeners = new Map<PaymentEventName, AnyListener[]>();
+  private readonly verifications = new Map<string, PendingVerification>();
   private readonly defaultProviderId?: string;
   private initialized?: Promise<void>;
   private initializedPlugins = 0;
@@ -288,8 +307,123 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
       }
     }
 
+    // remember a verifyCard() 3D Secure init so its callback can release the
+    // hold; every completion path goes through this method
+    if (operation === 'verifyCard') {
+      const init = after.result as Partial<VerifyCardInitResponse> | undefined;
+      if (ctx.provider && init?.verification === 'card') {
+        if (init.status === PaymentStatus.PENDING || init.status === PaymentStatus.SUCCESS) {
+          const { paymentId, conversationId } = init;
+          if (paymentId || conversationId) {
+            // drop sessions nobody completed, so the map cannot grow forever
+            const cutoff = Date.now() - VERIFICATION_TTL_MS;
+            for (const [key, record] of this.verifications) {
+              if (record.createdAt < cutoff) this.verifications.delete(key);
+            }
+            const record: PendingVerification = {
+              // keep only what the void needs: never retain the card in memory
+              ip: (ctx.request as VerifyCardRequest | undefined)?.buyer?.ip ?? '',
+              paymentId,
+              conversationId,
+              amount: init.amount,
+              currency: init.currency,
+              createdAt: Date.now(),
+            };
+            const prefix = `${ctx.provider}:`;
+            if (paymentId) this.verifications.set(prefix + paymentId, record);
+            if (conversationId) this.verifications.set(prefix + conversationId, record);
+          }
+        }
+      }
+    } else if (operation === 'completeThreeDSPayment') {
+      after = {
+        ...after,
+        result: await this.settleVerification(ctx.provider, ctx.request, after.result),
+      } as typeof after;
+    }
+
     if (emit) await this.emit(operation, after.provider, after.request, after.result);
     return after.result;
+  }
+
+  /**
+   * @internal Settles the callback of a verifyCard() session: a successful
+   * completion voids the hold, then the result carries the verification
+   * outcome. A failed authentication left no hold, so it is not voided.
+   */
+  private async settleVerification(
+    provider: string | undefined,
+    request: unknown,
+    result: unknown
+  ): Promise<unknown> {
+    const completion = result as VerifyCardResult;
+    // A forged callback is not an outcome: keep the session for the real one
+    if (!provider || !completion || completion.errorCode === 'INVALID_HASH') return result;
+
+    // The completion result carries the provider's id; the callback body is the
+    // fallback (some providers, e.g. iyzico, omit ids from failed completions).
+    const callback = (request ?? {}) as Record<string, unknown>;
+    const id =
+      completion.paymentId ??
+      completion.conversationId ??
+      callback.paymentId ??
+      callback.conversationId;
+    const record = id ? this.verifications.get(`${provider}:${id}`) : undefined;
+    if (!record) return result;
+
+    completion.verification = 'card';
+    completion.amount = record.amount;
+    completion.currency = record.currency;
+    if (completion.status !== PaymentStatus.SUCCESS) return completion;
+
+    this.verifications.delete(`${provider}:${record.paymentId}`);
+    this.verifications.delete(`${provider}:${record.conversationId}`);
+
+    const stored = completion.storedCard;
+    if (stored) {
+      completion.cardToken = stored.cardToken;
+      completion.customerToken = stored.customerToken;
+    }
+
+    const voidRequest: VoidAuthorizationRequest = {
+      paymentId: completion.paymentId ?? record.paymentId ?? '',
+      ip: record.ip,
+      conversationId: completion.conversationId,
+    };
+    let voidResult: CancelResponse;
+    try {
+      // Hooks and the payment.cancelled event apply to the automatic void
+      voidResult = (await this.run('voidAuthorization', provider, voidRequest, {
+        routable: false,
+      })) as CancelResponse;
+    } catch {
+      voidResult = {
+        status: PaymentStatus.FAILURE,
+        errorMessage: 'Automatic void failed',
+      };
+    }
+
+    completion.voided = voidResult.status === PaymentStatus.SUCCESS;
+    if (!completion.voided) {
+      completion.voidError = {
+        status: voidResult.status,
+        code: voidResult.code,
+        errorMessage: voidResult.errorMessage,
+      };
+      await this.emitEvent({
+        type: 'verification.void_failed',
+        provider,
+        operation: 'completeThreeDSPayment',
+        paymentId: completion.paymentId ?? record.paymentId,
+        conversationId: completion.conversationId ?? record.conversationId,
+        amount: record.amount,
+        currency: record.currency,
+        code: voidResult.code,
+        result: completion,
+        request: voidRequest,
+      });
+    }
+    return completion;
   }
 
   private resolve(providerId: string | undefined): PaymentProvider {
@@ -489,6 +623,14 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   /** 3D Secure pre-authorization with the default provider */
   initThreeDSAuthorize(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     return this.call('initThreeDSAuthorize', request);
+  }
+
+  /**
+   * Verifies a card with a small 3D Secure pre-authorization that is released
+   * automatically after a successful callback, with the default provider.
+   */
+  verifyCard(request: VerifyCardRequest): Promise<VerifyCardInitResponse> {
+    return this.call('verifyCard', request);
   }
 
   /** Captures a pre-authorization with the default provider */

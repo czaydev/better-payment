@@ -217,6 +217,59 @@ export interface ThreeDSInitResponse {
 }
 
 /**
+ * Card verification request: a small 3D Secure pre-authorization that is
+ * released as soon as the authentication succeeds, so nothing stays held.
+ */
+export interface VerifyCardRequest {
+  /** The card to verify */
+  paymentCard: PaymentCard;
+  buyer: Buyer;
+  /** Where the provider posts the 3D Secure result (the handler's callback route) */
+  callbackUrl: string;
+  /**
+   * Store the card when the verification succeeds, on providers that can store
+   * it in the same flow. The tokens come back as `cardToken` / `customerToken`.
+   */
+  saveCard?: boolean | { customerToken?: string; alias?: string };
+  /** Your order id; a `VC...` id is generated when omitted */
+  conversationId?: string;
+}
+
+/** 3D Secure init response of verifyCard() */
+export interface VerifyCardInitResponse extends ThreeDSInitResponse {
+  /** Marks the init as a card verification, not a charge */
+  verification: 'card';
+  /** Amount held (and released after the authentication) */
+  amount?: string;
+  currency?: string;
+}
+
+/**
+ * The completion result of a verifyCard() callback: a PaymentResponse with the
+ * verification outcome. `voided: false` means the card was verified but the
+ * automatic release failed; void the hold manually.
+ */
+export interface VerifyCardResult extends PaymentResponse {
+  /** Marks the result as a card verification, not a charge */
+  verification: 'card';
+  /** Amount that was held */
+  amount?: string;
+  currency?: string;
+  /** True when the hold was released automatically */
+  voided?: boolean;
+  /** Why the automatic release failed (`voided` is false) */
+  voidError?: {
+    status: PaymentStatus;
+    code?: PaymentErrorCode;
+    errorCode?: string;
+    errorMessage?: string;
+  };
+  /** Token of the card saved during the verification (`saveCard`) */
+  cardToken?: string;
+  customerToken?: string;
+}
+
+/**
  * Refund request
  */
 export interface RefundRequest {

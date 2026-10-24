@@ -66,6 +66,7 @@ export type BuiltInHandlerAction =
   | 'cancel'
   | 'authorize'
   | 'authorize/init-3ds'
+  | 'verify-card/init-3ds'
   | 'capture'
   | 'void'
   | 'cards/save'
@@ -96,6 +97,7 @@ export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
   'cancel',
   'authorize',
   'authorize/init-3ds',
+  'verify-card/init-3ds',
   'capture',
   'void',
   'cards/save',
@@ -249,6 +251,7 @@ export const IDEMPOTENT_KEY_ACTIONS: HandlerAction[] = [
   'cancel',
   'authorize',
   'authorize/init-3ds',
+  'verify-card/init-3ds',
   'capture',
   'void',
   'cards/save',
@@ -336,6 +339,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
  * - GET  /:provider/payment/:id            -> getPayment()
  * - POST /:provider/refund | cancel        -> refund() / cancel()
  * - POST /:provider/authorize[/init-3ds]    -> authorize() / initThreeDSAuthorize()
+ * - POST /:provider/verify-card/init-3ds   -> verifyCard()
  * - POST /:provider/capture | void         -> capture() / voidAuthorization()
  * - POST /:provider/cards/{save,list,delete} -> saveCard() / listCards() / deleteCard()
  * - POST /:provider/installment | bin-check
@@ -728,6 +732,10 @@ export class BetterPaymentHandler {
       case 'authorize/init-3ds':
         this.requireMethod(ctx, 'POST');
         return this.resultResponse(await provider.initThreeDSAuthorize(this.requireBody(ctx)));
+
+      case 'verify-card/init-3ds':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(await provider.verifyCard(this.requireBody(ctx)));
 
       case 'capture':
         this.requireMethod(ctx, 'POST');
