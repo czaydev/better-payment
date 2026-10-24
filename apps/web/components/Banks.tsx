@@ -52,7 +52,7 @@ const institutions: RouteItem[] = [
   { name: "QNBpay", since: "0.12.0" },
   { name: "Moka United", logo: "/brand/institutions/moka-united.svg", w: 196, h: 80, tall: true, issue: 40 },
   { name: "Papara", logo: "/brand/institutions/papara.png", w: 1280, h: 354, issue: 40 },
-  { name: "Lidio", logo: "/brand/institutions/lidio.svg", w: 197, h: 91, tall: true, issue: 40 },
+  { name: "Lidio", logo: "/brand/institutions/lidio.svg", w: 197, h: 91, tall: true, since: "0.12.0" },
 ];
 
 const ISSUES = "https://github.com/czaydev/better-payment/issues";
