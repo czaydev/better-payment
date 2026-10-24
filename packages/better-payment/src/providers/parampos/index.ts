@@ -31,9 +31,21 @@ import {
   InstallmentDetail,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  SaveCardRequest,
+  SaveCardResponse,
+  ListCardsResponse,
+  DeleteCardRequest,
+  DeleteCardResponse,
+  SavedCardTokens,
+  StoredCard,
   PaymentStatus,
 } from '../../types';
-import { ParamposResult, Parampos3DSCallbackData, ParamposOrderStatus } from './types';
+import {
+  ParamposResult,
+  Parampos3DSCallbackData,
+  ParamposKsCallbackData,
+  ParamposOrderStatus,
+} from './types';
 import { PARAMPOS_ERROR_CODES } from './error-codes';
 import { ISO8583_ERROR_CODES, PaymentErrorCode, resolveErrorCode } from '../../core/error-codes';
 import {
@@ -50,8 +62,14 @@ import {
   isParamposSuccess,
   parseParamposAmount,
   parseParamposDataSetRows,
+  extractParamposDataSetXml,
+  decodeParamposHtml,
   paramposRatesOf,
   calculateParamposTotalMinor,
+  PARAMPOS_NAMESPACE,
+  PARAMPOS_KS_NAMESPACE,
+  PARAMPOS_KS_URLS,
+  defaultParamposKsUrl,
   XmlValue,
 } from './utils';
 
@@ -59,6 +77,12 @@ import {
  * Parampos configuration
  */
 const PARAMPOS_CARD_RULES: PaymentValidationRules = { card: true, required: ['buyer.ip'] };
+/** Card payments can also be saved (KS_Kart_Ekle) or paid with a KS_GUID (KS_Tahsilat) */
+const PARAMPOS_PAYMENT_RULES: PaymentValidationRules = {
+  ...PARAMPOS_CARD_RULES,
+  storedCard: true,
+  saveCard: true,
+};
 
 /** Commission rates of one card program (virtual POS) */
 export interface ParamposInstallmentRates {
@@ -79,6 +103,12 @@ export interface ParamposConfig extends PaymentProviderConfig {
   clientPassword: string;
   /** Merchant GUID (anahtar). Used for hashes, never sent to the browser. */
   guid: string;
+  /**
+   * Card storage (KS) service URL. Default: the KS host of the selected `mode`,
+   * or, when the provider class is constructed directly, the host that matches
+   * `baseUrl` (test when it contains "test").
+   */
+  cardStorageUrl?: string;
 }
 
 /**
@@ -123,12 +153,14 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   }
 
   /**
-   * Send SOAP request to Parampos API
+   * Send SOAP request to Parampos API. `options.cardStorage` targets the
+   * separate card-storage (Kart Saklama) ASMX endpoint: different namespace,
+   * no hash fields.
    */
   private async sendSoapRequest(
     soapAction: string,
     fields: Record<string, XmlValue>,
-    options: { retryable?: boolean } = {}
+    options: { retryable?: boolean; cardStorage?: boolean } = {}
   ): Promise<ParamposResult> {
     const xml = await this.sendSoapRaw(soapAction, fields, options);
     return parseParamposSoapResponse<ParamposResult>(xml, `${soapAction}Result`);
@@ -138,17 +170,21 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   private async sendSoapRaw(
     soapAction: string,
     fields: Record<string, XmlValue>,
-    options: { retryable?: boolean } = {}
+    options: { retryable?: boolean; cardStorage?: boolean } = {}
   ): Promise<string> {
-    const envelope = buildParamposSoapEnvelope(soapAction, fields);
+    const namespace = options.cardStorage ? PARAMPOS_KS_NAMESPACE : PARAMPOS_NAMESPACE;
+    const envelope = buildParamposSoapEnvelope(soapAction, fields, namespace);
 
     const requestConfig: HttpRequestConfig = {
-      headers: { SOAPAction: `https://turkpos.com.tr/${soapAction}` },
+      headers: { SOAPAction: `${namespace}${soapAction}` },
       retryable: options.retryable === true,
       responseType: 'text',
     };
 
-    const response = await this.client.post('', envelope, requestConfig);
+    const url = options.cardStorage
+      ? (this.config.cardStorageUrl ?? defaultParamposKsUrl(this.config.baseUrl))
+      : '';
+    const response = await this.client.post(url, envelope, requestConfig);
     return String(response.data);
   }
 
@@ -276,6 +312,112 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   }
 
   /**
+   * KS_Tahsilat fields: charges a card saved with KS_Kart_Ekle by its KS_GUID.
+   * There is no Islem_Hash in the card storage service. CVV is optional in the
+   * request; pass it when the card or the merchant configuration requires it.
+   */
+  private buildStoredCardFields(
+    request: PaymentRequest,
+    orderId: string,
+    securityType: 'NS' | '3D',
+    installment: number,
+    callbackUrl?: string
+  ): Record<string, XmlValue> {
+    const stored = request.storedCard;
+    if (!stored) {
+      throw new ValidationError('storedCard is required', undefined, [
+        { path: 'storedCard', message: 'is required' },
+      ]);
+    }
+    return {
+      ...this.credentials,
+      KS_GUID: stored.cardToken,
+      CVV: stored.cvc ?? '',
+      KK_Sahibi_GSM: formatParamposGsm(request.buyer?.gsmNumber),
+      Hata_URL: callbackUrl ?? '',
+      Basarili_URL: callbackUrl ?? '',
+      Siparis_ID: orderId,
+      Siparis_Aciklama: request.basketId ?? '',
+      Taksit: installment,
+      Islem_Tutar: formatParamposAmount(request.price),
+      Toplam_Tutar: formatParamposAmount(request.paidPrice ?? request.price),
+      Islem_Guvenlik_Tip: securityType,
+      Islem_ID: orderId,
+      IPAdr: request.buyer.ip,
+      Ref_URL: '',
+      Data1: '',
+      Data2: '',
+      Data3: '',
+      Data4: '',
+      KK_Islem_ID: stored.customerToken,
+    };
+  }
+
+  /** Saves a card without charging it (KS_Kart_Ekle) */
+  private addCard(
+    card: SaveCardRequest['card'],
+    customerToken: string,
+    alias?: string
+  ): Promise<ParamposResult> {
+    return this.sendSoapRequest(
+      'KS_Kart_Ekle',
+      {
+        ...this.credentials,
+        KK_Sahibi: card.cardHolderName,
+        KK_No: card.cardNumber,
+        KK_SK_Ay: formatParamposExpiryMonth(card.expireMonth),
+        KK_SK_Yil: formatParamposExpiryYear(card.expireYear),
+        KK_Kart_Adi: alias ?? '',
+        KK_Islem_ID: customerToken,
+      },
+      { cardStorage: true }
+    );
+  }
+
+  /**
+   * `saveCard` of a payment request: the card is stored with KS_Kart_Ekle
+   * before it is charged, so the KS_GUID can be returned to the caller. When
+   * the charge fails the card stays stored.
+   */
+  private async storeCardForPayment(
+    request: PaymentRequest
+  ): Promise<{ tokens?: SavedCardTokens; result?: ParamposResult; customerToken?: string }> {
+    if (!request.saveCard) return {};
+    if (request.storedCard) {
+      throw new ValidationError(
+        'saveCard requires paymentCard; storedCard is already saved with the provider'
+      );
+    }
+    const options = typeof request.saveCard === 'object' ? request.saveCard : {};
+    const customerToken = options.customerToken ?? generateOrderId('CARD');
+    const result = await this.addCard(this.cardOf(request), customerToken, options.alias);
+    if (!isParamposSuccess(result.Sonuc) || !result.KS_GUID) return { result, customerToken };
+    return { tokens: { customerToken, cardToken: result.KS_GUID }, customerToken };
+  }
+
+  /** Failure result of making a payment when its card could not be stored */
+  private cardStorageFailure<T extends PaymentResponse | ThreeDSInitResponse>(
+    result: ParamposResult,
+    orderId: string,
+    extra: Partial<T> = {}
+  ): T {
+    return this.withErrorCode({
+      status: PaymentStatus.FAILURE,
+      paymentId: orderId,
+      conversationId: orderId,
+      errorCode: result.Sonuc,
+      errorMessage: result.Sonuc_Str || 'Could not save the card',
+      rawResponse: result,
+      ...extra,
+    } as T);
+  }
+
+  /** The card of the request, or the stored card's tokens */
+  private savedCardOf(storedCard?: SavedCardTokens): { storedCard?: SavedCardTokens } {
+    return storedCard ? { storedCard } : {};
+  }
+
+  /**
    * TP_WMD_UCD only supports TRY. Foreign currency payments require a different
    * service (TP_Islem_Odeme_WD) which is not implemented yet.
    */
@@ -300,9 +442,39 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   ): Promise<PaymentResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
-      this.validatePayment(request, PARAMPOS_CARD_RULES);
+      this.validatePayment(request, PARAMPOS_PAYMENT_RULES);
       this.assertTry(request.currency);
       const installment = Math.max(1, request.installment ?? 1);
+      const storage = await this.storeCardForPayment(request);
+      if (storage.result) {
+        return this.cardStorageFailure<PaymentResponse>(storage.result, orderId);
+      }
+      const saved = this.savedCardOf(storage.tokens);
+
+      if (request.storedCard) {
+        const fields = this.buildStoredCardFields(
+          request,
+          orderId,
+          'NS',
+          installment,
+          request.callbackUrl
+        );
+        const result = await this.sendSoapRequest('KS_Tahsilat', fields, { cardStorage: true });
+        const approved =
+          isParamposSuccess(result.Sonuc) &&
+          Number(result.Islem_ID) > 0 &&
+          /^NONSECURE$/i.test(result.UCD_URL ?? '');
+
+        return this.withErrorCode({
+          status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
+          paymentId: orderId,
+          conversationId: orderId,
+          errorCode: approved ? undefined : result.Sonuc,
+          errorMessage: approved ? undefined : result.Sonuc_Str || result.Bank_HostMsg,
+          rawResponse: result,
+        });
+      }
+
       const fields = await this.buildPaymentFields(request, orderId, 'NS', installment);
       const result = await this.sendSoapRequest('TP_WMD_UCD', fields);
 
@@ -314,6 +486,7 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
         conversationId: orderId,
         errorCode: approved ? undefined : result.Sonuc,
         errorMessage: approved ? undefined : result.Sonuc_Str || result.Bank_HostMsg,
+        ...saved,
         rawResponse: result,
       });
     } catch (error) {
@@ -333,12 +506,53 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
-      this.validatePayment(request, PARAMPOS_CARD_RULES);
+      this.validatePayment(request, PARAMPOS_PAYMENT_RULES);
       this.assertTry(request.currency);
       if (!request.callbackUrl) {
         throw new ValidationError('callbackUrl is required for 3D Secure payments');
       }
       const installment = Math.max(1, request.installment ?? 1);
+      const storage = await this.storeCardForPayment(request);
+      if (storage.result) {
+        return this.cardStorageFailure<ThreeDSInitResponse>(storage.result, orderId);
+      }
+      const saved = this.savedCardOf(storage.tokens);
+
+      if (request.storedCard) {
+        const fields = this.buildStoredCardFields(
+          request,
+          orderId,
+          '3D',
+          installment,
+          request.callbackUrl
+        );
+        const result = await this.sendSoapRequest('KS_Tahsilat', fields, { cardStorage: true });
+
+        if (
+          !isParamposSuccess(result.Sonuc) ||
+          !result.UCD_URL ||
+          /^NONSECURE$/i.test(result.UCD_URL)
+        ) {
+          return this.withErrorCode({
+            status: PaymentStatus.FAILURE,
+            paymentId: orderId,
+            conversationId: orderId,
+            errorCode: result.Sonuc,
+            errorMessage: result.Sonuc_Str || '3D Secure form could not be created',
+            rawResponse: result,
+          });
+        }
+
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          // KS_Tahsilat returns the form HTML-encoded in UCD_URL
+          threeDSHtmlContent: decodeParamposHtml(result.UCD_URL),
+          paymentId: orderId,
+          conversationId: orderId,
+          rawResponse: result,
+        });
+      }
+
       const fields = await this.buildPaymentFields(
         request,
         orderId,
@@ -355,6 +569,7 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
           conversationId: orderId,
           errorCode: result.Sonuc,
           errorMessage: result.Sonuc_Str || '3D Secure form could not be created',
+          ...saved,
           rawResponse: result,
         });
       }
@@ -364,6 +579,7 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
         threeDSHtmlContent: result.UCD_HTML,
         paymentId: orderId,
         conversationId: orderId,
+        ...saved,
         rawResponse: result,
       });
     } catch (error) {
@@ -509,14 +725,163 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   }
 
   /**
-   * Complete 3D Secure payment
+   * ===================
+   * CARD STORAGE (KS_*)
+   * ===================
+   */
+
+  /**
+   * Saves a card without charging it (KS_Kart_Ekle). Param stores the card under
+   * the caller-defined `KK_Islem_ID`: pass `customerToken` to choose it, or one
+   * is generated and returned. `alias` becomes the card's `KK_Kart_Adi`.
+   */
+  async saveCard(request: SaveCardRequest): Promise<SaveCardResponse> {
+    const customerToken = request.customerToken || request.externalId || generateOrderId('CARD');
+    try {
+      const result = await this.addCard(request.card, customerToken, request.alias);
+      const approved = isParamposSuccess(result.Sonuc) && !!result.KS_GUID;
+
+      return this.withErrorCode({
+        status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
+        customerToken,
+        card: approved ? { cardToken: result.KS_GUID!, alias: request.alias } : undefined,
+        errorCode: approved ? undefined : result.Sonuc,
+        errorMessage: approved ? undefined : result.Sonuc_Str,
+        rawResponse: result,
+      });
+    } catch (error) {
+      return this.failure<SaveCardResponse>(error, 'Saving the card failed', {
+        customerToken,
+      });
+    }
+  }
+
+  /**
+   * A customer's saved cards (KS_Kart_Liste), filtered by `KK_Islem_ID`.
+   * Param's list has no reliable display digits: `KK_No` is documented as a
+   * 16-character BIN value and `KK_SK`'s format is unpublished, so
+   * `lastFourDigits` and the expiry are left undefined.
+   */
+  async listCards(request: { customerToken: string }): Promise<ListCardsResponse> {
+    const customerToken = request.customerToken;
+    try {
+      if (!customerToken) {
+        throw new ValidationError('customerToken is required', undefined, [
+          { path: 'customerToken', message: 'is required' },
+        ]);
+      }
+      // At least one filter is required, otherwise Param lists every stored card
+      const xml = await this.sendSoapRaw(
+        'KS_Kart_Liste',
+        {
+          ...this.credentials,
+          KK_Kart_Adi: '',
+          KK_Islem_ID: customerToken,
+        },
+        { retryable: true, cardStorage: true }
+      );
+      const result = parseParamposSoapResponse<ParamposResult>(xml, 'KS_Kart_ListeResult');
+
+      if (!isParamposSuccess(result.Sonuc)) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          customerToken,
+          cards: [],
+          errorCode: result.Sonuc,
+          errorMessage: result.Sonuc_Str,
+          rawResponse: result,
+        });
+      }
+
+      const rows = parseParamposDataSetRows(extractParamposDataSetXml(xml), 'Temp');
+
+      return this.withErrorCode({
+        status: PaymentStatus.SUCCESS,
+        customerToken,
+        cards: rows.map((row) => Parampos.storedCardOf(row)),
+        rawResponse: { ...result, cards: rows },
+      });
+    } catch (error) {
+      return this.failure<ListCardsResponse>(error, 'Listing cards failed', { cards: [] });
+    }
+  }
+
+  /**
+   * Deletes a saved card (KS_Kart_Sil). Param's contract requires the card's
+   * KS_GUID and the `KK_Islem_ID` it was saved with; there is no merchant GUID
+   * or hash in this method.
+   */
+  async deleteCard(request: DeleteCardRequest): Promise<DeleteCardResponse> {
+    try {
+      if (!request.cardToken || !request.customerToken) {
+        throw new ValidationError('customerToken and cardToken are required', undefined, [
+          ...(request.customerToken ? [] : [{ path: 'customerToken', message: 'is required' }]),
+          ...(request.cardToken ? [] : [{ path: 'cardToken', message: 'is required' }]),
+        ]);
+      }
+      const result = await this.sendSoapRequest(
+        'KS_Kart_Sil',
+        {
+          G: this.credentials.G,
+          KS_GUID: request.cardToken,
+          KK_Islem_ID: request.customerToken,
+        },
+        { cardStorage: true }
+      );
+      const approved = isParamposSuccess(result.Sonuc);
+
+      return this.withErrorCode({
+        status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
+        errorCode: approved ? undefined : result.Sonuc,
+        errorMessage: approved ? undefined : result.Sonuc_Str,
+        rawResponse: result,
+      });
+    } catch (error) {
+      return this.failure<DeleteCardResponse>(error, 'Deleting the card failed');
+    }
+  }
+
+  /** A KS_Kart_Liste row as the unified stored card (never the card number) */
+  private static storedCardOf(row: Record<string, string>): StoredCard {
+    const value = (key: string): string | undefined => row[key]?.trim() || undefined;
+    return {
+      cardToken: value('KK_GUID') ?? '',
+      alias: value('Kart_Adi'),
+      cardType: value('KK_Tip'),
+      cardAssociation: value('KK_Marka'),
+      bankName: value('KK_Banka'),
+    };
+  }
+
+  /**
+   * Complete a 3D Secure payment. Accepts both callback shapes:
    *
+   * - TP_WMD_UCD (card payment): md/mdStatus/orderId/islemGUID/islemHash.
+   *   The hash is verified with the configured GUID, then TP_WMD_Pay finalizes.
+   * - KS_Tahsilat (stored card): TURKPOS_RETVAL_* fields. There is no hash;
+   *   Param's TURKPOS_RETVAL_Sonuc is only a hint and the payment is confirmed
+   *   server-side with TP_Islem_Sorgulama4(Siparis_ID).
+   */
+  async completeThreeDSPayment(
+    callbackData: Parampos3DSCallbackData | ParamposKsCallbackData
+  ): Promise<PaymentResponse> {
+    const data = (callbackData ?? {}) as Record<string, unknown>;
+    if (Object.keys(data).some((key) => key.startsWith('TURKPOS_RETVAL_'))) {
+      return this.completeStoredCardPayment(callbackData as ParamposKsCallbackData);
+    }
+    return this.completeCashPayment(callbackData as Parampos3DSCallbackData);
+  }
+
+  /**
+   * Completion of a TP_WMD_UCD 3D payment:
    * 1. Verifies islemHash with the configured GUID (callback values are untrusted).
    * 2. Requires mdStatus = 1 (full 3D authentication).
    * 3. Finalizes the payment with TP_WMD_Pay. The payment is only successful
    *    when TP_WMD_Pay returns Sonuc > 0 and a Dekont_ID.
    */
-  async completeThreeDSPayment(callbackData: Parampos3DSCallbackData): Promise<PaymentResponse> {
+  private async completeCashPayment(
+    callbackData: Parampos3DSCallbackData
+  ): Promise<PaymentResponse> {
     const orderId = callbackData?.orderId;
     try {
       if (!(await verifyParampos3DSCallback(callbackData ?? {}, this.config.guid))) {
@@ -559,6 +924,87 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
           ? undefined
           : result.Sonuc_Ack || result.Sonuc_Str || result.Bank_HostMsg,
         rawResponse: { callback: callbackData, payment: result },
+      });
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, '3D Secure completion failed', {
+        paymentId: orderId,
+        conversationId: orderId,
+      });
+    }
+  }
+
+  /**
+   * Completion of a KS_Tahsilat 3D payment. The callback carries no signature, so
+   * the order is looked up with TP_Islem_Sorgulama4: a SUCCESS there (after a
+   * successful callback) is the only accepted proof of payment. A pending order
+   * returns PENDING, never FAILURE, because the payment may still settle.
+   */
+  private async completeStoredCardPayment(
+    callbackData: ParamposKsCallbackData
+  ): Promise<PaymentResponse> {
+    const orderId = callbackData.TURKPOS_RETVAL_Siparis_ID;
+    try {
+      if (!orderId) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          errorCode: 'INVALID_CALLBACK',
+          errorMessage: 'TURKPOS_RETVAL_Siparis_ID is missing from the 3D Secure callback',
+          rawResponse: callbackData,
+        });
+      }
+
+      if (!isParamposSuccess(callbackData.TURKPOS_RETVAL_Sonuc)) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          paymentId: orderId,
+          conversationId: orderId,
+          errorCode: callbackData.TURKPOS_RETVAL_Sonuc,
+          errorMessage:
+            callbackData.TURKPOS_RETVAL_Sonuc_Str ||
+            callbackData.TURKPOS_RETVAL_Banka_Sonuc_Kod ||
+            '3D Secure payment failed',
+          rawResponse: callbackData,
+        });
+      }
+
+      const status = await this.queryOrder(orderId);
+      if (!isParamposSuccess(status.Sonuc)) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          paymentId: orderId,
+          conversationId: orderId,
+          errorCode: status.Sonuc,
+          errorMessage: status.Sonuc_Str || 'Payment could not be found',
+          rawResponse: { callback: callbackData, payment: status },
+        });
+      }
+
+      const state = mapParamposOrderStatus(status.Durum as ParamposOrderStatus | undefined);
+      if (state === PaymentStatus.PENDING) {
+        return this.withErrorCode({
+          status: PaymentStatus.PENDING,
+          paymentId: status.Siparis_ID || orderId,
+          conversationId: status.Siparis_ID || orderId,
+          errorCode: 'PAYMENT_NOT_CONFIRMED',
+          errorMessage:
+            'The payment is not confirmed yet; query it with getPayment() before retrying',
+          rawResponse: { callback: callbackData, payment: status },
+        });
+      }
+
+      const approved = state === PaymentStatus.SUCCESS;
+
+      return this.withErrorCode({
+        status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
+        paymentId: status.Siparis_ID || orderId,
+        conversationId: status.Siparis_ID || orderId,
+        errorCode: approved ? undefined : status.Sonuc,
+        errorMessage: approved
+          ? undefined
+          : status.Odeme_Sonuc_Aciklama ||
+            status.Sonuc_Str ||
+            callbackData.TURKPOS_RETVAL_Sonuc_Str,
+        rawResponse: { callback: callbackData, payment: status },
       });
     } catch (error) {
       return this.failure<PaymentResponse>(error, '3D Secure completion failed', {
@@ -848,4 +1294,10 @@ export function mapParamposOrderStatus(durum: ParamposOrderStatus | undefined): 
  * The base URL follows `mode` unless `baseUrl` is set.
  */
 export const parampos = (config: ParamposConfig): ProviderDefinition<Parampos> =>
-  defineProvider((ctx) => new Parampos(withProviderDefaults(ProviderType.PARAMPOS, config, ctx)));
+  defineProvider(
+    (ctx) =>
+      new Parampos({
+        ...withProviderDefaults(ProviderType.PARAMPOS, config, ctx),
+        cardStorageUrl: config.cardStorageUrl ?? PARAMPOS_KS_URLS[ctx.mode],
+      })
+  );

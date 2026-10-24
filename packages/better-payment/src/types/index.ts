@@ -60,13 +60,13 @@ export interface PaymentRequest {
   basketId: string;
   /** The card to charge. Omit it when paying with `storedCard`. */
   paymentCard?: PaymentCard;
-  /** Pay with a card saved earlier (iyzico, PayTR) instead of `paymentCard` */
+  /** Pay with a card saved earlier (iyzico, PayTR, Parampos) instead of `paymentCard` */
   storedCard?: StoredCardReference;
   /**
    * Save `paymentCard` with the provider during this payment (iyzico, PayTR
-   * Direct API). The tokens come back in `storedCard` of the result, or of the
-   * 3D Secure / notification result. Pass `customerToken` to add the card to an
-   * existing customer.
+   * Direct API, Parampos). The tokens come back in `storedCard` of the result,
+   * or of the 3D Secure / notification result. Pass `customerToken` to add the
+   * card to an existing customer.
    */
   saveCard?: boolean | { customerToken?: string; alias?: string };
   buyer: Buyer;
@@ -105,9 +105,9 @@ export interface PaymentResponse {
 
 /** A card saved with the provider, referenced by its tokens */
 export interface StoredCardReference {
-  /** The provider's customer token (iyzico cardUserKey, PayTR utoken) */
+  /** The provider's customer token (iyzico cardUserKey, PayTR utoken, Parampos KK_Islem_ID) */
   customerToken: string;
-  /** The provider's card token (iyzico cardToken, PayTR ctoken) */
+  /** The provider's card token (iyzico cardToken, PayTR ctoken, Parampos KS_GUID) */
   cardToken: string;
   /** CVC, for providers or cards that require it on stored-card payments (PayTR require_cvv) */
   cvc?: string;
@@ -204,6 +204,8 @@ export interface ThreeDSInitResponse {
   threeDSHtmlContent?: string;
   /** Payment page URL when the provider supports redirecting instead of rendering HTML */
   redirectUrl?: string;
+  /** Tokens of the card saved during initialization (`saveCard`), when already known */
+  storedCard?: SavedCardTokens;
   paymentId?: string;
   conversationId?: string;
   /** Normalized error code, set on failures */
