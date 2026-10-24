@@ -53,6 +53,7 @@ Sağlayıcıya özel metotlar (iyzico ödeme formu, PWI ve abonelikler, PayTR to
 ## Resmi plugin'ler [#official-plugins]
 
 Resmi plugin'ler paketle birlikte gelir: çoğu `better-payment/plugins` altında, daha büyükleri kendi alt yolunda:
+Resmi plugin'ler paketle birlikte `better-payment/plugins` altında gelir; yalnızca `invoicing`, plugin barrel'ını temiz tutmak için kendi `better-payment/invoicing` alt yolu olarak sunulur:
 
 | Plugin | Ne yapar |
 | ------ | -------- |
@@ -74,5 +75,6 @@ Resmi plugin'ler paketle birlikte gelir: çoğu `better-payment/plugins` altınd
 | [`fraudRules`](/docs/plugins/fraud-rules) | IP, kart ve alıcı başına denemeleri sayar, kart testi saldırılarını sağlayıcı çağrılmadan reddeder (alt yol `better-payment/fraud`) |
 | [`commissionRouter`](/docs/plugins/commission-router) | Her ödemeyi kendi komisyon oranı tablolarınıza göre en ucuz uygun sağlayıcıya yönlendirir (alt yol `better-payment/commission-router`) |
 | [`routing`](/docs/plugins/routing) | Her ödemeyi kart ailesi, kartın menşei, tutar, taksit ve sağlığa göre doğru sağlayıcıya gönderir (alt yol `better-payment/routing`) |
+| [`invoicing`](/docs/plugins/invoicing) | Başarılı ödemelerin ardından Paraşüt gibi entegratörlerle otomatik olarak e-Fatura ve e-Arşiv faturası keser (`better-payment/invoicing` üzerinden içe aktarılır) |
 
 Başka bir şeye mi ihtiyacınız var? [Kendi plugin'inizi yazın](/docs/guides/writing-plugins); birkaç satır yeterli.

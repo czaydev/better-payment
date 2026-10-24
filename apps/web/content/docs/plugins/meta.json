@@ -20,6 +20,7 @@
     "mcp",
     "telemetry",
     "commission-router",
-    "routing"
+    "routing",
+    "invoicing"
   ]
 }

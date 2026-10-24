@@ -41,6 +41,11 @@
       "import": "./dist/routing/index.mjs",
       "require": "./dist/routing/index.js"
     },
+    "./invoicing": {
+      "types": "./dist/invoicing/index.d.ts",
+      "import": "./dist/invoicing/index.mjs",
+      "require": "./dist/invoicing/index.js"
+    },
     "./next": {
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.mjs",
