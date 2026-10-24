@@ -1,0 +1,48 @@
+---
+title: 1.0'a Geçiş
+description: 1.0, 0.12 API'sini sabitliyor. Son beta sürümdeyseniz geçiş bir sürüm yükseltmesi ve kısa bir kontrol listesinden ibaret.
+---
+
+1.0, sürüm sıfırlamasından sonraki ilk kararlı sürüm. [Kararlılık ve sürümlendirme](/docs/guides/stability) sayfasında anlatılan genel API'yi sabitliyor. 1.0 sürümü `0.12`'deki hiçbir şeyi yeniden adlandırmıyor veya kaldırmıyor; bu yüzden son beta sürümdeki bir proje, bir sürüm yükseltmesi ve aşağıdaki kontrollerle geçer.
+
+## Bu rehber kimin için [#who-this-guide-is-for]
+
+- **Yakın tarihli bir 0.x sürümündeyseniz (0.5 veya daha yeni):** kontrol listesini izleyin. API değişikliği gerekmez.
+- **0.4 veya daha eskisindeyseniz:** önce [0.5'e geçiş](/docs/guides/migration-0-5) rehberiyle son 0.x sürümüne yükseltin, sonra buraya dönün.
+- **Eski 1.x–3.x sürümlerindeyseniz:** o sürümler kullanımdan kaldırıldı; [Eski 1.x–3.x sürümlerindeyseniz](#old-releases) bölümüne bakın.
+
+## 1.0'da ne değişiyor [#what-changes-in-1-0]
+
+- Sürüm numarası. API, paket giriş noktaları ve sağlayıcı yapılandırmaları aynı kalıyor.
+- Node.js 20 artık minimum sürüm. Node.js 18 ve öncesi desteklenmiyor.
+- `@experimental` olarak işaretlenen yeni API'ler minor sürümde değişebilir; diğer her şey [sürümlendirme politikasına](/docs/guides/stability#versioning) uyar.
+- Paketin hâlâ çalışma zamanı bağımlılığı yok ve tek sürümden ESM ile CommonJS yayınlıyor.
+
+## Yükseltme kontrol listesi [#upgrade-checklist]
+
+1. Geliştirme ve üretim ortamlarında Node.js 20 veya daha yenisine geçin.
+2. Yeni sürümü kurun.
+3. Test paketinizi çalıştırın. `better-payment/testing` içindeki [test yardımcıları](/docs/concepts/testing) değişmeden çalışır.
+4. Çalıştırdığınız sürüm ile 1.0 arasındaki kullanımdan kaldırmalar için [changelog'a](/docs/reference/changelog) bakın.
+5. Handler yapılandırmasını aşağıdaki listeyle karşılaştırın.
+6. Sandbox veya staging ortamına dağıtıp üretime geçmeden önce her sağlayıcı için bir 3D Secure ödemesi çalıştırın.
+
+## Yeniden kontrol edilecek proje ayarları [#project-configuration-to-re-check]
+
+API değişmiyor, ancak üretimde bir ödemenin güvenli olup olmadığını bu ayarlar belirler. Her yükseltmede ikinci kez bakmaya değer:
+
+- `handler.allowedActions` yalnızca uygulamanızın ihtiyaç duyduğu eylemleri listeler; diğerleri kapalıdır.
+- `handler.authorize`, `refund` ve `cancel` gibi ayrıcalıklı eylemleri korur ve tarayıcının taklit edebileceği bir header veya cookie'ye güvenmez.
+- `handler.transformRequest`, tutarı, para birimini ve sepeti istek gövdesinden değil, kendi verinizden sunucuda oluşturur.
+- Birden fazla sunucu örneği callback alabiliyorsa idempotency store paylaşımlıdır. Bellek içi store yalnızca tek bir geliştirme süreci içindir.
+- Ödeme olayı dinleyicileri idempotenttir: aynı `payment.succeeded` olayı hem tarayıcı dönüşünden hem de sağlayıcı bildiriminden gelebilir.
+- Callback adresleri HTTPS'tir ve o sağlayıcının handler yolunu gösterir.
+- Loglar kart verisi, imza ve istek gövdelerini içermez.
+
+## Eski 1.x–3.x sürümlerindeyseniz [#old-releases]
+
+Eski sürümler kullanımdan kaldırıldı ve kullanılmamalıdır. Hatalı sağlayıcı entegrasyonları ve atlatılabilen callback kontrolleri içeriyorlardı. Gerekçenin tamamı ve geçiş yolu için [0.0.1'deki yeniliklere](/docs/whats-new) bakın ve eski paketi yamamak yerine değiştirin.
+
+## Yardım alma [#getting-help]
+
+Bir adım başarısız olursa ve changelog bunu açıklamıyorsa sürüm, sağlayıcı ve hata koduyla bir [tartışma](https://github.com/czaydev/better-payment/discussions) açın. Kimlik bilgisi, kart numarası veya kişisel veri yapıştırmayın. Güvenlik sorunları için bunun yerine [özel güvenlik açığı bildirimini](https://github.com/czaydev/better-payment/security/advisories/new) kullanın.

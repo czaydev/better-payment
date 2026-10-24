@@ -1,0 +1,81 @@
+---
+title: Stability and Versioning
+description: What 1.0 freezes, what a version number promises, how deprecations work and which providers and runtimes are supported.
+---
+
+better-payment is pre-1.0 (`0.12.0-beta`). This page explains what the 1.0 release freezes, what a version number promises after that, and how deprecations, providers and runtimes are supported.
+
+## What 1.0 freezes [#what-1-0-freezes]
+
+The public API is what the package exports and the options it accepts:
+
+- the `betterPayment()` factory, the payment and provider types, and the error codes
+- handler options: `allowedActions`, `authorize`, `transformRequest`, `callbackRedirect` and the idempotency store
+- payment events and plugin hooks
+- the framework adapters: `better-payment/next`, `/express`, `/hono`, `/fastify`, `/elysia` and `/react-router`
+- the browser client (`better-payment/client`) and the test helpers (`better-payment/testing`)
+
+Anything that is not exported from a package entry point is internal and may change in any release. Importing from `dist/` or from a source path is not supported.
+
+1.0 is a freeze, not a redesign: the 0.12 API is the 1.0 API, and no renames are planned. Awkward corners found during the review stay for compatibility instead of being renamed at the last minute; a future major can clean them up through the deprecation process below.
+
+## Versioning [#versioning]
+
+After 1.0 the package follows semantic versioning:
+
+| Change | Version |
+| --- | --- |
+| A breaking change to the public API | major |
+| A new feature, provider or plugin, or a deprecation | minor |
+| A bug fix, documentation or an internal change | patch |
+
+Before 1.0 every minor release may contain a breaking change, and each one is listed in the changelog with a migration note. Patch releases do not break working code.
+
+Every release ships ESM and CommonJS builds with the same API.
+
+## Deprecation policy [#deprecation-policy]
+
+- A deprecated API keeps working and stays documented, and its TypeScript declaration is marked `@deprecated`.
+- The deprecation is announced in the changelog and on this page.
+- A replacement is documented before the deprecation ships.
+- Removal happens no earlier than the next major release, and at least one minor release and 90 days after the announcement — whichever is later.
+
+## Node.js and runtimes [#nodejs-and-runtimes]
+
+| Runtime | Support |
+| --- | --- |
+| Node.js 20, 22 and 24 | tested in CI for every release |
+| Node.js 18 and older | not supported; the package requires Node.js 20 |
+| Edge runtimes (Vercel Edge, Cloudflare Workers) | the handler, providers and plugins use Web Crypto and `fetch` instead of Node-only APIs, and the edge build is tested in CI |
+| Deno and Bun | not tested; the package is standard ESM and may work |
+
+The library has no runtime dependencies, and CI fails if one is added, so installing it never pulls a transitive tree into a serverless bundle.
+
+## Provider support tiers [#provider-support-tiers]
+
+Every provider is documented and has unit tests. Verification against the provider's own test environment is tracked separately and is not implied by this table:
+
+| Provider | Documentation | Unit tests | Real test environment |
+| --- | --- | --- | --- |
+| iyzico | [/docs/providers/iyzico](/docs/providers/iyzico) | yes | not recorded |
+| PayTR | [/docs/providers/paytr](/docs/providers/paytr) | yes | open, [#62](https://github.com/czaydev/better-payment/issues/62) |
+| Parampos | [/docs/providers/parampos](/docs/providers/parampos) | yes | open, [#63](https://github.com/czaydev/better-payment/issues/63) |
+| Akbank | [/docs/banks/akbank](/docs/banks/akbank) | yes | open, [#64](https://github.com/czaydev/better-payment/issues/64) |
+| Sipay | [/docs/providers/sipay](/docs/providers/sipay) | yes | verified end to end (changelog) |
+| Kuveyt Türk, Albaraka Türk, Denizbank, EST banks, QNB, VakıfBank, Yapı Kredi | [/docs/banks](/docs/banks/kuveytturk) | yes | not recorded |
+
+"Not recorded" means this repository has no recent sandbox run for that provider; it does not mean the provider is broken. If you run one, say so in the matching issue so the table can be updated.
+
+## Experimental APIs [#experimental-apis]
+
+No public export is marked experimental today. If one is added before 1.0 it is marked `@experimental` in its declaration, listed on this page, and may change in a minor release even after 1.0. Everything else follows the versioning rules above.
+
+## Security [#security]
+
+Security reports go through GitHub's [private vulnerability reporting](https://github.com/czaydev/better-payment/security/advisories/new), never a public issue. [SECURITY.md](https://github.com/czaydev/better-payment/blob/beta/SECURITY.md) lists what is in scope and which versions receive fixes.
+
+## How the policy is enforced [#how-the-policy-is-enforced]
+
+- Every pull request runs type checking, the unit and edge test suites, bundle-size budgets, the no-runtime-dependencies check and the documentation checks in CI.
+- Releases are cut from changesets, so every user-visible change has a changelog entry in English and Turkish.
+- The `beta` line publishes prereleases; `main` only receives released versions. See [Contributing](https://github.com/czaydev/better-payment/blob/beta/CONTRIBUTING.md) for the release flow.
