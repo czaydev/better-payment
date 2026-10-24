@@ -32,8 +32,8 @@ test('MDX becomes readable Markdown without changing code', () => {
   const result = toMarkdown(input, siteUrl('/beta'), '/docs/test');
   assert.match(result, /Feature version: 0\.11\.0/);
   assert.match(result, /> Never retry payments/);
-  assert.match(result, /https:\/\/better-payment.czaylabs.com\/beta\/docs\/installation/);
-  assert.match(result, /\/beta\/api-reference\/index.html/);
+  assert.match(result, /https:\/\/better-payment\.czaylabs\.com\/beta\/docs\/installation/);
+  assert.match(result, /\/beta\/api-reference\/index\.html/);
   const tree = unified().use(remarkParse).parse(result);
   assert.equal(tree.children.find((node) => node.type === 'code').value, code);
   assert.doesNotMatch(result, /import \{ x \}|items=|\{\/\* comment/);
