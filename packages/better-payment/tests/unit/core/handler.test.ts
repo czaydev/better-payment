@@ -114,7 +114,7 @@ describe('BetterPaymentHandler', () => {
 
   describe('secure defaults', () => {
     it('only exposes callbacks and card queries by default', async () => {
-      expect(DEFAULT_HANDLER_ACTIONS).toEqual(['payment/complete-3ds', 'callback', 'installment', 'bin-check']);
+      expect(DEFAULT_HANDLER_ACTIONS).toEqual(['payment/complete-3ds', 'callback', 'webhook', 'installment', 'bin-check']);
       const { payment, mockProvider } = buildMockPayment();
       const handler = new BetterPaymentHandler(payment);
 
@@ -373,7 +373,7 @@ describe('BetterPaymentHandler', () => {
     });
 
     it('CALLBACK_HANDLER_ACTIONS lists the callback routes', () => {
-      expect(CALLBACK_HANDLER_ACTIONS).toEqual(['payment/complete-3ds', 'callback']);
+      expect(CALLBACK_HANDLER_ACTIONS).toEqual(['payment/complete-3ds', 'callback', 'webhook']);
     });
   });
 

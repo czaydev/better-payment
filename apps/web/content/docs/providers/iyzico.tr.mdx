@@ -129,3 +129,38 @@ await payment.iyzico.cancelSubscription({ subscriptionReferenceCode });
 ```
 
 Abonelik yanıtları iyzico'nun yapısını (`data`, `systemTime`) korur. `status` alanları `success` / `failure` olarak eşlenir; yanıtın tamamı `rawResponse` içindedir.
+
+## Webhook Bildirimleri [#webhook-notifications]
+
+iyzico, asenkron üye işyeri bildirimlerini (ör. `CHECKOUT_FORM_AUTH`, `THREEDS_AUTH`, `PWI_AUTH`, `REFUND`) panelinizde belirlediğiniz webhook URL'ine iletir. Gelen bildirimleri doğrudan doğrulayabilir veya `BetterPaymentHandler` ile otomatik yönetebilirsiniz.
+
+```typescript
+// Manual verification
+const { valid, event, result } = await payment.iyzico.verifyWebhook(
+  req.headers, // must contain x-iyz-signature-v3
+  req.body // parsed JSON or string payload
+);
+
+if (!valid) {
+  return res.status(401).send('Invalid signature');
+}
+
+console.log(event?.iyziEventType, result?.status, result?.paymentId);
+```
+`result.status` bildirime göre belirlenir: `SUCCESS` için `success`, açık bir `FAILURE` için
+(veya yalnızca `errorCode` taşıyan bildirimde) `failure`, diğer tüm durumlar için `pending` —
+devam eden 3DS ya da kayıt adımı böyle gelir. Yalnızca sonlanan bildirimler
+`payment.succeeded` ya da `payment.failed` yayar; diğerleri `payment.pending` yayar.
+
+
+`BetterPaymentHandler` veya HTTP adaptörleri kullanıldığında `/api/pay/iyzico/webhook` rotası otomatik karşılanır:
+
+```typescript
+const handler = new BetterPaymentHandler(payment, {
+  // Runs for every verified notification, and for 3DS callbacks
+  onCallback: async (result) => {
+    // Update order status in database
+    await updateOrder(result.paymentId, result.status);
+  },
+});
+```
