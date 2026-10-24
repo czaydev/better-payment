@@ -27,9 +27,9 @@ Olaylar her sağlayıcı için yayınlanır; çağrı ödeme nesnesinde, bir sa�
 
 | Olay | Ne zaman yayınlanır |
 | ---- | ------------------- |
-| `payment.succeeded` | `createPayment`, `completeThreeDSPayment` ya da `capture` başarılı olduğunda |
+| `payment.succeeded` | `createPayment`, `chargeStoredCard`, `completeThreeDSPayment` ya da `capture` başarılı olduğunda |
 | `payment.authorized` | `authorize` başarılı olduğunda: tutar kartta bloke edilmiştir |
-| `payment.pending` | `createPayment`, `completeThreeDSPayment`, `authorize` ya da `capture` `pending` döndüğünde, örneğin `NETWORK_ERROR` ile |
+| `payment.pending` | `createPayment`, `chargeStoredCard`, `completeThreeDSPayment`, `authorize` ya da `capture` `pending` döndüğünde, örneğin `NETWORK_ERROR` ile |
 | `payment.failed` | bir ödeme işlemi, `initThreeDSPayment` ya da `initThreeDSAuthorize` başarısız olduğunda |
 | `payment.cancelled` | `cancel` ya da `voidAuthorization` başarılı olduğunda |
 | `refund.succeeded` | `refund` başarılı olduğunda |
@@ -59,6 +59,8 @@ interface PaymentEvent {
 ```
 
 Belirli bir olayın dinleyicisi daraltılmış tipi alır: `payment.on('payment.failed', (event) => ...)` içinde `event.type`, `'payment.failed'` tipindedir.
+
+`event.request` hiçbir zaman kart verisi taşımaz: `paymentCard` dışarıda bırakılır ve kayıtlı kartın `cvc` alanı silinir. Kayıtlı kart token'ları kalır; böylece tekrarlayan ödeme dinleyicisi PAN tutmadan kartı tanıyabilir.
 
 `amount` ve `currency` istekten gelir. 3D Secure ödemenin callback'inde tutar bulunmaz, bu yüzden orada boştur: siparişi `conversationId` ile bulun.
 

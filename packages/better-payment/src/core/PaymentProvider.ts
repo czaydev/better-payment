@@ -18,6 +18,7 @@ import {
   ListCardsResponse,
   DeleteCardRequest,
   DeleteCardResponse,
+  RecurringPaymentRequest,
   PaymentStatus,
 } from '../types';
 import { BetterPaymentLogger } from './logger';
@@ -26,6 +27,7 @@ import { HttpClient } from './http';
 import { BetterPaymentError, ValidationError } from './errors';
 import { PaymentErrorCode, resolveErrorCode } from './error-codes';
 import { NETWORK_ERROR_CODE, type FailureResult } from './failure';
+import { validateRecurringRequest } from './recurring';
 import {
   validateCaptureRequest,
   validatePaymentRequest,
@@ -52,6 +54,22 @@ export interface PaymentProviderConfig {
 }
 
 /**
+ * Capabilities a provider declares for provider-independent code.
+ * Verified against each provider's official integration docs.
+ */
+export interface ProviderCapabilities {
+  /** Charges a stored card by token (`storedCard` in a payment request) */
+  storedCard: boolean;
+  /**
+   * Charges a stored card without the cardholder present (`recurring: true`,
+   * merchant-initiated / COF). Providers that document it: iyzico
+   * (https://docs.iyzico.com/en/advanced/card-storage), PayTR
+   * (https://dev.paytr.com/direkt-api/kart-saklama-api/kayitli-kart-tekrarlayan-odeme).
+   */
+  recurring: boolean;
+}
+
+/**
  * Abstract base class for all payment providers
  */
 export abstract class PaymentProvider<
@@ -71,6 +89,16 @@ export abstract class PaymentProvider<
    * Validate the configuration. Each provider checks its own required fields.
    */
   protected validateConfig(): void {}
+
+  /**
+   * What this provider can do, for provider-independent code such as
+   * `chargeStoredCard()`. Custom providers override this; the defaults are the
+   * safest values (unsupported), so a provider that does not declare a feature
+   * never receives a request that needs it.
+   */
+  get capabilities(): ProviderCapabilities {
+    return { storedCard: false, recurring: false };
+  }
 
   /**
    * The provider's documented error codes mapped to PaymentErrorCode.
@@ -199,6 +227,30 @@ export abstract class PaymentProvider<
   /** Deletes a saved card */
   async deleteCard(_request: DeleteCardRequest): Promise<DeleteCardResponse> {
     throw this.notSupported('Card storage');
+  }
+
+  /**
+   * Charges a stored card for one recurring billing period, without the
+   * cardholder present (merchant-initiated / card-on-file).
+   *
+   * SAFETY — this method NEVER retries: a `pending` result with `NETWORK_ERROR`
+   * means the provider may already have processed the charge. Query it with
+   * `getPayment()` before doing anything else. The schedule (cron, queues,
+   * dunning) stays in the application; this only runs one period's charge.
+   *
+   * Providers that document merchant-initiated stored-card payments implement
+   * it through their direct (non-3D) payment; the others throw
+   * `NOT_SUPPORTED` and are never sent a guessed payload.
+   */
+  async chargeStoredCard(request: RecurringPaymentRequest): Promise<PaymentResponse> {
+    if (!this.capabilities.recurring) {
+      throw this.notSupported(
+        'Recurring payments with a stored card',
+        'it has no documented merchant-initiated stored-card payment'
+      );
+    }
+    validateRecurringRequest(request);
+    return this.createPayment(request);
   }
 
   /**

@@ -21,6 +21,7 @@ import type {
   SubscriptionCardUpdateRequest,
   SubscriptionProductCreateRequest,
   PricingPlanCreateRequest,
+  RecurringPaymentRequest,
 } from '../types';
 import { Iyzico } from '../providers/iyzico';
 import { PayTR } from '../providers/paytr';
@@ -62,6 +63,7 @@ export type BuiltInHandlerAction =
   | 'payment/complete-3ds'
   | 'payment/get'
   | 'callback'
+  | 'recurring/charge'
   | 'refund'
   | 'cancel'
   | 'authorize'
@@ -92,6 +94,7 @@ export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
   'payment/complete-3ds',
   'payment/get',
   'callback',
+  'recurring/charge',
   'refund',
   'cancel',
   'authorize',
@@ -140,6 +143,7 @@ export const PRIVILEGED_HANDLER_ACTIONS: HandlerAction[] = [
   'cards/list',
   'cards/delete',
   'payment/get',
+  'recurring/charge',
   'subscription/cancel',
   'subscription/upgrade',
   'subscription/retrieve',
@@ -245,6 +249,7 @@ export const IDEMPOTENT_KEY_ACTIONS: HandlerAction[] = [
   'payment',
   'payment/init-3ds',
   'payment/token',
+  'recurring/charge',
   'refund',
   'cancel',
   'authorize',
@@ -334,6 +339,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
  * - POST /:provider/payment/complete-3ds   -> completeThreeDSPayment()
  * - POST /:provider/callback               -> completeThreeDSPayment() (PayTR: responds "OK")
  * - GET  /:provider/payment/:id            -> getPayment()
+ * - POST /:provider/recurring/charge        -> chargeStoredCard()
  * - POST /:provider/refund | cancel        -> refund() / cancel()
  * - POST /:provider/authorize[/init-3ds]    -> authorize() / initThreeDSAuthorize()
  * - POST /:provider/capture | void         -> capture() / voidAuthorization()
@@ -708,6 +714,12 @@ export class BetterPaymentHandler {
       case 'callback':
         this.requireMethod(ctx, 'POST');
         return this.handleCallback({ ...ctx, provider: this.providerOf(ctx) });
+
+      case 'recurring/charge':
+        this.requireMethod(ctx, 'POST');
+        return this.resultResponse(
+          await provider.chargeStoredCard(this.requireBody<RecurringPaymentRequest>(ctx))
+        );
 
       case 'payment/get':
         this.requireMethod(ctx, 'GET');

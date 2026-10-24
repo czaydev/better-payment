@@ -14,6 +14,7 @@ import {
   PaymentStatus,
   ValidationError,
   type PaymentProviderConfig,
+  type ProviderCapabilities,
 } from 'better-payment';
 import type { PaymentValidationRules } from '../core/validation';
 import { hmac, randomHex, safeEqual, toHex } from '../core/crypto';
@@ -136,7 +137,12 @@ const CARD_SCENARIOS: Record<string, Scenario> = {
   [MOCK_CARDS.REFUND_FAILS]: { type: 'refund-fails' },
 };
 
-const RULES: PaymentValidationRules = { card: true, storedCard: true, saveCard: true };
+const RULES: PaymentValidationRules = {
+  card: true,
+  storedCard: true,
+  saveCard: true,
+  recurring: true,
+};
 
 const IDENTITY_CODES = Object.fromEntries(
   Object.values(PaymentErrorCode).map((code) => [code, code])
@@ -186,6 +192,12 @@ export class MockProvider extends PaymentProvider<MockProviderConfig> {
 
   protected errorCodeTable(): Record<string, PaymentErrorCode> {
     return { ...IDENTITY_CODES, THREEDS_REQUIRED: PaymentErrorCode.CARD_DECLINED };
+  }
+
+  get capabilities(): ProviderCapabilities {
+    // The mock charges saved cards directly, so application tests can run the
+    // recurring flow without a provider sandbox.
+    return { storedCard: true, recurring: true };
   }
 
   // ---- Test controls ------------------------------------------------------
