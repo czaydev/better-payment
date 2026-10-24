@@ -169,7 +169,8 @@ jobs:
 
   next-shop:
     name: next-shop example (Playwright)
-    runs-on: ubuntu-latest
+    # ubuntu-latest moved to 26.04, which Playwright cannot install chromium on yet.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
