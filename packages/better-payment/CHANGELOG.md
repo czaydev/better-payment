@@ -6,12 +6,16 @@ earlier `1.x`–`3.x` releases are superseded and should not be used (see "Why t
 Upgrading from `3.x`? Read the migration guide:
 https://better-payment.czaylabs.com/docs/whats-new
 
-## 0.12.0-beta.2
+## 0.12.0
 
 ### Added
 
+- Add the Albaraka Türk provider (e-POS, Posnet JSON API): non-3D sale, 3D Secure completed with the 3D data and the order values from your records, refund, cancel, order inquiry and pre-authorization. Generate bank-compatible order ids when conversationId is omitted. Thanks to @sizinajans (#197).
 - Add `commissionRouter` (subpath `better-payment/commission-router`), which routes each payment to the cheapest eligible provider from merchant-defined commission rate tables, with quotes that explain every choice, tie/share-cap/override policies, safe fallbacks and same-provider refunds Thanks to @Enard52.
 - Plugin: currency conversion with TCMB exchange rates, markup, and refund protection Thanks to @Enard52.
+- Add the Denizbank provider (InterVPos): non-3D sale, 3D Secure (3D Model) verified from HASHPARAMS and charged with the 3D Secure data, refund and cancel Thanks to @sizinajans (#208).
+- EST: Girogate alternative payment methods (iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly and more) with `initThreeDSPayment({ girogate: { method, country } })` on the 3d_pay store types. A `Pending` callback returns `pending` with the order id. The EST currency list gains the methods' currencies (PLN, SEK, CHF, ...) Thanks to @sizinajans (#210).
+- Add two banks to the EST provider: `est({ bank: 'akbankest' })` for Akbank's older virtual POS (sanalakpos.com) and `est({ bank: 'halkbankmkd' })` for Halkbank Macedonia, with Macedonian denars (`MKD`, sent as `807`) Thanks to @sizinajans (#209).
 - Plugin: provider failover with circuit breaker and zero double-charge guarantee Thanks to @Enard52 (#247).
 - Add the `fraudRules` plugin for card-testing protection: velocity counters per IP, card, BIN, email or buyer (with consecutive-decline and distinct-value rules), blocked BIN ranges, an amount limit, your own rule functions and an optional challenge hook, all checked before the provider is called. Every counter key is a salted HMAC digest, so a card number never reaches the store, the log or a message, and nothing is read from `X-Forwarded-For` unless you name that header and your proxies. It ships as its own `better-payment/fraud` entry point, so `better-payment/plugins` stays the same size. Closes #105 Thanks to @Enard52.
 - Add the Garanti BBVA provider (GVP, XML API 512): non-3D and 3D Secure payments (3D, 3D_PAY), GarantiPay (`securityLevel: 'GARANTI_PAY'`), refund, void and order inquiry. 3D callbacks are verified from `hashparams` and confirmed with the bank Thanks to @sizinajans (#195).
@@ -20,6 +24,7 @@ https://better-payment.czaylabs.com/docs/whats-new
 - Add the `better-payment/nestjs` framework adapter: `toNestHandler(payment)` returns a single request handler for a NestJS controller that works on both the Express and the Fastify platform. It has no `@nestjs/*` dependency and reads the request and response objects injected by `@Req()` and `@Res()` Thanks to @Enard52 (#270).
 - Add `examples/next-shop`, a complete Next.js App Router and Prisma shop: server-side cart totals, 3D Secure through the handler, orders updated by payment events and a privileged refund route, with a Playwright happy-path test and a MockProvider that needs no credentials Thanks to @Enard52 (#287).
 - Add the `openAPI` plugin: generates an OpenAPI 3.1.0 document and serves an interactive Scalar API reference page for all HTTP handler routes, configured providers, and registered plugin endpoints. The document lists only the routes the handler serves, under its `basePath`. The reference is off in `mode: 'production'` unless `disabled: false` is set, and `privileged: true` puts it behind the handler's `authorize` hook. Plugin endpoint contexts now always have `html()`, and plugins get a read-only `endpoints` list. Thanks to @Enard52.
+- PayTR: `threeDSMode: 'direct'` runs 3D Secure payments with a new card through the Direct API (your own card form, posted from the customer's browser) instead of the iFrame Thanks to @sizinajans (#199).
 - Add `pendingResolver` plugin to query and resolve timed out payments (`NETWORK_ERROR`) on a schedule, preventing double charging and emitting final outcome events. Thanks to @Enard52.
 - feat(plugins): add captcha plugin supporting Turnstile, reCAPTCHA, and hCaptcha (#173)
 
@@ -28,6 +33,8 @@ https://better-payment.czaylabs.com/docs/whats-new
   - Read token from HTTP headers or request body candidates
   - Normalize failure error codes to `CAPTCHA_MISSING` and `CAPTCHA_INVALID`
   - Exclude provider callback and 3DS completion operations Thanks to @Enard52.
+- Add the QNB provider (PayFor): non-3D sale, 3D Secure (3D Model and 3D Pay) verified with the ResponseHash and confirmed with the bank, refund, cancel and order inquiry Thanks to @sizinajans (#207).
+- Add QNBpay, which runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })` uses QNBpay's hosts and provider id, with the same payments, 3D Secure, refunds, pre-authorization and installment queries as Sipay Thanks to @sizinajans (#232).
 - Add `rateLimit` plugin for HTTP handler endpoints with per-route throttling, a customizable key extractor, sliding window store, and callback exclusion. The client identity defaults to a safe source: proxy headers are only read with `trustProxy`, otherwise an explicit `key` is required. Thanks to @Enard52.
 - Plugin: redact card data and personal data from logs and events (PCI DSS & KVKK) Thanks to @Enard52.
 - Add the `refundApproval` plugin: requires manager approval before processing refunds and cancellations above a specified threshold, with in-memory or custom store, approval/rejection methods, self-approval prevention, Slack/webhook notify callback, and handler endpoints (`/refunds/pending`, `/refunds/approve`, `/refunds/reject`). Thanks to @Enard52.
@@ -39,37 +46,17 @@ https://better-payment.czaylabs.com/docs/whats-new
   - Support configurable timeout duration (e.g. `'15m'`), pluggable `ThreeDSFlowStore`, and `onExpire` callback
   - Query provider before expiring to protect against late successful callbacks
   - Provide `payment.threeDS.expireStale()` for serverless and cron schedulers Thanks to @Enard52.
+- Add the VakıfBank provider (VPOS 7/24): non-3D sale, 3D Secure through the MPI and VakıfBank's 3DS product, refund and cancel (no payment status query: VakıfBank's record search cannot see cancels and refunds) Thanks to @sizinajans (#206).
 - Add the `webhookForwarding` plugin: forwards payment events to external microservices as HMAC-SHA256 signed JSON webhooks with configurable event filtering, exponential backoff retries, sensitive card data sanitization, and the `verifyForwardedWebhook` helper for receivers. Thanks to @Enard52.
+- Add the Yapı Kredi provider (Posnet XML): non-3D sale, 3D Secure through Posnet OOS (resolved and charged with a MAC over your order, the bank's answer MACs checked), refund, cancel and order inquiry (agreement). Generate bank-compatible order ids when conversationId is omitted. Thanks to @sizinajans (#205).
 
 ### Fixed
 
 - `failover`: a payment that failed with an HTTP 500, 502 or 504 answer no longer moves to a backup provider, because the provider may have charged the card before the error. These statuses are out of the default `on` codes and are ignored even when listed; 503 still fails over.
+- Serialize PayTR Direct API baskets as JSON for new-card and stored-card payments, including 3D Secure forms. Keep iFrame baskets Base64-encoded and preserve their token signatures. Thanks to @sizinajans (#199).
 - Plugin endpoints refuse HTML form bodies on `POST` with 415, like the built-in actions, so another site cannot post to them with the visitor's cookies (CSRF); an endpoint a third party posts a form to sets the new `acceptForm: true`. An `onRequest` hook that throws now stops the request with 503 instead of letting it through, and `rateLimit` gets `passOnStoreError` for applications that prefer to stay open while their store is down.
 - `redact`: `fields` and `custom` now add to the defaults instead of replacing them, so listing one extra field no longer unmasks the CVC or the TCKN pattern; `cardHolderName`, `securityCode` and provider secrets (`storeKey`, `hashKey`, `apiSecret`, `clientSecret`, `terminalProvPassword`) are masked by default; and the result the call returns keeps `paymentId`, `conversationId`, the 3D Secure and checkout form pages and the stored card tokens as the provider sent them.
 - `refundApproval`: the approve and reject endpoints take the approver from the new `getActor` option instead of the request body (and answer 403 without it), a request body can no longer mark a refund as already approved, cancellations wait for approval unless the new `cancelAmount` option puts them under the threshold, amounts are parsed strictly, and approving the same request twice refunds once.
-
-## 0.12.0-beta.1
-
-### Added
-
-- Add QNBpay, which runs on Sipay's platform: `qnbpay()` or `sipay({ brand: 'qnbpay' })` uses QNBpay's hosts and provider id, with the same payments, 3D Secure, refunds, pre-authorization and installment queries as Sipay Thanks to @sizinajans (#232).
-
-## 0.12.0-beta.0
-
-### Added
-
-- Add the Albaraka Türk provider (e-POS, Posnet JSON API): non-3D sale, 3D Secure completed with the 3D data and the order values from your records, refund, cancel, order inquiry and pre-authorization. Generate bank-compatible order ids when conversationId is omitted.
-- Add the Denizbank provider (InterVPos): non-3D sale, 3D Secure (3D Model) verified from HASHPARAMS and charged with the 3D Secure data, refund and cancel
-- EST: Girogate alternative payment methods (iDEAL, Sofort, giropay, EPS, Bancontact, Przelewy24, Trustly and more) with `initThreeDSPayment({ girogate: { method, country } })` on the 3d_pay store types. A `Pending` callback returns `pending` with the order id. The EST currency list gains the methods' currencies (PLN, SEK, CHF, ...)
-- Add two banks to the EST provider: `est({ bank: 'akbankest' })` for Akbank's older virtual POS (sanalakpos.com) and `est({ bank: 'halkbankmkd' })` for Halkbank Macedonia, with Macedonian denars (`MKD`, sent as `807`)
-- PayTR: `threeDSMode: 'direct'` runs 3D Secure payments with a new card through the Direct API (your own card form, posted from the customer's browser) instead of the iFrame
-- Add the QNB provider (PayFor): non-3D sale, 3D Secure (3D Model and 3D Pay) verified with the ResponseHash and confirmed with the bank, refund, cancel and order inquiry
-- Add the VakıfBank provider (VPOS 7/24): non-3D sale, 3D Secure through the MPI and VakıfBank's 3DS product, refund and cancel (no payment status query: VakıfBank's record search cannot see cancels and refunds)
-- Add the Yapı Kredi provider (Posnet XML): non-3D sale, 3D Secure through Posnet OOS (resolved and charged with a MAC over your order, the bank's answer MACs checked), refund, cancel and order inquiry (agreement). Generate bank-compatible order ids when conversationId is omitted.
-
-### Fixed
-
-- Serialize PayTR Direct API baskets as JSON for new-card and stored-card payments, including 3D Secure forms. Keep iFrame baskets Base64-encoded and preserve their token signatures.
 
 ## 0.11.1
 
