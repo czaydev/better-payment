@@ -1,0 +1,111 @@
+---
+title: MCP Sunucusu
+description: Better Payment'ı yapay zekâ ajanları (AI agents) için Model Context Protocol (MCP) sunucusu olarak sunun.
+---
+
+<Since version="0.12.0" />
+
+`mcp` eklentisi, Better Payment kütüphanesini HTTP JSON-RPC 2.0 üzerinden standart bir Model Context Protocol (MCP) sunucusuna dönüştürür. Bu sayede yapay zekâ asistanları ve otonom ajanlar (Claude Desktop, Cursor, Copilot veya özel LLM ajanları) ödeme durumunu sorgulayabilir, BIN kontrolü yapabilir, taksit seçeneklerini listeleyebilir ve güvenli bir şekilde iade veya iptal işlemlerini yürütebilir.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { mcp } from 'better-payment/plugins';
+
+const AGENT_TOKEN = process.env.MCP_AGENT_SECRET!; // a secret of its own, not your API keys
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    mcp({
+      path: '/mcp',
+      readOnly: false,
+      authorize: (req, tool) => {
+        const header = req.headers['authorization'] ?? req.headers['Authorization'];
+        if (header !== `Bearer ${AGENT_TOKEN}`) return false;
+        // A read-only agent token: the write tools stay unreachable
+        return tool !== 'refund' && tool !== 'cancel' ? true : process.env.MCP_ALLOW_WRITES === '1';
+      },
+      // The IP the provider sees on refunds and cancellations. Behind a proxy,
+      // read the header your edge actually sets (and strips client copies of).
+      getClientIp: (req) => req.headers['cf-connecting-ip'],
+      onToolCall: ({ tool, provider, isError, durationMs }) => {
+        console.log(`MCP tool ${tool} on ${provider}: ${isError ? 'failed' : 'ok'} in ${durationMs}ms`);
+      },
+    }),
+  ],
+  // The MCP endpoints are privileged: the handler refuses to build without this hook
+  handler: {
+    basePath: '/api/pay',
+    authorize: ({ request }) =>
+      (request.headers['authorization'] ?? request.headers['Authorization']) === `Bearer ${AGENT_TOKEN}`,
+  },
+});
+```
+
+`betterPayment` HTTP işleyicisi (Next.js, Fastify, Express, Hono, Elysia vb.) ile bağlandığında aşağıdaki uç noktalar otomatik olarak kaydedilir:
+- `POST /mcp` — JSON-RPC 2.0 protokol uç noktası (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`).
+- `GET /mcp/info` — Sunucu durumu ve metaveri sorgulama uç noktası.
+
+## Kullanılabilir Araçlar [#available-tools]
+
+MCP sunucusu aşağıdaki araçları kullanıma sunar:
+
+| Araç | Tür | Açıklama |
+| ---- | --- | -------- |
+| `getPayment` | Okuma | Sağlayıcı ve ödeme kimliğine göre ödeme durumu ve detaylarını sorgular. |
+| `binCheck` | Okuma | Kartın ilk 6-8 hanesine göre banka, marka, kart tipi ve kart ailesi bilgilerini getirir. |
+| `installmentInfo` | Okuma | Belirtilen BIN ve tutar için mevcut taksit seçeneklerini ve vade oranlarını listeler. |
+| `refund` | Yazma | Ödemenin tamamını veya bir kısmını iade eder. Yetkilendirme kontrolü gerektirir. |
+| `cancel` | Yazma | İşlemi gün sonu öncesinde iptal eder. Yetkilendirme kontrolü gerektirir. |
+
+## Kimlik Doğrulama [#authentication]
+
+Her iki uç nokta da tıpkı iade işlemleri gibi [`privileged`](/docs/concepts/handler) olarak işaretlenmiştir:
+
+- Bu eklenti kayıtlıyken işleyici, `authorize` kancası olmadan hiç oluşturulmaz; yani yanlışlıkla herkese açık kalan bir MCP rotası, açık bir uç nokta yerine bir yapılandırma hatası verir. Bu kanca önce çalışır ve reddettiği istek `initialize`, `tools/list` ve `tools/call` dâhil hiçbir araca ulaşamaz.
+- Eklentinin kendi `authorize(request, tool)` fonksiyonu her araç çağrısından önce çalışır; böylece bir ajan token'ı yalnızca okuma araçlarıyla sınırlandırılabilir.
+- Yazma araçları (`refund`, `cancel`) buna ek olarak `authorize` seçeneğini zorunlu tutar: hiçbir yetkilendirici yapılandırılmadıysa, işleyici kancası isteği geçirmiş olsa bile `401` ile yanıtlar.
+- `readOnly: true`, yazma araçlarını `tools/list` yanıtından tamamen çıkarır; ajan onları göremez bile.
+
+## Protokol [#protocol]
+
+- **Sürüm el sıkışması:** sunucu `2025-06-18`, `2025-03-26` ve `2024-11-05` sürümlerini konuşur. `initialize`, istemcinin `protocolVersion` değerini sunucu da konuşuyorsa onu geri döner, konuşmuyorsa kendi en yeni sürümünü döner; yanıt ayrıca `serverInfo` ve `capabilities.tools` içerir.
+- **Bildirimler** (`notifications/initialized`, `id` taşımayan hiçbir mesaj) Streamable HTTP transport'unun beklediği gibi `202 Accepted` ve boş gövde ile yanıtlanır.
+- **JSON-RPC hataları** (bilinmeyen metod, geçersiz istek, sunucunun tanımadığı bir araç) `200 OK` ve gövdede bir `error` nesnesi olarak döner: JSON-RPC hatayı HTTP durumuna değil, yanıt zarfına bağlar. 200 dışı yanıtlar yalnızca taşıma ve yetkilendirme hataları içindir: işleyici kancasından `403`, eklenti yetkilendiricisinden `401`, yanlış metotta `405`, geçersiz JSON gövdede `400`.
+- **Araç hataları** — hata fırlatan veya `failure` döndüren bir sağlayıcı, eksik argümanlar — başarılı bir JSON-RPC sonucu olarak, `isError: true` ve mesaj içerikte dönülür; böylece istemci nedeni modele gösterir ve çağrıyı kaybeden taraf olmaz.
+
+## İstemci IP'si [#client-ip]
+
+Sağlayıcılar, iade ve iptal işlemlerinde müşteri IP'sini ister. Uç nokta bağlamı yalnızca istek başlıklarını taşıdığı için eklenti varsayılan olarak sırayla `cf-connecting-ip`, ardından `x-real-ip` başlıklarını okur — kenar (edge) proxy'nin sonuna eklemediği, üstüne yazdığı başlıklar. `x-forwarded-for` bilinçli olarak varsayılan güvenilir listede değildir: herhangi bir istemci bu başlığa istediği değeri yazabilir. Güvenilen bu iki başlığı da sizin yerinize doğrulayan bir mekanizma yoktur: ancak kenar katmanınız onu ayarlayıp istemciden gelen kopyaları sildiğinde güvenilir sayılırlar; bu sizin dağıtımınızın sorumluluğudur. Platformunuz IP'yi yalnızca temizleyen bir proxy arkasında `x-forwarded-for` içinde veriyorsa, onu `getClientIp` içinde kendiniz okuyun. Okunacak bir IP yoksa yazma aracı, uydurma bir adrese atılmak yerine reddedilir.
+
+## Kart Verisi Güvenliği [#card-data-safety]
+
+Araç sonuçları modele ulaşmadan önce temizlenir:
+
+- Kartla ilgili alanlar (`card`, `cardNumber`, `cvv`, `securityCode`, `expireMonth`/`expiryMonth`, `expireYear`/`expiryYear`, `cardHolderName`, `pan`) tamamen düşürülür.
+- Kalan her string — hata mesajları ve iç içe geçmiş sağlayıcı yükleri dâhil — içindeki 16-19 hanelik her rakam dizisi `************1111` biçiminde maskelenir; yalnızca son dört hane korunur. Uzun sayısal sipariş numaraları da maskelenebilir; bir LLM'in okuduğu yanıt için güvenli yön budur.
+- `authorize`, `getClientIp` ve `onToolCall` kancaları istek başlıklarını ve temizlenmiş argümanları görür, asla ham bir kart numarası görmez.
+
+## Denetim Kaydı [#audit-trail]
+
+- `refund` ve `cancel`, sağlayıcı vekili (proxy) üzerinden çalışır; bu yüzden normal [ödeme olaylarını](/docs/concepts/events) üretir: `payment.on('refund.succeeded', ...)` dinleyicisi ve [`notifications`](/docs/plugins/notifications) eklentisi, ajan tarafından yapılan iadeyi kendi kodunuzdan yapılmış gibi görür.
+- Her araç çağrısı, okuma olanları da dâhil, kütüphane [logger'ına](/docs/concepts/handler) tek satır yazar: araç, sağlayıcı ve süreyi taşıyan `mcp: tool 'refund' called`. İstek ve yanıt gövdeleri asla loglanmaz.
+- Yetki verenin reddettiği çağrı asla bir araca ulaşmaz, ama aynı denetim kaydına o da düşer: logger'da `mcp: tool 'refund' denied`, `onToolCall` içinde ise gerekyle birlikte `isError: true`.
+- `onToolCall` sizin ek kancanızdır: araç, temizlenmiş argümanlar, temizlenmiş sonuç veya hata mesajı, `isError`, `durationMs`, sağlayıcı, çözümlenen IP ve zaman damgası.
+
+## Seçenekler [#options]
+
+| Seçenek | Tür | Varsayılan | Açıklama |
+| ------- | --- | ---------- | -------- |
+| `path` | `string` | `'/mcp'` | MCP JSON-RPC uç noktasının taban yolu. |
+| `tools` | `McpToolName[]` | tüm araçlar | Sunucunun hangi araçları açtığı. |
+| `readOnly` | `boolean` | `false` | `true` ise yalnızca güvenli okuma araçları sunulur (yazma araçları gizlenir). |
+| `authorize` | `(req, tool) => boolean \| Promise<boolean>` | — | Her araç çağrısından önce çalışır; yazma araçları için zorunludur. |
+| `getClientIp` | `(req) => string \| undefined` | `cf-connecting-ip`, sonra `x-real-ip` | Yazma işlemlerine geçirilecek IP'yi çözümler. |
+| `serverName` | `string` | `'better-payment-mcp'` | `serverInfo` içinde bildirilen ad. |
+| `serverVersion` | `string` | Better Payment sürümü | `serverInfo` içinde bildirilen sürüm. |
+| `onToolCall` | `(details) => void` | — | Her araç çağrısından sonra tetiklenen denetim kancası. |

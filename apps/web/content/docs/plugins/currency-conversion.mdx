@@ -1,0 +1,94 @@
+---
+title: Currency conversion
+description: Convert payment amounts with Central Bank (TCMB) exchange rates, with markup, kuruş-accurate basket allocation, and refund protection.
+---
+
+<Since version="0.12.0" />
+
+Shops often price products in USD or EUR but charge in TRY, or use a provider that only accepts local currency (like Parampos). Converting amounts manually across payments, basket items, and refunds leads to rounding mismatches and exchange rate losses.
+
+The `currencyConversion` plugin integrates Central Bank of the Republic of Turkey (TCMB) daily exchange rates (or your own custom rate source). It automatically converts charges before they reach the provider, preserves kuruş integrity on basket items, and locks the original exchange rate for refunds.
+
+## Setup
+
+```typescript
+import { betterPayment, parampos, iyzico } from 'better-payment';
+import { currencyConversion } from 'better-payment/plugins';
+
+export const payment = betterPayment({
+  providers: {
+    parampos: parampos({ /* ... */ }),
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    currencyConversion({
+      source: 'tcmb', // default: today.xml from TCMB
+      rate: 'forex-selling', // default: 'forex-selling'
+      markup: 0.01, // optional 1% margin
+      target: {
+        parampos: 'TRY', // convert to TRY for Parampos
+        iyzico: ['TRY', 'USD', 'EUR'], // allowed currencies; converts only if outside list
+      },
+      cache: { ttl: '1h' },
+    }),
+  ],
+});
+```
+
+When a customer pays `$50.00` via Parampos, the plugin fetches the TCMB rate (e.g. `34.50`), applies any margin, and sends `1725.00 TRY` to Parampos.
+
+The result carries:
+
+```typescript
+const result = await payment.parampos.createPayment({
+  ...order,
+  price: '50.00',
+  currency: 'USD',
+});
+
+console.log(result.originalAmount); // '50.00'
+console.log(result.originalCurrency); // 'USD'
+console.log(result.exchangeRate); // 34.5
+```
+
+## Pre-checkout quote
+
+Use `payment.fx.quote()` on your product or cart page to show the converted amount before the customer starts checkout:
+
+```typescript
+const quote = await payment.fx.quote({
+  amount: 100,
+  from: 'USD',
+  to: 'TRY',
+});
+
+console.log(quote.convertedAmount); // 3450.00
+console.log(quote.exchangeRate); // 34.5
+```
+
+## Refund protection
+
+If exchange rates change tomorrow, issuing a refund using today's rate causes the merchant or customer to lose money.
+
+When you refund a converted payment, the plugin automatically resolves the payment's original rate and converts the refund amount using that rate:
+
+```typescript
+// Refund $25 of the original $50 payment:
+await payment.mock.refund({
+  paymentId: result.paymentId,
+  price: '25.00',
+  currency: 'USD',
+});
+// Charged with 25 * 34.5 = 862.50 TRY, regardless of today's rate
+```
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `source` | `'tcmb'` | `'tcmb'` or an async function `(from, to) => Promise<number>` |
+| `rate` | `'forex-selling'` | TCMB rate type: `'forex-selling'`, `'forex-buying'`, `'banknote-selling'`, `'banknote-buying'` |
+| `markup` | `undefined` | Optional margin added to the rate (e.g. `0.01` for +1%) |
+| `target` | `undefined` | Target currency map per provider id: `{ [providerId]: 'TRY' \| string[] }` |
+| `cache.ttl` | `'1h'` | In-memory cache duration for exchange rates (`'30m'`, `'1h'`, or milliseconds) |
+| `fetch` | `globalThis.fetch` | Custom fetch implementation for tests or proxies |

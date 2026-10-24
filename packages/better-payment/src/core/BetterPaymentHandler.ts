@@ -2,7 +2,7 @@ import type { PaymentCore, RegisteredEndpoint } from './BetterPayment';
 import { ProviderType } from './BetterPaymentConfig';
 import { BetterPaymentError, ConfigurationError } from './errors';
 import { EventListenerError } from './events';
-import type { EndpointContext } from './plugin';
+import type { EndpointContext, EndpointHandlerInfo } from './plugin';
 import { VERSION } from '../version';
 import { PaymentStatus } from '../types';
 import type { PaymentResponse } from '../types';
@@ -348,6 +348,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export class BetterPaymentHandler {
   private readonly basePath: string;
   private readonly allowed: Set<HandlerAction>;
+  private readonly info: EndpointHandlerInfo;
   private readonly idempotency?: Required<Omit<HandlerIdempotencyOptions, 'scope'>> &
     Pick<HandlerIdempotencyOptions, 'scope'>;
   private readonly endpoints: Map<string, RegisteredEndpoint>;
@@ -362,6 +363,12 @@ export class BetterPaymentHandler {
         ? ALL_HANDLER_ACTIONS
         : (options.allowedActions ?? DEFAULT_HANDLER_ACTIONS);
     this.allowed = new Set(allowed);
+    this.info = Object.freeze({
+      basePath: this.basePath,
+      allowedActions: Object.freeze(
+        allowed.filter((a): a is BuiltInHandlerAction => ALL_HANDLER_ACTIONS.includes(a as never))
+      ),
+    });
 
     if (options.idempotency !== false) {
       this.idempotency = {
@@ -403,6 +410,13 @@ export class BetterPaymentHandler {
    * Main request handler
    */
   async handle(request: BetterPaymentRequest): Promise<BetterPaymentResponse> {
+    const path = this.getPath(request.url);
+    if (path !== null && path !== '/health' && path !== '/ok') {
+      const intercepted = await this.core.interceptRequest(request, { path });
+      if (intercepted) {
+        return this.core.respond(intercepted, { request });
+      }
+    }
     return this.core.respond(await this.route(request), { request });
   }
 
@@ -497,6 +511,10 @@ export class BetterPaymentHandler {
     if (request.method.toUpperCase() !== endpoint.method) {
       return this.errorResponse(405, 'Method not allowed');
     }
+    if (endpoint.method === 'POST' && !endpoint.acceptForm && this.isFormRequest(request)) {
+      // A cross-site HTML form can send these without a CORS preflight (CSRF)
+      return this.errorResponse(415, 'Content-Type must be application/json');
+    }
     const body = asRecord(this.parseBody(request));
     const ctx: HandlerContext = {
       provider: undefined,
@@ -511,11 +529,21 @@ export class BetterPaymentHandler {
     const responses = new WeakSet<BetterPaymentResponse>();
     const endpointContext: EndpointContext = {
       ...this.core.context,
+      handler: this.info,
       request,
       body,
       query: new URL(request.url, 'http://localhost').searchParams,
       json: (value, status = 200) => {
         const response = this.jsonResponse(status, value);
+        responses.add(response);
+        return response;
+      },
+      html: (content, status = 200) => {
+        const response: BetterPaymentResponse = {
+          status,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: content,
+        };
         responses.add(response);
         return response;
       },
@@ -613,7 +641,7 @@ export class BetterPaymentHandler {
 
   /**
    * Content types a browser form can send cross-site without a CORS preflight.
-   * Only provider callbacks are posted this way.
+   * Only provider callbacks, and plugin endpoints with `acceptForm`, are posted this way.
    */
   private isFormRequest(request: BetterPaymentRequest): boolean {
     const contentType = (this.header(request, 'content-type') || '').toLowerCase();

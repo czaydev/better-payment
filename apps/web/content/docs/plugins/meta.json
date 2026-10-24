@@ -2,8 +2,24 @@
   "title": "Plugins",
   "icon": "plugins",
   "pages": [
+    "i18n",
     "localized-errors",
+    "fraud-rules",
     "chaos",
-    "notifications"
+    "notifications",
+    "openapi",
+    "failover",
+    "currency-conversion",
+    "redact",
+    "three-ds-timeout",
+    "captcha",
+    "rate-limit",
+    "pending-resolver",
+    "refund-approval",
+    "webhook-forwarding",
+    "mcp",
+    "telemetry",
+    "commission-router",
+    "routing"
   ]
 }

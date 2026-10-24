@@ -1,0 +1,94 @@
+---
+title: Para birimi çevirme
+description: Ödeme tutarlarını Merkez Bankası (TCMB) döviz kurlarıyla, kâr marjı, kuruş hassasiyetinde sepet dağıtımı ve iade korumasıyla dönüştürün.
+---
+
+<Since version="0.12.0" />
+
+E-ticaret mağazaları genellikle ürün fiyatlarını USD veya EUR olarak belirler ancak ödemeyi TL olarak alır ya da yalnızca yerel para birimini destekleyen sağlayıcılar kullanır (Parampos gibi). Tutarları, sepet kalemlerini ve iadeleri manuel olarak dönüştürmek kuruş yuvarlama hatalarına ve kur farkı zararlarına yol açar.
+
+`currencyConversion` eklentisi, Türkiye Cumhuriyet Merkez Bankası (TCMB) günlük kurlarını (veya kendi özel kur kaynağınızı) entegre eder. Tutarları ödeme sağlayıcısına iletilmeden önce otomatik çevirir, sepet kalemlerinin kuruş tutarlılığını korur ve iadelerde orijinal ödeme kurunu kilitler.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, parampos, iyzico } from 'better-payment';
+import { currencyConversion } from 'better-payment/plugins';
+
+export const payment = betterPayment({
+  providers: {
+    parampos: parampos({ /* ... */ }),
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    currencyConversion({
+      source: 'tcmb', // default: today.xml from TCMB
+      rate: 'forex-selling', // default: 'forex-selling'
+      markup: 0.01, // optional 1% margin
+      target: {
+        parampos: 'TRY', // convert to TRY for Parampos
+        iyzico: ['TRY', 'USD', 'EUR'], // allowed currencies; converts only if outside list
+      },
+      cache: { ttl: '1h' },
+    }),
+  ],
+});
+```
+
+Müşteri Parampos üzerinden `50.00 USD` ödemek istediğinde, eklenti TCMB kurunu çeker (örn. `34.50`), varsa marjı ekler ve Parampos'a `1725.00 TRY` gönderir.
+
+Dönen ödeme sonucu orijinal verileri taşır:
+
+```typescript
+const result = await payment.parampos.createPayment({
+  ...order,
+  price: '50.00',
+  currency: 'USD',
+});
+
+console.log(result.originalAmount); // '50.00'
+console.log(result.originalCurrency); // 'USD'
+console.log(result.exchangeRate); // 34.5
+```
+
+## Ödeme Öncesi Fiyat Teklifi [#pre-checkout-quote]
+
+Müşteri ödeme adımına geçmeden önce ürün veya sepet sayfasında çevrilmiş tutarı göstermek için `payment.fx.quote()` kullanın:
+
+```typescript
+const quote = await payment.fx.quote({
+  amount: 100,
+  from: 'USD',
+  to: 'TRY',
+});
+
+console.log(quote.convertedAmount); // 3450.00
+console.log(quote.exchangeRate); // 34.5
+```
+
+## İade Koruması [#refund-protection]
+
+Ertesi gün döviz kurları yükselirse veya düşerse, güncel kur üzerinden iade yapmak satıcının veya müşterinin zararına neden olur.
+
+Dönüştürülmüş bir ödeme için iade başlattığınızda, eklenti otomatik olarak o ödemenin orijinal kurunu hatırlar ve iade tutarını o kurla çevirir:
+
+```typescript
+// Refund $25 of the original $50 payment:
+await payment.mock.refund({
+  paymentId: result.paymentId,
+  price: '25.00',
+  currency: 'USD',
+});
+// Charged with 25 * 34.5 = 862.50 TRY, regardless of today's rate
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| --- | --- | --- |
+| `source` | `'tcmb'` | `'tcmb'` veya asenkron kur fonksiyonu `(from, to) => Promise<number>` |
+| `rate` | `'forex-selling'` | TCMB kur tipi: `'forex-selling'`, `'forex-buying'`, `'banknote-selling'`, `'banknote-buying'` |
+| `markup` | `undefined` | Kura eklenecek yüzde marj (örn. %1 için `0.01`) |
+| `target` | `undefined` | Sağlayıcı bazlı hedef para birimi: `{ [providerId]: 'TRY' \| string[] }` |
+| `cache.ttl` | `'1h'` | Bellek içi kur önbellek süresi (`'30m'`, `'1h'` veya milisaniye) |
+| `fetch` | `globalThis.fetch` | Testler veya proxy için özel fetch implementasyonu |

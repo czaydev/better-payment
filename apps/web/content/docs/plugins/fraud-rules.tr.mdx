@@ -1,0 +1,224 @@
+---
+title: Fraud Kuralları ve Kart Testi
+description: Ödeme denemelerini IP, kart, BIN, e-posta veya alıcı bazında sayın, kart testi saldırılarını ve BIN aralıklarını engelleyin; şüpheli bir ödemenin reddine, 3D Secure'a yönlendirilmesine ya da yalnızca işaretlenmesine karar verin.
+---
+
+<Since version="0.12.0" />
+
+Bir bot, çalınmış kart numaralarını listesi hâlinde küçük tutarlarla sizin checkout'unuzdan geçirir ve biri geçene kadar devam eder; her deneme size sağlayıcı ücreti ve bankanız nezdinde itibar kaybettirir. Bir HTTP throttle'ı tek bir uç noktaya gelen istekleri sayar, bir captcha ise düğmeye bir insanın bastığını kanıtlar; ikisi de aynı IP'nin son bir saatte on bir farklı kart kullandığını ya da bir alıcının dördü de reddedilen dört kart denediğini bilmez. `fraudRules` plugin'i eksik olan katmandır: denemeler üzerinde sayaçlar, bir de sizin yazdığınız kurallar; hepsi sağlayıcı çağrılmadan **önce** çalışır.
+
+Bir ret, sıradan bir başarısız sonuçtur (`status: 'failure'`, `code: 'FRAUD_SUSPECTED'`, ayrıca kuralın `errorCode` değeri), bu yüzden asla başarı gibi raporlanmaz, asla yeniden denenmez ve `payment.failed` dinleyicilerinize ve [hata yerelleştirmesine](/docs/plugins/localized-errors) herhangi bir ret gibi ulaşır.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { fraudRules } from 'better-payment/fraud';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    fraudRules({
+      salt: process.env.FRAUD_SALT!,
+      velocity: [
+        { key: 'ip', max: 20, window: '10m' },
+        { key: 'card', max: 5, window: '1h' },
+        { key: 'buyer', distinct: 'card', max: 4, window: '1h' },
+        { key: 'email', max: 3, window: '1h', on: 'declined' },
+      ],
+      blockBins: ['552879', ['492156', '492160']],
+      maxAmount: '25000',
+    }),
+  ],
+});
+```
+
+Kuralların her biri isteğe bağlıdır: `fraudRules({ blockBins: ['552879'] })` tam bir kurulumdur. Koruyucu, siz `operations` geçmediğiniz sürece `createPayment`, `initThreeDSPayment`, `authorize` ve `initThreeDSAuthorize` üzerinde çalışır.
+
+## Kararlar [#verdicts]
+
+| Karar | Ne olur |
+| ----- | ------- |
+| `block` | Ödeme reddedilir: kuralın `errorCode` değeri, `code: 'FRAUD_SUSPECTED'`. Varsayılan. |
+| `threeDS` | 3D Secure olmadan yapılan bir kart ödemesi `THREEDS_REQUIRED` ile reddedilir; müşteri onu `initThreeDSPayment` ile tamamlar, bu karar o çağrıyı asla reddetmez. |
+| `flag` | Ödeme geçer ve tetiklenme günlüğe ayrıca `onDecision` içine yazılır; incelemek veya bir eğitim kümesi için. |
+
+```typescript
+fraudRules({
+  verdict: 'flag', // the default of every rule
+  velocity: [
+    // too many attempts from one IP: ask for 3D Secure instead of refusing
+    { key: 'ip', max: 10, window: '10m', verdict: 'threeDS' },
+    // the same card hammered: refuse it
+    { key: 'card', max: 5, window: '1h', verdict: 'block', code: 'RATE_LIMITED' },
+    // one buyer, several amounts in half an hour: note it and carry on
+    { key: 'buyer', distinct: 'amount', max: 3, window: '30m' },
+  ],
+});
+```
+
+Müşterinin gördüğü `THREEDS_REQUIRED`'dır; sonucun `code` değeri `THREEDS_FAILED`'dir, çünkü hiçbir 3D Secure başlatılmamıştır. Bunun için bir "3D Secure ile doğrula" düğmesi gösterin ve `initThreeDSPayment` başlatın — bir `initThreeDSPayment` çağrısı bu kararla engellenmez, yani yeniden deneme çalışır.
+
+## Hız kuralları [#velocity-rules]
+
+Bir hız kuralı denemeleri `key` ile gruplar ve bunları bir `window` içinde sayar.
+
+| Alan | Açıklama |
+| ---- | -------- |
+| `key` | `'ip'`, `'email'`, `'buyer'`, `'bin'`, `'prefix'`, `'card'` ya da kendi gruplama değeriniz için `(ctx) => string` |
+| `max` | Pencere içinde izin verilen deneme sayısı. Bir `attempt` kuralı `max + 1`'inci denemede tetiklenir; bir `declined` kuralı pencere zaten `max` ret içerdiğinde |
+| `window` | `'30s'`, `'10m'`, `'1h'`, `'1d'` veya milisaniye. Varsayılan: plugin `window` değeri, yani `'10m'` |
+| `on` | `'attempt'` (varsayılan) engellenmiş olsun ya da olmasın her denemeyi sayar; `'declined'` yalnızca bankanın reddettiği denemeleri sayar |
+| `distinct` | Denemeler yerine grup içindeki *farklı* değerleri sayar: `key: 'buyer'` üzerinde `distinct: 'card'` bir alıcının birkaç kart denemesi, `distinct: 'amount'` bir tutar merdivenidir |
+| `when` | `(ctx) => boolean`: kuralı yalnızca bu doğruysa uygula |
+| `verdict`, `code` | Yalnızca bu kural için geçerli olan overrides |
+
+Kurallar sırayla okunur ve limitini aşan ilk kural kazanır. Kurallar aynı anahtarı paylaşsalar bile bağımsızdır: iki `ip` kuralı birbirinin penceresini kirletmez.
+
+## Engellenen BIN'ler, tutarlar ve sizin kurallarınız [#blocked-bins-amounts-and-your-own-rules]
+
+```typescript
+fraudRules({
+  blockBins: ['552879', ['492156', '492160']], // exact BIN, or a range; 6 to 8 digits
+  maxAmount: '25000',
+  rules: [
+    (ctx) => ctx.currency === 'USD' && Number(ctx.amount) > 10_000 && 'AMOUNT_LIMIT',
+    (ctx) => (ctx.installment ?? 1) > 12 && { code: 'FRAUD_BLOCKED', verdict: 'flag' },
+  ],
+});
+```
+
+Bir kural bir hata kodu, bir `{ code, verdict, message }` tetiklenmesi ya da ödemenin geçmesine izin veren falsy bir değer döndürür. Bir `FraudContext` alır: `operation`, `provider`, `request`, `bin`, `prefix`, `last4`, `maskedCard`, `email`, `ip`, `buyerId`, `amount`, `currency`, `installment`, `conversationId`. Sayaçlar bu kurallar çalışmadan önce kaydedildiği için, engellenen bir deneme pencerede izini bırakmaya devam eder.
+
+`maxAmount`, `paidPrice` (ya da `price`) değerini sayı olarak karşılaştırır. İsteklerinizde para string olarak kalır ve istek sunucuda kurulur — bkz. [HTTP handler](/docs/concepts/handler) — bu plugin yalnızca "bu limitin üzerinde mi" sorusunu yanıtlamak için onu sayıya çevirir.
+
+## Bir tetiklenmeyi reddetmek yerine ona meydan okumak [#challenging-a-trigger-instead-of-refusing-it]
+
+```typescript
+fraudRules({
+  maxAmount: '25000',
+  // a trigger blocks unless the customer has already solved a captcha
+  challenge: async (ctx) => {
+    const token = await loadCaptchaToken(ctx.conversationId);
+    return token === undefined ? false : verifyCaptcha(token);
+  },
+  onDecision: async (decision) => {
+    await audit.record(decision); // never changes the outcome, and its failure is logged
+  },
+});
+```
+
+`challenge` yalnızca `block` kararında çalışır. Bir throw ya da reddedilmiş promise "temizlenmedi" sayılır — ulaşılamayan bir doğrulama servisi bir açıklığa dönüşmemelidir. `onDecision` sizin uyarı ve denetim kancaınızdır: türetilmiş kararı (`code`, `verdict`, `outcome`, `key`, `count`, `maskedCard`, `amount`, `operation`, `conversationId`) alır ve içindeki bir hata yalnızca günlüğe yazılır, asla bir ödeme hatasına dönüştürülmez.
+
+## Sayaçlar nerede tutulur [#where-the-counters-live]
+
+`MemoryFraudStore` varsayılandır: anahtar başına sabit bir pencere ve sahte kimlikler üreten bir botun sonsuza büyütememesi için 10 000 kayıtla sınırlı. Bu, tek bir süreç için yeterlidir. Birden çok sunucu ya da serverless bir checkout paylaşılan bir sayaç ister:
+
+```typescript
+fraudRules({
+  salt: process.env.FRAUD_SALT!, // the same salt on every instance, or the keys never match
+  store: {
+    async hit(key, windowMs) {
+      const count = await redis.incr(`fraud:${key}`);
+      if (count === 1) await redis.pexpire(`fraud:${key}`, windowMs);
+      return { count, resetAt: Date.now() + windowMs };
+    },
+    async peek(key) {
+      return Number((await redis.get(`fraud:${key}`)) ?? 0);
+    },
+    async distinct(group, member, windowMs) {
+      await redis.sadd(`fraud:${group}`, member);
+      await redis.pexpire(`fraud:${group}`, windowMs);
+      return { count: await redis.scard(`fraud:${group}`), resetAt: Date.now() + windowMs };
+    },
+  },
+});
+```
+
+`hit` bir denemeyi kaydeder, `peek` kayıt yapmadan içinde yaşanılan pencereyi okur (`on: 'declined'` kuralları kullanır), `distinct` farklı değerleri sayan kurallar için gereklidir, `reset` ise opsiyoneldir. Hepsini async yapabilirsiniz ve arayüz yalnızca string ile sayılardan oluşur: bir anahtar altında bir son kullanma süresiyle sayabilen her şey uyar; [#116](https://github.com/czaydev/better-payment/issues/116) içinde tartışılan key-value store adapterları da (`get`/`set`/`setIfAbsent`/`delete`; `reset` karşılığı `delete`). `payment.fraud.store` kullanılan sayaç deposudur, `payment.fraud.reset()` ise tek bir anahtarı ya da tüm sayaçları temizler:
+
+```typescript
+payment.fraud.reset(); // after a deploy, or when an operator releases a customer
+```
+
+## Kart verisi istekten asla çıkmaz [#card-data-never-leaves-the-request]
+
+Bir kart numarasıyla karıştırılabilecek hiçbir şey saklanmaz, günlüğe yazılmaz veya kurallarınıza iletilmez:
+
+- gruplama değerlerinin her biri (IP, e-posta, alıcı id'si, kart, BIN, prefix, kendi `key` fonksiyonunuzun sonucu) `salt` değerinizle HMAC-SHA256 üzerinden hash'lenir ve 16 hex karaktere indirilir. Bir depo anahtarı `0:ip:6f4a1c9d2b8e73a0` gibi görünür, `0:ip:85.34.78.112` gibi değil;
+- CVC ve son kullanma tarihi asla okunmaz, son kullanma tarihi bir anahtar olamaz;
+- kurallar ve `onDecision` numaranın yerine `bin`, `prefix`, `last4` ve `maskedCard` (`552879******0008`) görür;
+- log satırı yalnızca `code`, `outcome`, `key`, `count` ve `operation` taşır. İstek gövdesi yok, yanıt gövdesi yok;
+- depo sınırlıdır ve `payment.fraud.reset()` sayaçları düşürür.
+
+Test paketi (`tests/unit/plugins/fraud-rules.test.ts`) bir sayaç deposunun, günlüğün ve callback'lerinizin aldığı her string'i dolaşır ve içlerinde 13 ila 19 ardışık rakam bulursa başarısız olur. PCI-DSS ve KVKK açısından pratik olan kısım bu: kart verisi tutmadığınız için sayaçlar normal bir veritabanında durabilir. `salt` bir sırdır: diğer her şey gibi onu da döndürün ve döndürdüğünüzde her pencerenin baştan başladığını unutmayın.
+
+## Ziyaretçinin adresi [#the-visitor-address]
+
+`ip`, bir müşterinin ulaşmaya çalışacağı tek anahtardır, bu yüzden plugin onun hakkında olabilecek en az şeye güvenir:
+
+- varsayılan olarak adres, işlem isteğinin `buyer.ip` alanıdır — yani **sizin** kodunuzun doldurduğu bir alan. Plugin hiçbir HTTP header'ı okumaz; çünkü `X-Forwarded-For` her istemcinin kendi koyabildiği bir header'dır: ona göre anahtarlanmış bir sayaç, müşterinin seçtiği bir sayaç olur ve bunu tahmin eden bir bot pencere başına bir kimlik yerine deneme başına kimlik döndürür.
+- istek size bir proxy üzerinden geliyorsa bunu iki kez söyleyin: header'ı adlandırın ve sözünü kabul ettiğiniz proxy'leri adlandırın. `clientIp` zinciri en yakın proxy'den içe doğru okur ve kendisinden gelmeyen bir bağlantıda header'ı kullanmayı reddeder.
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { clientIp, fraudRules } from 'better-payment/fraud';
+
+const ip = { headers: ['x-forwarded-for'], trustedProxies: ['10.0.0.0/8', '127.0.0.1'] };
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [fraudRules({ velocity: [{ key: 'ip', max: 20, window: '10m' }] })],
+  handler: {
+    // the HTTP request is here, so this is where the address is decided
+    transformRequest: (ctx) => ({
+      ...ctx.body,
+      buyer: {
+        ...ctx.body.buyer,
+        ip: clientIp({ headers: ctx.request.headers }, ip) ?? ctx.body.buyer.ip,
+      },
+    }),
+  },
+});
+```
+
+Siz adlandırmadan hiçbir header okunmaz ve bağlantıyla örtüşmeyen bir `trustedProxies` listesi `clientIp`'yi bağlantının kendi adresini döndürmeye zorlar — müşteri bir header yazarak içinde olduğu pencerenin dışına çıkamaz. Adresin nereden geldiği sizin altyapınızla ilgilidir: serverless bir hostta bağlantı yük dengeleyiciniindir, bu yüzden platformun kendi aralığının arkasında genellikle `cf-connecting-ip` ya da `x-real-ip` kullanılır (yalnızca header'ı değil, aralığı da verin). Uygulamanız isteği deneme bazında zaten tutuyorsa — ara yazılım, `AsyncLocalStorage` — onu `resolveIp: () => ({ headers, socketAddress })` ile aynı `ip` kuralları üzerinde plugin'e verin; adresi guard'lı her işlem için kendisi çözer. Herhangi bir anahtarı tamamen ele geçirmek istiyorsanız `keys.ip` vardır. Kaynak ne olursa olsun, değer bir depo anahtarı olmadan önce hash'lenir.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `velocity` | — | Sıralı sayan kurallar |
+| `rules` | — | Sayaçlarla BIN/tutar kontrollerinden sonra çalışan kendi kurallarınız |
+| `blockBins` | — | Reddedilecek BIN'ler veya `[from, to]` aralıkları, 6 ila 8 hane |
+| `maxAmount` | — | Bundan yüksek tutarları reddet |
+| `verdict` | `'block'` | Kendi kararını vermeyen kuralların kararı |
+| `window` | `'10m'` | Hız kurallarının varsayılan penceresi |
+| `operations` | dört ödeme ve 3DS başlatma | Hangi işlemler korunuyor |
+| `store` | `new MemoryFraudStore()` | Senkron ya da async sayaç deposu |
+| `salt` | süreç başına rastgele | Türetilmiş anahtarların sırrı. Depoyu paylaşan örnekler için ayarlayın |
+| `keys` | — | Bir kimliğin nereden geldiğini ezen `(ctx) => string` fonksiyonları, örneğin IP'yi kendi sunucu tarafı değerinizden alın |
+| `resolveIp` | — | `(ctx) => ({ headers, socketAddress })`: denemenin HTTP isteği; plugin adresi buradan okur |
+| `ip` | hiçbir şeye güvenmez | `{ headers, trustedProxies }`: ziyaretçiyi taşıyabilecek header ve sözü kabul edilecek proxy'ler |
+| `challenge` | — | Bir `block` kararını temizleyebilen async kontrol |
+| `onDecision` | — | Engellenmiş, işaretlenmiş ya da temizlenmiş her tetiklenmede çağrılır |
+
+## Hata kodları [#error-codes]
+
+| `errorCode` | `code` | Müşteriye gösterilen mesaj |
+| ----------- | ------ | -------------------------- |
+| `FRAUD_BLOCKED` | `FRAUD_SUSPECTED` | This payment was not accepted. Please contact us or use another payment method. |
+| `RATE_LIMITED` | `FRAUD_SUSPECTED` | Too many payment attempts from here. Please try again later. |
+| `BLOCKED_BIN` | `FRAUD_SUSPECTED` | This card is not accepted. |
+| `AMOUNT_LIMIT` | `FRAUD_SUSPECTED` | This card is not accepted for amounts this high. |
+| `THREEDS_REQUIRED` | `THREEDS_FAILED` | This payment needs 3D Secure verification. |
+| `FRAUD_CHALLENGE_FAILED` | `FRAUD_SUSPECTED` | Verification failed. Please try again. |
+
+Bu mesajlar `FRAUD_ERROR_MESSAGES` içindeki İngilizce varsayılanlardır. [`localizedErrors`](/docs/plugins/localized-errors) bunları (ve kendi kuralınızın döndürdüğü her `code` değerini) Türkçeye çevirir; sözcükleri değiştirmek için o plugin'in `messages` seçeneğini kullanın.
+
+## Bu plugin ne yapmaz [#what-this-plugin-does-not-do]
+
+- **Bir captcha kontrolü de bir HTTP throttle'ı da değildir.** Bir insanın düğmeye bastığını kanıtlayan token ile bir uç noktanın ne sıklıkla çağrılabildiğini sınırlayan şeyler istek katmanına aittir; bu plugin denemeler üzerindeki durumdur. Onların yanında kullanın, yerine değil.
+- **Bir sağlayıcı callback'ini veya 3D Secure tamamlamasını asla korumaz.** `completeThreeDSPayment`, müşterinin bankada zaten bitirdiği bir ödemenin sonucunu bankanın bildirdiği yerdir: birini reddetmek ödenmiş bir siparişi ortada bırakır. `operations` içinde vermek, bunu kazaen yapmanıza izin vermek yerine bir `ConfigurationError` fırlatır. İadeler, iptaller, capture'lar ve sorgular da korunmaz.
+- **Asla yeniden denemez ve asla başarı bildirmez.** Bir ret, sağlayıcı çağrılmadan işlemi kısa devre yaptırır; bankaya hiçbir şey gitmez ve hiçbir şey yeniden denenmez. Bir `flag` kararı bilinçli olarak tersini yapar: ödeme çalışır.
+- **Sizin yerinize karar vermez.** Bir alıcının sıfır `distinct` değeri suç değildir ve hiçbir BIN aralığı tek başına zararlı değildir; listeler ve limitler sizindir — acquiring raporlarınızdan ve kendi chargeback kayıtlarınızdan.

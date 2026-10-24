@@ -1,0 +1,164 @@
+---
+title: Örnek mağaza (Next.js + Prisma)
+description: Sepet, sunucu tarafında siparişler, 3D Secure ve iadeler içeren çalıştırılabilir bir mağaza.
+---
+
+[`examples/next-shop`](https://github.com/czaydev/better-payment/tree/beta/examples/next-shop) bu
+depodaki küçük bir mağazadır. App Router, SQLite ile Prisma ve workspace'teki `better-payment`
+kullanır; varsayılan sağlayıcı `MockProvider` olduğu için kimlik bilgisi olmadan çalışır.
+
+## Örnekte neler var [#what-the-example-contains]
+
+- ürün listesi ve yalnızca ürün kimlikleri ile adetleri tutan bir çerez sepeti
+- tutarı veritabanındaki fiyatlardan toplanan, sunucuda oluşturulan sipariş
+- kart alanları ve `installmentInfo`'dan gelen taksitlerle ödeme formu
+- `toNextJsHandler` üzerinden 3D Secure, doğrulanan callback ve `callbackRedirect`
+- yalnızca `payment.succeeded` / `payment.pending` / `payment.failed` ile güncellenen siparişler
+- ödenmiş siparişi ayrıcalıklı `refund` route'u üzerinden iade eden yönetici sayfası
+- `MockProvider` ile mutlu yol için bir Playwright testi
+
+### Akış beş adımda [#the-flow-in-five-steps]
+
+1. `app/page.tsx` bir server action ile ürünü sepete ekler.
+2. `lib/cart-actions.ts` sepetten siparişi oluşturur; tarayıcı hiçbir tutar göndermez.
+3. `lib/payment.ts` içindeki `transformRequest` ödeme isteğini sipariş satırından yeniden kurar.
+4. Mock banka 3D Secure sonucunu handler'a gönderir; handler sonucu doğrular ve siparişi ödeme
+   olayları üzerinden günceller.
+5. `callbackRedirect` tarayıcıyı `/orders/<id>` sayfasına gönderir; sayfa veritabanındaki durumu
+   gösterir.
+
+## Çalıştırma [#run-it]
+
+```bash
+corepack pnpm@10.33.0 install
+corepack pnpm@10.33.0 --filter next-shop dev
+```
+
+`http://localhost:3000` adresini açın. `dev` betiği Next.js başlamadan önce `prisma generate` ve
+`prisma db push` çalıştırır, yani yeni bir checkout ek adım gerektirmez. Ödeme sayfasında
+`MockProvider` başarı kartı `4242424242424242`, ileri bir son kullanma tarihi ve herhangi bir CVC ile
+ödeyin. Aynı sayfadaki diğer sihirli kartlar reddedilmeyi, başarısız 3D Secure'u ve kaybolan yanıtı
+simüle eder.
+
+Bunun yerine iyzico sandbox kullanmak için `.env.example` dosyasını `.env.local` olarak kopyalayın,
+`IYZICO_API_KEY` ile `IYZICO_SECRET_KEY` değerlerini ayarlayın ve yeniden başlatın. Bu değerler boşken
+örnek `MockProvider` kullanır; depoda hiçbir zaman kimlik bilgisi bulunmaz.
+
+## Ödeme nesnesi [#the-payment-object]
+
+Handler yalnızca bu mağazanın kullandığı eylemleri açar ve `transformRequest` istemciden gelen her
+tutarı sipariş verisiyle değiştirir:
+
+```ts
+async function buildRequestFromDatabase(ctx: HandlerContext): Promise<object> {
+  if (ctx.action !== 'payment/init-3ds') return ctx.body ?? {};
+
+  const order = await getOrder(String(ctx.body?.orderId));
+  if (!order || !isPayable(order.status)) throw new Error('Order is not payable');
+
+  const total = formatKurus(order.amountKurus);
+  const paymentCard = readCard(ctx.body?.paymentCard);
+  // For installments > 1, ask the provider what it will charge.
+  const paidPrice = await quotedPaidPrice(paymentCard.cardNumber, total, order.id, order.installment);
+
+  return {
+    price: total, // never a browser value
+    paidPrice,
+    currency: order.currency,
+    installment: order.installment,
+    paymentCard,
+    buyer: demoBuyer(order.id),
+    basketItems: order.items.map(toBasketItem),
+    callbackUrl: `${new URL(ctx.request.url).origin}/api/pay/${PROVIDER_ID}/payment/complete-3ds`,
+  };
+}
+```
+
+Birden fazla taksit seçildiğinde örnek, sağlayıcıdan o taksit sayısının fiyat teklifini ister ve
+teklif edilen toplamı `paidPriceKurus` olarak saklar; böylece iade tam olarak tahsil edilen tutarı
+geri verir. Kart sağlayıcıya iletilir ve veritabanına asla yazılmaz; Prisma şemasında kart verisi
+alanı yoktur.
+
+## Route handler [#the-route-handler]
+
+```ts
+// app/api/pay/[...path]/route.ts
+import { toNextJsHandler } from 'better-payment/next';
+import { getBetterPayment } from '@/lib/payment';
+
+export const runtime = 'nodejs'; // Prisma's SQLite client is not edge-compatible
+
+export const { GET, POST } = toNextJsHandler(getBetterPayment);
+```
+
+`getBetterPayment` tembel bir singleton'dır, bu yüzden `next build` hiçbir ortam değişkenine ihtiyaç
+duymaz. Tam entegrasyon için [Next.js rehberine](/docs/integrations/nextjs) bakın.
+
+## Olaylardan siparişler [#orders-from-events]
+
+Sipariş durumunu tarayıcının dönüşü değil, ödeme olayları yazar:
+
+```ts
+payment.on('payment.succeeded', async (event) => {
+  await prisma.order.updateMany({
+    where: { id: event.conversationId ?? '' },
+    data: { status: 'PAID', paymentId: event.paymentId ?? null },
+  });
+});
+
+payment.on('payment.failed', async (event) => {
+  await prisma.order.updateMany({
+    where: { id: event.conversationId ?? '', status: { notIn: ['PAID', 'REFUNDED'] } },
+    data: { status: 'FAILED', errorCode: event.code ?? 'UNKNOWN' },
+  });
+});
+```
+
+Aynı olaylar hem tarayıcıdaki 3D Secure dönüşü hem de sağlayıcı bildirimi için yayınlanır; bu yüzden
+iki yol çelişemez ve sahte bir callback hiçbir olay üretmez. [Olaylara](/docs/concepts/events) bakın.
+
+## İadeler ve authorize [#refunds-and-authorize]
+
+`refund` ayrıcalıklı bir eylemdir; handler bir `authorize` kancası olmadan başlamayı reddeder. Örnek,
+sağlayıcı callback'lerine ve müşteri ödemesine izin verir, iade için demo yönetici çerezini ister:
+
+```ts
+function authorize(ctx: HandlerContext): boolean {
+  // Signed provider callbacks and the customer checkout are public
+  if (CALLBACK_HANDLER_ACTIONS.includes(ctx.action)) return true;
+  if (ctx.action === 'payment/init-3ds' || ctx.action === 'installment') return true;
+  // Refunds need the shop's admin session (a demo cookie in the example)
+  if (ctx.action === 'refund') return hasDemoAdmin(ctx.request.headers);
+  return false;
+}
+```
+
+İade tutarı ve sağlayıcı ödeme kimliği `transformRequest` içinde siparişten okunur, yani yönetici
+sayfası yalnızca sipariş kimliğini gönderir. Üretimde kullanmadan önce demo çerezini gerçek bir
+oturum ve yönetici rolü kontrolüyle değiştirin.
+
+<Callout type="warn">
+  Örnek öğrenmek içindir, üretim için değil. Paylaşılan bir idempotency store, gerçek kimlik
+  doğrulama, HTTPS callback URL'leri, Prisma migration'ları ve sağlayıcının barındırılan kart
+  alanlarını kullanın. README her maddeyi listeler.
+</Callout>
+
+## Üretim için neleri değiştirmeli [#what-to-change-for-production]
+
+- birden fazla instance çalıştırıyorsanız `handler.idempotency.store` için paylaşılan bir
+  `IdempotencyStore` verin
+- demo yönetici çerezini oturumunuz ve `admin` rolü kontrolüyle değiştirin
+- `callbackUrl`'i `request.url` yerine yapılandırılmış bir HTTPS origin'inden türetin
+- `prisma db push` yerine `prisma migrate deploy` kullanın
+- kart verisini sağlayıcının barındırılan alanlarıyla sunucunuzun dışında tutun
+- ödemeyi yeniden denemeden önce `pending` sonucu `getPayment` ile doğrulayın
+
+## Testler [#tests]
+
+```bash
+corepack pnpm@10.33.0 --filter next-shop test:e2e
+```
+
+Playwright testi sepete ürün ekler, başarı kartıyla öder, 3D Secure callback'ini bekler, siparişin
+`PAID` olduğunu kontrol eder, yönetici sayfasından iade eder ve kaydedilen iadeyi doğrular. Kendi dev
+sunucusunu 3310 portunda başlatır ve kimlik bilgisi gerektirmez.

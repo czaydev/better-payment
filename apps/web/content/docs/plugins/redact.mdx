@@ -1,0 +1,75 @@
+---
+title: Redaction (PCI DSS & KVKK)
+description: Mask cardholder data, CVV, and personal data in logs, events, and audit trails.
+---
+
+<Since version="0.12.0" />
+
+Payment requests carry credit card numbers (PAN), security codes (CVC/CVV), expiration dates, Turkish ID numbers (TCKN), phone numbers, and addresses. Writing these in raw form to logs or broadcasting them across internal event listeners violates **PCI DSS** (Requirement 3: Protect Stored Account Data) and Turkish **KVKK** (Kişisel Verilerin Korunması Kanunu).
+
+The `redact` plugin guarantees that sensitive cardholder and personal data is automatically masked before leaving the library via logger outputs, payment event listeners, or audit trails—without altering the real payload delivered to payment providers.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { redact } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ apiKey: '...', secretKey: '...' }),
+  },
+  plugins: [
+    redact({
+      // Masking style for card numbers
+      card: 'first6last4', // e.g. 545454******5454
+      // More patterns to mask in string values (TCKN 11-digit numbers are always masked)
+      custom: [/\bTR\d{24}\b/g], // IBAN
+    }),
+  ],
+});
+
+// Event listeners receive masked data
+payment.on('payment.succeeded', (event) => {
+  // event.request.paymentCard.cardNumber === '545454******5454'
+  // event.request.paymentCard.cvc === '***'
+  // event.request.buyer.identityNumber === '<redacted>'
+  console.log('Payment completed for:', event.request);
+});
+```
+
+## How It Works
+
+1. **Untouched Provider Delivery**: The real card and customer data is dispatched to the payment gateway without any modification, ensuring successful processing.
+2. **Event Payload Redaction**: In the `after` hook, copies of `request` and `result` passed to `BetterPayment` events (`payment.succeeded`, `payment.failed`, etc.) are masked. The masked result is also what the call returns, except `paymentId`, `conversationId`, `threeDSHtmlContent`, `redirectUrl`, `checkoutFormContent`, `paymentPageUrl`, `token` and `storedCard`, which stay as the provider sent them.
+3. **Logger Wrapping**: If a `logger` is passed to `betterPayment({ logger })`, its `debug`, `info`, and `error` methods are wrapped so any log messages or metadata matching sensitive keys or PAN patterns are masked before writing to the log destination.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `fields` | — | More object keys to mask, added to the defaults (`cardNumber`, `cardHolderName`, `cvc`, `cvv`, `securityCode`, `expireMonth`, `expireYear`, `identityNumber`, `gsmNumber`, `phoneNumber`, `password`, provider secrets...), which are always masked |
+| `card` | `'first6last4'` | Card masking format: `'first6last4'`, `'last4'`, `'none'`, or custom `(pan) => string` |
+| `custom` | — | More RegExp patterns to mask within text strings, added to the built-in 11-digit TCKN pattern |
+| `maskString` | `'<redacted>'` | Generic placeholder string |
+| `redactLogger` | `true` | Wrap the configured logger to mask log entries |
+| `redactEvents` | `true` | Mask event payloads before listeners receive them |
+
+## Manual Redaction Helper
+
+The plugin attaches a `redact` namespace to the payment instance for ad-hoc masking in application code:
+
+```typescript
+// Mask card number
+payment.redact.maskCard('5528790000000008');
+// => '552879******0008'
+
+// Mask arbitrary objects or logs
+const safeObject = payment.redact.mask({
+  orderId: 'ORD-1',
+  cardNumber: '5528790000000008',
+  cvc: '123',
+  identityNumber: '12345678901',
+});
+// => { orderId: 'ORD-1', cardNumber: '552879******0008', cvc: '***', identityNumber: '<redacted>' }
+```

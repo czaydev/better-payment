@@ -186,9 +186,11 @@ endpoints: {
 - `ctx` has the plugin context plus `request`, the parsed `body` and `query`.
 - The handler's `authorize` hook runs for endpoints too, with `provider: undefined` and `action: 'plugin:<plugin id>/<endpoint name>'` (here `plugin:rates/quote`).
 - Mark endpoints that change or reveal payments with `privileged: true`: the handler then refuses to start without an `authorize` hook, like it does for refunds.
+- A `POST` endpoint answers `415` to HTML form bodies (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`), which another site can post with the visitor's cookies (CSRF). Set `acceptForm: true` only for an endpoint a third party posts a form to, like a bank callback, and verify that request yourself.
 - A path must not start with a provider id or `health`.
+- If an `onRequest` hook throws, the handler answers `503`: a guard that could not decide does not let the request through.
 
-To change the handler's responses, use `onResponse`. It runs on every response, including replayed ones, and can return a replacement; [localizedErrors](/docs/plugins/localized-errors) uses it to translate messages for each request's `Accept-Language`. If it throws, the error is logged and the response is sent unchanged.
+To change the handler's responses, use `onResponse`. It runs on every response, including replayed ones, and can return a replacement; [i18n](/docs/plugins/i18n) uses it to translate messages for each request's `Accept-Language`. If it throws, the error is logged and the response is sent unchanged.
 
 ## Error codes
 

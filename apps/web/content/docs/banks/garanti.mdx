@@ -1,0 +1,145 @@
+---
+title: Garanti BBVA
+description: Garanti BBVA virtual POS (GVP) integration reference.
+since: 0.12.0
+---
+
+Uses the Garanti BBVA virtual POS XML API (version 512). Every request carries a `HashData`:
+`SHA512(OrderID + TerminalID + card number + Amount + CurrencyCode + SecurityData)`, where
+`SecurityData` is `SHA1(password + terminal id padded to 9 digits)`, both uppercase hex over ISO-8859-9.
+
+<Callout type="info">
+  Verified in the Garanti BBVA test environment: non-3D sale, order inquiry, cancel and partial refund, and 3D Secure end to end in both models (`3D` and `3D_PAY`), including a card that asks for the test SMS code. The test callbacks are signed with SHA-512.
+</Callout>
+
+## Configuration
+
+```typescript
+import { betterPayment, garanti } from 'better-payment';
+
+const payment = betterPayment({
+  providers: {
+    garanti: garanti({
+      merchantId: process.env.GARANTI_MERCHANT_ID!,
+      terminalId: process.env.GARANTI_TERMINAL_ID!,
+      password: process.env.GARANTI_PROVAUT_PASSWORD!,
+      storeKey: process.env.GARANTI_STORE_KEY!,
+      // refundPassword?: string (PROVRFN password, when it differs)
+      // securityLevel?: '3D' | '3D_PAY' | 'GARANTI_PAY' (default '3D')
+      // provUserId / refundUserId: default PROVAUT / PROVRFN
+      // testMode: defaults to mode === 'sandbox' (Mode TEST)
+      // baseUrl: defaults from mode (sanalposprovtest.garantibbva.com.tr / sanalposprov.garanti.com.tr)
+    }),
+  },
+});
+```
+
+`password` belongs to the PROVAUT (provision) user and `storeKey` is the 3D Secure store key,
+both set in the Garanti BBVA virtual POS panel. Cancels and refunds use the PROVRFN user,
+signed with `refundPassword` when it is set.
+
+`paymentId` is your order id: the `conversationId` you pass, or a generated id.
+
+## Direct Payment (non-3D)
+
+```typescript
+const result = await payment.garanti.createPayment({ ...paymentRequest, conversationId: 'ORDER123' });
+// XML sales; success when the response Code is 00
+```
+
+## 3D Secure
+
+```typescript
+const init = await payment.garanti.initThreeDSPayment({
+  ...paymentRequest,
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/checkout/garanti/callback', // your own route
+});
+// init.threeDSHtmlContent auto-submits a form signed with secure3dhash to the 3D engine
+```
+
+Garanti BBVA POSTs the result to `callbackUrl`:
+
+```typescript
+// orderId, amount and currency come from your own records, never from the callback body
+const result = await payment.garanti.completeThreeDSPayment(callbackBody, { orderId, amount, currency });
+```
+
+The callback `hash` is rebuilt from the fields named in `hashparams` (never from
+`hashparamsval`) and must cover the order id and `mdstatus`. The values are joined without a
+separator, so the result is also confirmed with the bank:
+
+- a callback with an invalid hash, another terminal, or another order than the `orderId` you pass
+  is rejected as `INVALID_HASH`;
+- `3D`: when `mdstatus` is `1`, the payment is provisioned with XML `sales` for the `orderId`,
+  `amount` and `currency` from your records, and the bank's answer decides. They are required here,
+  because the bank charges what this request says and a re-split callback could carry other values;
+- `3D_PAY`: an approved callback is checked with an order inquiry, and the bank's amount must match
+  your `amount` (or, without it, the callback's); a payment the bank does not confirm is rejected as
+  `INVALID_HASH`.
+
+The second argument is never read from the callback body. The default handler route passes only
+the body, so for `3D` complete the payment in your own route. `paymentId` and `conversationId` are
+set only for a payment the bank confirmed, and on a timeout only when you passed `orderId`; a
+failure never carries an order id taken from the callback.
+
+### mdstatus
+
+`mdstatus` `1` means the card was fully authenticated. `2`, `3` and `4` are half-secure: the card
+or its bank is not enrolled in 3D Secure, or only an attempt was made. In the `3D` model only `1`
+is provisioned by default; any other value fails with `MD_STATUS_<value>`. To provision
+half-secure payments too, list them in `acceptedMdStatuses` (for example `['1', '2', '3', '4']`).
+Chargeback liability can then stay with you. In `3D_PAY` the bank decides.
+
+## GarantiPay
+
+GarantiPay lets the customer pay with the Garanti BBVA Mobile or BonusFlaş app instead of
+entering a card. With `securityLevel: 'GARANTI_PAY'`, `initThreeDSPayment()` needs no
+`paymentCard`: its form (`txntype` `gpdatarequest`, security level `CUSTOM_PAY`) opens Garanti's
+GarantiPay page, where the customer continues with a phone number or Turkish ID number and approves
+the payment in the app. The customer can also use Bonus, cheque and mile points there. Use a separate
+provider key next to your card provider, with the same terminal:
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    garantipay: garanti({
+      merchantId: process.env.GARANTI_MERCHANT_ID!,
+      terminalId: process.env.GARANTI_TERMINAL_ID!,
+      password: process.env.GARANTI_PROVAUT_PASSWORD!,
+      storeKey: process.env.GARANTI_STORE_KEY!,
+      securityLevel: 'GARANTI_PAY',
+      companyName: 'My Shop', // shown on the GarantiPay page
+    }),
+  },
+});
+
+const init = await payment.garantipay.initThreeDSPayment({
+  ...paymentRequest, // no paymentCard
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/garantipay/payment/complete-3ds',
+});
+```
+
+The bank charges the payment itself, so the callback is completed like `3D_PAY`: the hash is
+checked, and an approved callback is confirmed with an order inquiry.
+
+<Callout type="warn">
+  On the test terminal the GarantiPay form and its hash were accepted and the GarantiPay page opened, but a payment could not be completed: that needs a test customer approving in the app. When the page timed out, the bank posted back an unsigned error (`procreturncode` `92`), which is returned as a failure without ids. GarantiPay must be enabled for your terminal by Garanti BBVA. Try a small amount before going live.
+</Callout>
+
+## Refund, Cancel & Status
+
+```typescript
+await payment.garanti.refund({ paymentId: 'ORDER123', price: '50.00', currency: 'TRY', ip: '1.2.3.4' }); // refund
+await payment.garanti.cancel({ paymentId: 'ORDER123', ip: '1.2.3.4' });                               // void
+const status = await payment.garanti.getPayment('ORDER123');                                          // orderinq
+// status: 'success' (APPROVED), 'cancelled' (VOID / REFUND), 'failure' (DECLINED)
+```
+
+A refund lower than the sale amount is a partial refund. `cancel()` voids a sale on the same
+day; when the order already has a refund, Garanti BBVA asks for the original transaction, so use `refund()`.
+
+<Callout type="info">
+  BIN and installment queries are not supported for Garanti BBVA: `binCheck()` and `installmentInfo()` throw `NOT_SUPPORTED`. Send `installment` in the payment request and compute `paidPrice` from your contracted rates.
+</Callout>

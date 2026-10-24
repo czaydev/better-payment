@@ -1,0 +1,71 @@
+{
+  "$comment": [
+    "Single source of truth for the website's languages. URLs, redirects, the navbar switcher,",
+    "sitemap and hreflang alternates, metadata, the docs sidebar fallback and the translation",
+    "checks all derive from this file. scripts/locales.mjs validates every entry.",
+    "To add a language: add one entry here, then follow TRANSLATIONS.md → Adding a language.",
+    "  code: must equal the key; used in URLs (/de/...) and content file names (intro.de.mdx).",
+    "  names.en / names.tr: how the switcher labels this language in the English and Turkish UIs.",
+    "  nativeName: the language's own name (docs UI, llms.txt).",
+    "  dir: ltr or rtl. rtl sets dir=\"rtl\" on <html>; mirroring the layouts is a follow-up.",
+    "  enabled: false declares a prepared language without routing or listing it. A disabled",
+    "    language may not have content files yet; enable it when its translation lands (#112-#114).",
+    "  docs: required = every page must exist; optional = missing pages fall back to English.",
+    "  contribGuide: true only for a translated CONTRIBUTING.<code>.md; socialImage overrides",
+    "    the default og-<code>.png preview."
+  ],
+  "defaultLanguage": "en",
+  "languages": {
+    "en": {
+      "code": "en",
+      "names": { "en": "English", "tr": "İngilizce" },
+      "nativeName": "English",
+      "dir": "ltr",
+      "enabled": true,
+      "ogLocale": "en_US",
+      "intlLocale": "en-US",
+      "docs": "required"
+    },
+    "tr": {
+      "code": "tr",
+      "names": { "en": "Turkish", "tr": "Türkçe" },
+      "nativeName": "Türkçe",
+      "dir": "ltr",
+      "enabled": true,
+      "ogLocale": "tr_TR",
+      "intlLocale": "tr-TR",
+      "docs": "required",
+      "contribGuide": true
+    },
+    "de": {
+      "code": "de",
+      "names": { "en": "German", "tr": "Almanca" },
+      "nativeName": "Deutsch",
+      "dir": "ltr",
+      "enabled": false,
+      "ogLocale": "de_DE",
+      "intlLocale": "de-DE",
+      "docs": "optional"
+    },
+    "ru": {
+      "code": "ru",
+      "names": { "en": "Russian", "tr": "Rusça" },
+      "nativeName": "Русский",
+      "dir": "ltr",
+      "enabled": false,
+      "ogLocale": "ru_RU",
+      "intlLocale": "ru-RU",
+      "docs": "optional"
+    },
+    "ar": {
+      "code": "ar",
+      "names": { "en": "Arabic", "tr": "Arapça" },
+      "nativeName": "العربية",
+      "dir": "rtl",
+      "enabled": false,
+      "ogLocale": "ar_SA",
+      "intlLocale": "ar-SA",
+      "docs": "optional"
+    }
+  }
+}

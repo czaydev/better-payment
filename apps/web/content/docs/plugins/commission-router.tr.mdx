@@ -1,0 +1,252 @@
+---
+title: Komisyon yönlendirici
+description: Her ödemeyi kendi komisyon oranı tablolarınıza göre en ucuz uygun sağlayıcıya gönderin.
+---
+
+<Since version="0.12.0" />
+
+`commissionRouter`, her yeni ödemeyi yapılandırdığınız komisyon sözleşmelerine göre size en az maliyetli sağlayıcıya yönlendirir. Hiçbir oranı tahmin etmez: her maliyet sizin oran satırlarınızdan birinden gelir ve her karar, her sağlayıcının neden seçildiğini ya da elendiğini açıklayan bir teklifle birlikte gelir.
+
+Yönlendirici ayrı ve tree-shakable bir giriş noktasıdır: `better-payment/commission-router`.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico, paytr, type PaymentResponse } from 'better-payment';
+import { commissionRouter, type RoutedResult } from 'better-payment/commission-router';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+  plugins: [
+    commissionRouter({
+      strategy: 'lowest-cost',
+      rates: [
+        { provider: 'iyzico', rate: '1.10', fixed: '0.10', installments: [1] },
+        { provider: 'paytr', rate: '1.05', installments: [1, 3, 6] },
+      ],
+      policy: {
+        prefer: ['paytr'],
+        shareCap: { maxShare: 0.7, window: 100 },
+      },
+    }),
+  ],
+});
+
+const result: RoutedResult<PaymentResponse> = await payment.createPayment(request);
+console.log(result.provider); // 'paytr' for 1,000.00 TRY, one installment
+```
+
+Yukarıdaki sayılar örnektir. Kendi sözleşmelerinizle değiştirin; plugin oranları asla tahmin etmez.
+
+## Oran tablosu [#rate-table]
+
+Her satır, bir sağlayıcının belirli bir ödeme türü için ne aldığını söyler. Bir alanı filtrelemeden bırakan satır, o alanın her değeri için geçerlidir.
+
+| Alan | Varsayılan | Anlamı |
+| ---- | ---------- | ------ |
+| `provider` | gerekli | Yapılandırılmış sağlayıcı id'si |
+| `rate` | gerekli | Yüzde komisyon, en fazla 4 ondalık: `'1.10'` = %1,10 |
+| `fixed` | `0` | İşlem başına sabit ücret, en fazla 2 ondalık |
+| `installments` | her taksit sayısı | Satırın kapsadığı taksit sayıları, ör. `[1, 3, 6]` |
+| `threeDS` | ikisi de | Yalnızca 3D Secure işlemleri için `true`, yalnızca 3DS'siz için `false` |
+| `cardFamily` | hepsi | Kart ailesi/programı, ör. `'Bonus'` |
+| `cardAssociation` | hepsi | `VISA`, `MASTER_CARD`, `TROY`, `AMERICAN_EXPRESS`... |
+| `cardType` | hepsi | `CREDIT_CARD`, `DEBIT_CARD`, `PREPAID_CARD`... |
+| `bankName` | hepsi | Kartı veren banka adı |
+| `commercial` | hepsi | Ticari kartlar için `true`, bireysel kartlar için `false` |
+| `currencies` | hepsi | Satırın geçerli olduğu para birimleri, ör. `['TRY']` |
+| `minAmount`, `maxAmount` | sınırsız | Ödenen tutar için kapsayıcı sınırlar |
+| `validFrom`, `validTo` | her zaman | Geçerlilik aralığı; `validFrom` dahil, `validTo` hariç |
+
+Kart alanları büyük/küçük harf duyarsız eşleştirilir. Bir sağlayıcının birkaç satırı olabilir; ödemeyle eşleşen en ucuz satır o sağlayıcının maliyetidir.
+
+Maliyetler tam sayı alt birimlerde, float kullanmadan tam sayı aritmetiği ile hesaplanır. Yarım alt birime denk gelen bir yüzde yukarı yuvarlanır: 50,00 TRY'nin %0,95'i 0,475 TRY'dir; bu 48 kuruş olur, 0,05 TRY sabit ücretle toplam 0,53 TRY. Tutarlar 13 tam sayı basamağıyla sınırlıdır, böylece her karşılaştırma tam olur.
+
+## Sağlayıcı nasıl seçilir [#how-a-provider-is-chosen]
+
+1. Her yapılandırılmış sağlayıcı ödemeye göre değerlendirilir: para birimi, taksit sayısı, 3D Secure, kart filtreleri, tutar sınırları ve oran geçerliliği.
+2. Eşleşen satırı olmayan sağlayıcılar `excluded` içinde bir nedenle raporlanır; `isHealthy` daha fazlasını eleyebilir.
+3. Uygun sağlayıcılar toplam maliyete göre sıralanır. Eşit maliyette `policy.prefer` kazanır, sonra oran tablosundaki sıra.
+4. `policy.override` ve `policy.shareCap` kazananı değiştirebilir (aşağıya bakın).
+5. Ödeme için ilk aday kullanılır.
+
+Her elemenin sabit bir neden kodu vardır; böylece bir teklif, plugin loglarına bakmadan kararı açıklar:
+
+| Neden | Anlamı |
+| ----- | ------ |
+| `no-rate-line` | Sağlayıcının satırı yok ya da hiçbiri uygulanmıyor |
+| `rate-not-yet-valid`, `rate-expired` | Eşleşen satır geçerlilik aralığının dışında |
+| `amount-below-min`, `amount-above-max` | Ödenen tutar satırın sınırlarının dışında |
+| `currency-not-supported` | Satır başka para birimleri için |
+| `installment-not-supported` | Satır bu taksit sayısını kapsamıyor |
+| `threeds-not-supported` | Satır diğer 3D Secure modu için |
+| `card-unknown` | Bir kart filtresi, mevcut olmayan bir sınıflandırma gerektiriyor |
+| `card-mismatch` | Sınıflandırılan kart filtreyle eşleşmiyor |
+| `provider-unhealthy` | `isHealthy` `false` döndürdü |
+| `share-cap` | Bir ödeme daha `policy.shareCap` sınırını aşardı |
+
+## Ödemeden önce teklif [#quote-before-you-pay]
+
+`payment.router.quote()` bir ödemeyi para hareketi olmadan fiyatlandırır:
+
+```typescript
+const quote = await payment.router.quote({
+  binNumber: '552879',
+  price: '1000.00',
+  installment: 1,
+  currency: 'TRY',
+  conversationId: 'order-1001',
+});
+
+console.log(quote.selected); // 'paytr'
+console.log(quote.selectionReason); // 'lowest-cost'
+for (const candidate of quote.candidates) {
+  console.log(candidate.provider, candidate.cost, candidate.reason);
+}
+```
+
+```text
+paytr 10.50 TRY lowest-cost
+iyzico 11.10 TRY higher-cost
+```
+
+`quote()` girdisini doğrular; geçersiz tutar, taksit sayısı, para birimi ya da BIN için `ValidationError` fırlatır. `binNumber` 6-8 haneli BIN öneki olmalıdır, asla tam kart numarası değil. Otomatik bir ödemede tam kart numarası sorgudan önce ilk 8 hanesine indirgenir; BIN ve PAN hiçbir zaman loglanmaz veya döndürülmez.
+
+Teklif şunları içerir:
+
+| Alan | İçeriği |
+| ---- | ------- |
+| `amount` | Biçimlenmiş fiyat, tam alt birimler, para birimi, taksit, 3D Secure |
+| `card` | Yalnızca sınıflandırma (banka, aile, tür, birlik, ticari); asla BIN |
+| `selected` | Ödemenin kullanacağı sağlayıcı ya da `null` |
+| `selectionReason` | `lowest-cost`, `preferred-on-tie`, `override` veya `fallback` |
+| `candidates` | Uygun sağlayıcılar, seçilen ilk sırada, maliyet ve nedenle |
+| `excluded` | Diğer tüm yapılandırılmış sağlayıcılar, neden ve ayrıntıyla |
+| `notes` | Ortaya çıkarılması gereken politika ve sorgu sorunları |
+| `strategy` | `'lowest-cost'` |
+
+`payment.router.status()` pay penceresindeki yönlendirme sayılarını ve BIN önbellek kullanımını raporlar; `payment.router.reset()` ikisini de temizler.
+
+## Yönlendirme politikaları [#routing-policies]
+
+### Eşit maliyetler [#ties]
+
+İki sağlayıcının maliyeti tamamen aynıysa `policy.prefer` karar verir. O yoksa, ilk eşleşen satırı `rates` içinde daha önce gelen sağlayıcı kazanır; böylece teklifler deterministiktir.
+
+### Pay üst sınırı [#share-cap]
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  policy: { shareCap: { maxShare: 0.5, window: 100 } },
+});
+```
+
+`maxShare`, bir sağlayıcının son `window` yönlendirme kararındaki azami payıdır. Bunu aşacak sağlayıcı atlanır (`share-cap` nedeni) ve sıradaki en ucuz uygun sağlayıcı kullanılır. Tüm uygun sağlayıcılar sınıra dayandığında en ucuz olan yine kullanılır ve bir not bunu söyler; üst sınır yüzünden bir ödeme asla başarısız edilmez. `policy.override` sınırı atlar.
+
+Pencere süreç belleğinde tutulur. Birden çok uygulama örneğinde her örnek kendi penceresini uygular, bu yüzden etkin küresel pay `maxShare` değerinden yüksek olabilir.
+
+### Sipariş bazlı geçersiz kılma [#per-order-override]
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  policy: {
+    override: ({ conversationId, amount, candidates }) =>
+      conversationId === 'vip-42' ? 'paytr' : null,
+  },
+});
+```
+
+Geçersiz kılma işlemi, `conversationId` değerini, tutarı, uygun sağlayıcıları (en ucuz önce) ve kart sınıflandırmasını alır. Bir sağlayıcı id'si döndürür ya da normal sıralamayı korumak için nullish bir değer. Uygun olmayan bir sağlayıcı döndürmek bir notla yok sayılır; geçersiz kılma para birimi, kart veya sağlık filtresini asla atlayamaz. Geçersiz kılma pay üst sınırını da atlar.
+
+## Çift ücretlendirme olmadan yedek [#fallback-without-double-charges]
+
+Yedek, hatadan sonraki yeniden denemedir. Güvenlik kuralı basittir: **bir ödeme yalnızca hata, ücret alınmadığını kanıtlıyorsa yeniden denenir**.
+
+- Varsayılanlar `INVALID_REQUEST` ve `PROVIDER_ERROR`; listeyi `fallbackOn` ile daraltın.
+- `NETWORK_ERROR`, tüm kart redleri, `THREEDS_FAILED`, `INVALID_HASH`, `UNKNOWN` ve bekleyen sonuçlar asla yeniden denenmez. Bunları `fallbackOn` içinde listelemek oluşturma sırasında `ConfigurationError` fırlatır.
+- Yeniden deneme aynı teklifteki sıradaki adayı kullanır, yani sıradaki en ucuz sağlayıcıyı. En fazla iki yedek denenir (toplam üç deneme).
+- Yedek çağrının kendisi hata fırlatırsa sonuç bilinmez: hata yeniden fırlatılır ve başka bir şey denenmez.
+- Bir sonuç, sağlayıcının onayı olmadan asla başarıya çevrilmez.
+
+`fallback`, henüz oran satırı olmayan sağlayıcıları listeler (örneğin sözleşmesi hâlâ görüşülen bir sağlayıcı). Yalnızca hiçbir oran satırı eşleşmediğinde sırayla kullanılırlar. Sert bir filtreyle (para birimi, kart, sağlık...) elenen bir sağlayıcı asla yedek olarak kullanılmaz.
+
+## İade, iptal ve durum çağrıları [#refunds-cancels-and-status-calls]
+
+Bir ödeme başarılı olduğunda yönlendirici hangi sağlayıcının işlediğini hatırlar ve o ödeme id'si için `refund`, `cancel`, `getPayment`, `capture`, `voidAuthorization` ve `completeThreeDSPayment` çağrılarını aynı sağlayıcıya gönderir. Bu çağrılar her zaman ödeme nesnesinde çalışır; bir sağlayıcıda yapılan çağrı (`payment.iyzico.refund()`) asla taşınmaz.
+
+Varsayılan depo bellektedir, sınırlıdır (10 000 ödeme) ve girdileri 90 gün sonra sona erer. Çok örnekli bir kurulum paylaşılan bir `store` vermelidir; aksi halde başka bir örnekte işlenen iade varsayılan sağlayıcıya düşer:
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  store: {
+    get: (paymentId) => storage.get(`route:${paymentId}`),
+    set: (paymentId, provider) => storage.set(`route:${paymentId}`, provider),
+  },
+});
+```
+
+## BIN sorgusu ve önbellek [#bin-lookup-and-cache]
+
+Kart filtreleri bir BIN sınıflandırması gerektirir. `binLookup` verin; en fazla ilk 8 haneyi alır (8 haneli sorgu bir şey bilmiyorsa sonra 6 haneyi), böylece tam kart numarası yönlendiriciden asla çıkmaz:
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  binLookup: async (bin) => bankBinService.lookup(bin),
+  cache: { maxEntries: 2048, ttlMs: 12 * 60 * 60 * 1000 },
+});
+```
+
+Bu şekle uyan her fonksiyon çalışır; BIN paketindeki `lookupBin` (issue #153, PR #252) veya bir sağlayıcının `binCheck()` metodu dahil. Arayüz enjekte edilir, bu yüzden yönlendiricinin ikisine de bağımlılığı yoktur.
+
+Önbellek her zaman sınırlıdır ve süresi dolar: varsayılan 1 024 girdi ve 24 saat. Bilinmeyen BIN'ler bilinmeyen olarak önbelleğe alınır; başarısız bir sorgu bilinmeyen sayılır ve önbelleğe alınmaz. `binLookup` yoksa kart filtreli satırlar `card-unknown` bildirir ve yalnızca filtresiz satırlar yarışır.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `strategy` | `'lowest-cost'` | Desteklenen tek strateji |
+| `rates` | gerekli | Komisyon oranı tablosu |
+| `fallback` | `[]` | Oran satırı olmayan sağlayıcılar, sırayla |
+| `binLookup` | — | Enjekte edilen BIN sınıflandırması |
+| `cache` | `{ maxEntries: 1024, ttlMs: 86400000 }` | BIN önbelleğinin sınırları |
+| `policy.prefer` | `[]` | Eşitlik tercih sırası |
+| `policy.shareCap` | — | `{ maxShare, window: 100 }` |
+| `policy.override` | — | `(context) => providerId \| null` |
+| `store` | `MemoryRoutingStore` | ödeme id'si → sağlayıcı eşlemesi |
+| `isHealthy` | — | Yeni ödemeler için `(providerId) => boolean \| Promise<boolean>` |
+| `fallbackOn` | `INVALID_REQUEST`, `PROVIDER_ERROR` | Ücret alınmadığını kanıtlayan hatalar |
+| `now` | `Date.now` | Geçerlilik ve önbellek için saat aralığı |
+
+Plugin ayrıca handler'dan `POST /api/pay/router/quote` sunar (`basePath`e göre). JSON gövdesi `quote()` girdisiyle aynıdır; geçersiz girdi `400 { error }` döndürür. Uç nokta bir teklif gibi herkese açıktır: para hareketi yapmaz.
+
+## Örnek [#worked-example]
+
+Aşağıdaki hesaplamalarda kullanılan kurgusal bir sözleşme tablosu:
+
+| Sağlayıcı | Kart | Taksitler | Oran | Sabit |
+| --------- | ---- | --------- | ---- | ----- |
+| `alpha` | hepsi | 1 | %1,10 | 0,10 TRY |
+| `beta` | hepsi | 1, 3, 6 | %1,25 | — |
+| `gamma` | Bonus | 1, 3, 6 | %0,95 | 0,05 TRY |
+| `delta` | hepsi | 1 | %1,00 | 0,25 TRY |
+
+- **1 000,00 TRY, tek taksit, Bonus kart:** gamma 9,50 + 0,05 = 9,55; delta 10,00 + 0,25 = 10,25; alpha 11,00 + 0,10 = 11,10; beta 12,50. Gamma kazanır.
+- **1 000,00 TRY, üç taksit, Bonus kart:** alpha ve delta satırları yalnızca tek taksiti kapsar, bu yüzden `installment-not-supported` ile elenirler. Gamma beta'ya karşı kazanır.
+- **50,00 TRY, tek taksit, Bonus kart:** gamma 0,475 → 0,48 (yukarı yuvarlama) + 0,05 = 0,53; delta 0,75, alpha 0,65 ve beta 0,63. Gamma kazanır.
+- **1 000,00 TRY, tek taksit, bilinmeyen BIN:** gamma `card-unknown` ile elenir; delta kazanır.
+
+## Sınırlamalar [#limitations]
+
+- Tablo sizin sorumluluğunuzdadır. Yönlendirici oranları asla tahmin etmez, güncellemez veya keşfetmez.
+- Komisyon bir sıralama değeridir. Sağlayıcının takas ettiği tutar değildir ve better-payment ondan türetilen bir fiyatı asla tahsil etmez.
+- Kayıtlı kart ödemesinde sınıflandırılacak kart numarası yoktur. Kart filtreli satırlar böyle bir ödeme için `card-unknown` bildirir; fiyatlandırmak için açık bir `binNumber` ile teklif alın.
+- Sağlık kontrolleri ve pay penceresi süreç bazlıdır, küresel değildir.
+- Yeniden denemeler tek bir teklifin adaylarıyla sınırlıdır (ilki dahil üç deneme), bu yüzden bir ödeme tüm sağlayıcılardan geçmez.

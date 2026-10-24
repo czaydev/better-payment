@@ -1,0 +1,98 @@
+---
+title: Captcha Doğrulaması
+description: Ödeme formlarınızı ve uç noktalarınızı otomatik kart deneme botlarından koruyun.
+---
+
+<Since version="0.12.0" />
+
+Otomatik botlar ve dolandırıcılar, çalıntı kredi kartı numaralarını e-ticaret ödeme formlarında art arda denerler (card-testing saldırıları). Ödeme işleminden önce bir captcha doğrulaması yapmak, bu saldırılara karşı en hesaplı ve etkili savunmadır.
+
+`captcha` eklentisi, ödeme sağlayıcısını çağırmadan önce token'ı **Cloudflare Turnstile**, **Google reCAPTCHA v3** veya **hCaptcha** servisleriyle doğrular.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { captcha } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    captcha({
+      provider: 'cloudflare-turnstile',
+      secretKey: process.env.TURNSTILE_SECRET!,
+    }),
+  ],
+});
+```
+
+## Nasıl Çalışır? [#how-it-works]
+
+1. **Token Çıkarma**: Eklenti istek gövdesini (`captchaToken`, `cf-turnstile-response`, `g-recaptcha-response`, `h-captcha-response`) ve HTTP başlıklarını (`x-captcha-response`) otomatik inceler.
+2. **Sunucu Tarafı Doğrulama**: Ödeme işlemi başlamadan hemen önce token, seçilen servisin `siteverify` API'si ile sunucu tarafında doğrulanır.
+3. **Bot Engelleme**: Token eksikse veya geçersizse istek doğrudan `status: 'failure'` ve standart `CAPTCHA_MISSING` ya da `CAPTCHA_INVALID` hata koduyla reddedilir.
+4. **Banka Callback'lerini Etkilemez**: Banka yönlendirmeleri, 3D Secure onayları ve webhook bildirimleri captcha eklentisinden muaf tutulur.
+
+## Desteklenen Sağlayıcılar [#supported-providers]
+
+### Cloudflare Turnstile
+
+Kullanıcı dostu ve gizlilik odaklı modern doğrulama:
+
+```typescript
+captcha({
+  provider: 'cloudflare-turnstile',
+  secretKey: process.env.TURNSTILE_SECRET_KEY!,
+});
+```
+
+### Google reCAPTCHA v3
+
+Davranışsal puan eşiği (0.0 ile 1.0 arası) desteği:
+
+```typescript
+captcha({
+  provider: 'google-recaptcha',
+  secretKey: process.env.RECAPTCHA_SECRET_KEY!,
+  minScore: 0.5, // reject submissions with score < 0.5
+});
+```
+
+### hCaptcha
+
+```typescript
+captcha({
+  provider: 'hcaptcha',
+  secretKey: process.env.HCAPTCHA_SECRET_KEY!,
+});
+```
+
+## İstemci (Frontend) Örneği [#frontend-example]
+
+Ödeme isteğinizde token'ı iletin:
+
+```typescript
+// Next.js / React with Cloudflare Turnstile
+const res = await fetch('/api/pay/iyzico/payment', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-captcha-response': turnstileToken,
+  },
+  body: JSON.stringify({
+    price: '150.00',
+    paidPrice: '150.00',
+    card: { ... },
+  }),
+});
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `provider` | — | `'cloudflare-turnstile'`, `'google-recaptcha'` veya `'hcaptcha'` |
+| `secretKey` | — | Captcha sağlayıcı panelinizden aldığınız gizli anahtar |
+| `minScore` | `0.5` | Google reCAPTCHA v3 için gereken asgari geçerlilik puanı (0.0 ile 1.0) |
+| `operations` | Ödeme başlatma | Captcha doğrulaması gerektiren operasyonlar (varsayılan: `['createPayment', 'initThreeDSPayment', 'authorize', 'initThreeDSAuthorize']`) |
+| `getToken` | — | Özel token çıkarma fonksiyonu `(req) => string` |

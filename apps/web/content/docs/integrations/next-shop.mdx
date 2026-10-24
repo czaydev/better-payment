@@ -1,0 +1,161 @@
+---
+title: Example shop (Next.js + Prisma)
+description: A complete, runnable storefront with a cart, server-side orders, 3D Secure and refunds.
+---
+
+[`examples/next-shop`](https://github.com/czaydev/better-payment/tree/beta/examples/next-shop) is a
+small shop in this repository. It uses the App Router, Prisma with SQLite and `better-payment` from
+the workspace, and it runs without credentials because `MockProvider` is the default.
+
+## What the example contains [#what-the-example-contains]
+
+- a product list and a cookie cart that stores only product ids and quantities
+- an order created on the server, with the amount summed from database prices
+- a checkout form with card fields and installments from `installmentInfo`
+- 3D Secure through `toNextJsHandler`, a verified callback and `callbackRedirect`
+- orders updated only by `payment.succeeded` / `payment.pending` / `payment.failed`
+- an admin page that refunds a paid order through a privileged `refund` route
+- one Playwright test for the happy path with `MockProvider`
+
+### The flow in five steps [#the-flow-in-five-steps]
+
+1. `app/page.tsx` adds a product to the cart with a server action.
+2. `lib/cart-actions.ts` creates the order from the cart; the browser sends no amount.
+3. `transformRequest` in `lib/payment.ts` rebuilds the payment request from the order row.
+4. The mock bank posts the 3D Secure result to the handler, which verifies it and updates the order
+   through payment events.
+5. `callbackRedirect` sends the browser to `/orders/<id>`, which renders the database status.
+
+## Run it [#run-it]
+
+```bash
+corepack pnpm@10.33.0 install
+corepack pnpm@10.33.0 --filter next-shop dev
+```
+
+Open `http://localhost:3000`. The `dev` script runs `prisma generate` and `prisma db push` before
+Next.js starts, so a fresh checkout needs no extra step. On the checkout page, pay with the
+`MockProvider` success card `4242424242424242`, any future expiry and any CVC. Other magic cards on
+that page simulate a decline, a failed 3D Secure and a lost response.
+
+To use the iyzico sandbox instead, copy `.env.example` to `.env.local`, set `IYZICO_API_KEY` and
+`IYZICO_SECRET_KEY`, and restart. The example defaults to `MockProvider` when those values are
+empty; it never ships credentials.
+
+## The payment object [#the-payment-object]
+
+The handler only needs the actions this shop uses, and `transformRequest` replaces every amount the
+client sent with data from the order:
+
+```ts
+async function buildRequestFromDatabase(ctx: HandlerContext): Promise<object> {
+  if (ctx.action !== 'payment/init-3ds') return ctx.body ?? {};
+
+  const order = await getOrder(String(ctx.body?.orderId));
+  if (!order || !isPayable(order.status)) throw new Error('Order is not payable');
+
+  const total = formatKurus(order.amountKurus);
+  const paymentCard = readCard(ctx.body?.paymentCard);
+  // For installments > 1, ask the provider what it will charge.
+  const paidPrice = await quotedPaidPrice(paymentCard.cardNumber, total, order.id, order.installment);
+
+  return {
+    price: total, // never a browser value
+    paidPrice,
+    currency: order.currency,
+    installment: order.installment,
+    paymentCard,
+    buyer: demoBuyer(order.id),
+    basketItems: order.items.map(toBasketItem),
+    callbackUrl: `${new URL(ctx.request.url).origin}/api/pay/${PROVIDER_ID}/payment/complete-3ds`,
+  };
+}
+```
+
+For an installment above one, the example asks the provider for the quote of that count and stores
+the quoted total as `paidPriceKurus`, so the refund returns exactly what was charged. The card is
+passed to the provider and never written to the database; the Prisma schema has no card-data fields.
+
+## The route handler [#the-route-handler]
+
+```ts
+// app/api/pay/[...path]/route.ts
+import { toNextJsHandler } from 'better-payment/next';
+import { getBetterPayment } from '@/lib/payment';
+
+export const runtime = 'nodejs'; // Prisma's SQLite client is not edge-compatible
+
+export const { GET, POST } = toNextJsHandler(getBetterPayment);
+```
+
+`getBetterPayment` is a lazy singleton, so `next build` does not need any environment variable. See
+the [Next.js guide](/docs/integrations/nextjs) for the full integration.
+
+## Orders from events [#orders-from-events]
+
+The order status is written by payment events, never by the browser return:
+
+```ts
+payment.on('payment.succeeded', async (event) => {
+  await prisma.order.updateMany({
+    where: { id: event.conversationId ?? '' },
+    data: { status: 'PAID', paymentId: event.paymentId ?? null },
+  });
+});
+
+payment.on('payment.failed', async (event) => {
+  await prisma.order.updateMany({
+    where: { id: event.conversationId ?? '', status: { notIn: ['PAID', 'REFUNDED'] } },
+    data: { status: 'FAILED', errorCode: event.code ?? 'UNKNOWN' },
+  });
+});
+```
+
+The same events fire for a browser 3D Secure return and a provider notification, so the two paths
+cannot disagree, and a forged callback emits nothing. See [events](/docs/concepts/events).
+
+## Refunds and authorize [#refunds-and-authorize]
+
+`refund` is a privileged action, so the handler refuses to start without an `authorize` hook. The
+example lets provider callbacks and the customer checkout through, and requires the demo admin
+cookie for refunds:
+
+```ts
+function authorize(ctx: HandlerContext): boolean {
+  // Signed provider callbacks and the customer checkout are public
+  if (CALLBACK_HANDLER_ACTIONS.includes(ctx.action)) return true;
+  if (ctx.action === 'payment/init-3ds' || ctx.action === 'installment') return true;
+  // Refunds need the shop's admin session (a demo cookie in the example)
+  if (ctx.action === 'refund') return hasDemoAdmin(ctx.request.headers);
+  return false;
+}
+```
+
+The refund amount and the provider payment id are loaded from the order in `transformRequest`, so
+the admin page sends only the order id. Replace the demo cookie with a real session and an admin
+role check before using this in production.
+
+<Callout type="warn">
+  The example is for learning, not for production. Use a shared idempotency store, real
+  authentication, HTTPS callback URLs, Prisma migrations and the provider's hosted card fields.
+  The README lists each item.
+</Callout>
+
+## What to change for production [#what-to-change-for-production]
+
+- pass a shared `IdempotencyStore` to `handler.idempotency.store` when running more than one instance
+- replace the demo admin cookie with your session and an `admin` role check
+- derive `callbackUrl` from a configured HTTPS origin instead of `request.url`
+- use `prisma migrate deploy` instead of `prisma db push`
+- keep card data out of your server with the provider's hosted fields
+- reconcile a `pending` result with `getPayment` before retrying a payment
+
+## Tests [#tests]
+
+```bash
+corepack pnpm@10.33.0 --filter next-shop test:e2e
+```
+
+The Playwright test adds a product to the cart, pays with the success card, waits for the 3D Secure
+callback, checks that the order is `PAID`, refunds it from the admin page and checks the recorded
+refund. It starts its own dev server on port 3310 and needs no credentials.

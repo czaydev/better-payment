@@ -146,3 +146,9 @@ payment.on('payment.failed', async (event) => {
   await orders.markFailed(event.conversationId, event.code);
 });
 ```
+
+## Tam örnek [#complete-example]
+
+[Next.js + Prisma örnek mağazası](/docs/integrations/next-shop) bu adımları bir veritabanı, sepet ve
+iadelerle bir araya getirir. Kimlik bilgisi olmadan `MockProvider` ile çalıştığı için sağlayıcı
+hesabınız olmadan tüm akışı takip edebilirsiniz.

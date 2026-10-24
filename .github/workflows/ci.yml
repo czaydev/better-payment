@@ -126,6 +126,17 @@ jobs:
           # better-payment/plugins: a plugin works with the main entry (shared classes)
           node -e "const { localizedErrors } = require('better-payment/plugins'); const bp = require('better-payment'); try { localizedErrors({ locale: 'xx' }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
           node --input-type=module -e "import { localizedErrors } from 'better-payment/plugins'; import { betterPayment } from 'better-payment'; const p = betterPayment({ providers: {}, plugins: [localizedErrors({ locale: 'tr' })] }); if (!p.errors.message('INSUFFICIENT_FUNDS').startsWith('Kart')) process.exit(1)"
+          # better-payment/fraud: the fraud rules engine ships as its own subpath
+          node -e "const { fraudRules, MemoryFraudStore } = require('better-payment/fraud'); const bp = require('better-payment'); if (typeof fraudRules !== 'function' || typeof MemoryFraudStore !== 'function') process.exit(1); try { fraudRules({ operations: ['completeThreeDSPayment'] }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
+          node --input-type=module -e "import { fraudRules } from 'better-payment/fraud'; if (typeof fraudRules !== 'function') process.exit(1)"
+          # importing better-payment/plugins must not pull the fraud rules engine
+          node -e "const p = require('better-payment/plugins'); if ('fraudRules' in p || 'MemoryFraudStore' in p) process.exit(1)"
+          # better-payment/commission-router is its own subpath, not part of the plugins barrel
+          node -e "const plugins = require('better-payment/plugins'); if ('commissionRouter' in plugins) process.exit(1); const { commissionRouter } = require('better-payment/commission-router'); const bp = require('better-payment'); try { commissionRouter({ rates: [{ provider: 'x', rate: '101' }] }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
+          node --input-type=module -e "import { commissionRouter } from 'better-payment/commission-router'; import { betterPayment } from 'better-payment'; import { MockProvider } from 'better-payment/testing'; const p = betterPayment({ providers: { mock: new MockProvider() }, plugins: [commissionRouter({ rates: [{ provider: 'mock', rate: '1.00' }] })] }); const q = await p.router.quote({ price: '10.00' }); if (q.selected !== 'mock' || q.candidates[0].cost !== '0.10') process.exit(1)"
+          # better-payment/routing is its own subpath, not part of the plugins barrel
+          node -e "const plugins = require('better-payment/plugins'); if ('routing' in plugins) process.exit(1); const { routing } = require('better-payment/routing'); const bp = require('better-payment'); try { routing({ rules: [{ use: 'x', when: { cardType: 'prepaid' } }] }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
+          node --input-type=module -e "import { routing } from 'better-payment/routing'; import { betterPayment } from 'better-payment'; import { MockProvider } from 'better-payment/testing'; const p = betterPayment({ providers: { mock: new MockProvider() }, defaultProvider: 'mock', plugins: [routing({ default: 'mock' })] }); const d = await p.routing.explain({ price: '10.00', currency: 'TRY' }); if (d.provider !== 'mock' || d.reason !== 'default') process.exit(1)"
 
       - name: Smoke test framework adapter subpaths (CJS and ESM)
         run: |
@@ -149,9 +160,31 @@ jobs:
           test -f dist/client/index.js && test -f dist/client/index.d.ts
           test -f dist/testing/index.js && test -f dist/testing/index.mjs && test -f dist/testing/index.d.ts
           test -f dist/plugins/index.js && test -f dist/plugins/index.mjs && test -f dist/plugins/index.d.ts
+          test -f dist/fraud/index.js && test -f dist/fraud/index.mjs && test -f dist/fraud/index.d.ts
+          test -f dist/commission-router/index.js && test -f dist/commission-router/index.mjs && test -f dist/commission-router/index.d.ts
+          test -f dist/routing/index.js && test -f dist/routing/index.mjs && test -f dist/routing/index.d.ts
           for adapter in next express hono fastify elysia react-router; do
             for extension in js mjs d.ts; do
               test -f "dist/$adapter/index.$extension"
             done
           done
           npm pack --dry-run
+
+  next-shop:
+    name: next-shop example (Playwright)
+    # ubuntu-latest moved to 26.04, which Playwright cannot install chromium on yet.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # The example imports the workspace package's built `exports`, so build it first.
+      - run: pnpm --filter better-payment build
+      - run: pnpm --filter next-shop exec playwright install --with-deps chromium
+      # Playwright's webServer runs the example's own `dev` script, which also
+      # proves `prisma generate` and `prisma db push` work on a clean checkout.
+      - run: pnpm --filter next-shop test:e2e

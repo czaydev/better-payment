@@ -1,0 +1,154 @@
+---
+title: i18n
+description: Tell customers why a payment failed, in their language.
+---
+
+<Since version="0.5.0" />
+
+Providers write error messages in their own words and language, often in technical terms ("Do not honour", "Invalid merchant"). The `i18n` plugin replaces the `errorMessage` of failed results with a message for the customer, in their language, chosen by the normalized [error code](/docs/reference/error-codes). It works like the [i18n plugin of Better Auth](https://better-auth.com/docs/plugins/i18n): English is built in, you add the languages you support, and the language of each request is detected by strategies you choose.
+
+Built-in translations: English and Turkish <Since version="0.5.0" />, German <Since version="0.5.1" />, Russian <Since version="0.5.2" />, and Arabic <Since version="0.7.0" />.
+
+<Callout type="info">
+Until 0.12.0 this plugin was called `localizedErrors`. The old name still works and is deprecated; see [Migrating from localizedErrors](#migrating-from-localizederrors).
+</Callout>
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { i18n, locales } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    i18n({
+      translations: { tr: locales.tr, de: locales.de },
+      defaultLocale: 'tr',
+    }),
+  ],
+});
+
+const result = await payment.createPayment(request);
+result.code;            // 'INSUFFICIENT_FUNDS'
+result.errorMessage;    // 'Kartınızın bakiyesi veya limiti yetersiz. Başka bir kart deneyin.'
+result.providerMessage; // the provider's own message, for your logs
+```
+
+Only results with a `code` change: failures, and `pending` results with `NETWORK_ERROR`. The provider's text stays in `providerMessage`, for your logs and your support team.
+
+## Translations
+
+`translations` maps each language to its messages, by error code. English is built in, so you only add other languages. `locales` has the built-in ones: `en`, `tr`, `de`, `ru` and `ar`.
+
+```typescript
+import { i18n, locales, type TranslationDictionary } from 'better-payment/plugins';
+
+// All built-in languages
+i18n({ translations: locales });
+
+// Some of them, with your own wording for one message
+i18n({
+  translations: {
+    tr: { ...locales.tr, INSUFFICIENT_FUNDS: 'Bakiyeniz yetersiz, lütfen başka bir kart deneyin.' },
+    de: locales.de,
+  },
+});
+
+// A language of your own
+const es: TranslationDictionary = {
+  INSUFFICIENT_FUNDS: 'Fondos insuficientes. Intente con otra tarjeta.',
+  CARD_DECLINED: 'Su banco rechazó el pago.',
+};
+i18n({ translations: { es }, defaultLocale: 'es' });
+```
+
+A code missing in a language keeps the English message. A `defaultLocale` without translations throws a `ConfigurationError`.
+
+## Options
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `translations` | `Record<string, TranslationDictionary>` | required | Messages by language, then by error code |
+| `defaultLocale` | `string` | `'en'` | Language of operations you call in code, and of responses whose language was not detected |
+| `detection` | `Array<'header' \| 'cookie' \| 'callback'>` | `['header']` | Detection strategies, in priority order |
+| `localeCookie` | `string` | `'locale'` | Cookie read by the `cookie` strategy |
+| `getLocale` | `(request) => string \| null \| Promise<string \| null>` | — | Language of a request, for the `callback` strategy |
+
+## Locale detection
+
+The [HTTP handler](/docs/concepts/handler) translates each response for its request. The strategies in `detection` run in order, and the first supported language wins; when none finds one, the response uses `defaultLocale`.
+
+- `header`: the `Accept-Language` header, with its q-values. A region falls back to its language: `tr-TR` gets Turkish.
+- `cookie`: the cookie named by `localeCookie`.
+- `callback`: `getLocale`, called with the request.
+
+```typescript
+i18n({
+  translations: locales,
+  detection: ['cookie', 'header'],
+  localeCookie: 'lang',
+});
+
+// Language from a query parameter: /api/pay/iyzico/payment?lang=tr
+i18n({
+  translations: locales,
+  detection: ['callback'],
+  getLocale: (request) => new URL(request.url, 'http://localhost').searchParams.get('lang'),
+});
+
+// Always Turkish
+i18n({ translations: { tr: locales.tr }, defaultLocale: 'tr', detection: [] });
+```
+
+Responses replayed for an `Idempotency-Key` are translated for the new request too. The handler's own error responses (404, 403, an invalid body) are meant for developers and stay in English.
+
+## In your code
+
+Operations you call in code use `defaultLocale`. For another language, or for results of provider-specific methods (the iyzico checkout form, subscriptions), which run without plugin hooks, use `payment.errors`:
+
+```typescript
+payment.errors.message('EXPIRED_CARD', 'en');   // "Check your card's expiry date."
+payment.errors.translate(checkoutResult, 'tr'); // the result, with errorMessage in Turkish
+await payment.errors.detectLocale(request);     // 'tr', by the detection strategies
+payment.errors.locales;                         // ['en', 'tr', 'de']
+```
+
+## Error codes of other plugins
+
+Codes that other plugins declare in `$ERROR_CODES` are translated too. The plugin's own message is the default; add translations in `translations`:
+
+```typescript
+plugins: [
+  blockList({ bins: ['400000'] }), // declares BLOCKED_BIN in $ERROR_CODES
+  i18n({
+    translations: { tr: { ...locales.tr, BLOCKED_BIN: 'Bu kart kullanılamaz.' } },
+    defaultLocale: 'tr',
+  }),
+],
+```
+
+The plugin's code (in `errorCode`) is looked up first, then the normalized `code`.
+
+## Migrating from localizedErrors
+
+`localizedErrors`, `errorMessages`, `LocalizedErrorsOptions` and `ErrorMessageDictionary` still work and are deprecated. `localizedErrors` included every built-in language; with `i18n`, list the ones you support, or pass `locales` for all of them.
+
+| `localizedErrors` | `i18n` |
+| ----------------- | ------ |
+| `localizedErrors({ locale: 'tr' })` | `i18n({ translations: locales, defaultLocale: 'tr' })` |
+| `messages: { tr: { ... } }` | `translations: { tr: { ...locales.tr, ... } }` |
+| `detectLocale: true` | `detection: ['header']` (the default) |
+| `detectLocale: (request) => ...` | `detection: ['callback'], getLocale: (request) => ...` |
+| `detectLocale: false` | `detection: []` |
+| `fallbackLocale` | English is always the fallback |
+| `errorMessages` | `locales` |
+| `ErrorMessageDictionary` | `TranslationDictionary` |
+
+## Add a language to Better Payment
+
+The built-in translations are in `packages/better-payment/src/plugins/i18n/locales/`, one file per language, typed as `Record<PaymentErrorCode, string>`: a file that misses a code does not compile.
+
+1. Copy `en.ts` to a file named after the language (`fr.ts`) and translate the messages. Write them for customers, in words that read naturally in that language, without technical details. Don't shorten them to fit the bundle size check; if the new language goes over the budget, say so in the pull request.
+2. Export the language from `locales/index.ts`.
+3. Open a pull request. The existing test checks that every language has a message for every code.

@@ -95,7 +95,7 @@ export interface PaymentResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   errorGroup?: string;
   /** Tokens of the card saved during this payment (`saveCard`) */
@@ -155,7 +155,7 @@ export interface SaveCardResponse {
   code?: PaymentErrorCode;
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -167,7 +167,7 @@ export interface ListCardsResponse {
   code?: PaymentErrorCode;
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -183,7 +183,7 @@ export interface DeleteCardResponse {
   code?: PaymentErrorCode;
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -211,7 +211,7 @@ export interface ThreeDSInitResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -266,7 +266,7 @@ export interface RefundResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -299,7 +299,7 @@ export interface CancelResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -350,7 +350,7 @@ export interface CheckoutFormInitResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -386,7 +386,7 @@ export interface CheckoutFormRetrieveResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -424,7 +424,7 @@ export interface PWIPaymentInitResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -468,7 +468,7 @@ export interface PWIPaymentRetrieveResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }
@@ -540,7 +540,7 @@ export interface InstallmentInfoResponse {
   /** The provider's raw error code */
   errorCode?: string;
   errorMessage?: string;
-  /** The original message when a plugin replaced `errorMessage` (e.g. `localizedErrors`) */
+  /** The original message when a plugin replaced `errorMessage` (e.g. `i18n`) */
   providerMessage?: string;
   rawResponse?: unknown;
 }

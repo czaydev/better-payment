@@ -1,0 +1,224 @@
+---
+title: Fraud Rules and Card Testing
+description: Count payment attempts per IP, card, BIN, email or buyer, block card-testing runs and BIN ranges, and decide whether a suspicious payment is refused, pushed to 3D Secure or only flagged.
+---
+
+<Since version="0.12.0" />
+
+A bot walks a list of stolen numbers through your checkout with small amounts until one of them goes through, and every attempt costs you provider fees and standing with your bank. An HTTP throttle counts requests to one endpoint and a captcha proves a human pressed the button, but neither of them knows that the same IP used eleven different cards in the last hour, or that one buyer tried four cards that all failed. The `fraudRules` plugin is that missing layer: counters over attempts, plus rules you write, checked **before** the provider is called.
+
+A refusal is an ordinary failure result (`status: 'failure'`, `code: 'FRAUD_SUSPECTED'`, plus the rule's `errorCode`), so it is never reported as a success, never retried, and reaches your `payment.failed` listeners and [error localization](/docs/plugins/localized-errors) like any other decline.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { fraudRules } from 'better-payment/fraud';
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [
+    fraudRules({
+      salt: process.env.FRAUD_SALT!,
+      velocity: [
+        { key: 'ip', max: 20, window: '10m' },
+        { key: 'card', max: 5, window: '1h' },
+        { key: 'buyer', distinct: 'card', max: 4, window: '1h' },
+        { key: 'email', max: 3, window: '1h', on: 'declined' },
+      ],
+      blockBins: ['552879', ['492156', '492160']],
+      maxAmount: '25000',
+    }),
+  ],
+});
+```
+
+Every rule is optional: `fraudRules({ blockBins: ['552879'] })` is a complete setup. The guard runs on `createPayment`, `initThreeDSPayment`, `authorize` and `initThreeDSAuthorize` unless you pass `operations`.
+
+## Verdicts
+
+| Verdict | What happens |
+| ------- | ------------ |
+| `block` | The payment is refused: `errorCode` of the rule, `code: 'FRAUD_SUSPECTED'`. Default. |
+| `threeDS` | A card payment without 3D Secure is refused with `THREEDS_REQUIRED`; the customer completes it through `initThreeDSPayment`, which this verdict never refuses. |
+| `flag` | The payment goes through and the trigger is written to the log and to `onDecision`, for review or a training set. |
+
+```typescript
+fraudRules({
+  verdict: 'flag', // the default of every rule
+  velocity: [
+    // too many attempts from one IP: ask for 3D Secure instead of refusing
+    { key: 'ip', max: 10, window: '10m', verdict: 'threeDS' },
+    // the same card hammered: refuse it
+    { key: 'card', max: 5, window: '1h', verdict: 'block', code: 'RATE_LIMITED' },
+    // one buyer, several amounts in half an hour: note it and carry on
+    { key: 'buyer', distinct: 'amount', max: 3, window: '30m' },
+  ],
+});
+```
+
+`THREEDS_REQUIRED` is what the customer sees; the `code` of the result is `THREEDS_FAILED`, because no 3D Secure was started. Show a "verify with 3D Secure" button for it and start `initThreeDSPayment` — an `initThreeDSPayment` call is not blocked by this verdict, so the retry works.
+
+## Velocity rules
+
+A velocity rule groups attempts by `key` and counts them inside a `window`.
+
+| Field | Description |
+| ----- | ----------- |
+| `key` | `'ip'`, `'email'`, `'buyer'`, `'bin'`, `'prefix'`, `'card'`, or `(ctx) => string` for your own grouping value |
+| `max` | Attempts allowed in the window. An `attempt` rule triggers on its `max + 1`-th attempt; a `declined` rule once the window already holds `max` declines |
+| `window` | `'30s'`, `'10m'`, `'1h'`, `'1d'`, or milliseconds. Default: the plugin `window`, which is `'10m'` |
+| `on` | `'attempt'` (default) counts every attempt, blocked or not; `'declined'` counts only attempts the bank declined |
+| `distinct` | Count *different* values inside the group instead of attempts: `distinct: 'card'` on `key: 'buyer'` is one buyer trying several cards, `distinct: 'amount'` is an amount ladder |
+| `when` | `(ctx) => boolean`: apply the rule only when this holds |
+| `verdict`, `code` | Overrides for this one rule |
+
+Rules are read in order and the first one that crossed its limit wins. Rules are independent even when they share a key: two `ip` rules never pollute each other's window.
+
+## Blocked BINs, amounts and your own rules
+
+```typescript
+fraudRules({
+  blockBins: ['552879', ['492156', '492160']], // exact BIN, or a range; 6 to 8 digits
+  maxAmount: '25000',
+  rules: [
+    (ctx) => ctx.currency === 'USD' && Number(ctx.amount) > 10_000 && 'AMOUNT_LIMIT',
+    (ctx) => (ctx.installment ?? 1) > 12 && { code: 'FRAUD_BLOCKED', verdict: 'flag' },
+  ],
+});
+```
+
+A rule returns an error code, a `{ code, verdict, message }` hit, or a falsy value to let the payment through. It gets a `FraudContext`: `operation`, `provider`, `request`, `bin`, `prefix`, `last4`, `maskedCard`, `email`, `ip`, `buyerId`, `amount`, `currency`, `installment`, `conversationId`. Counters are registered before these rules run, so a blocked attempt still leaves its mark on the window.
+
+`maxAmount` compares `paidPrice` (or `price`) as a number. Money stays a string in your requests, and the request is built on the server — see [the HTTP handler](/docs/concepts/handler) — so this plugin only turns it into a number to answer "is this above the limit".
+
+## Challenging a trigger instead of refusing it
+
+```typescript
+fraudRules({
+  maxAmount: '25000',
+  // a trigger blocks unless the customer has already solved a captcha
+  challenge: async (ctx) => {
+    const token = await loadCaptchaToken(ctx.conversationId);
+    return token === undefined ? false : verifyCaptcha(token);
+  },
+  onDecision: async (decision) => {
+    await audit.record(decision); // never changes the outcome, and its failure is logged
+  },
+});
+```
+
+`challenge` only runs for a `block` verdict. A throw or a rejection counts as "not cleared" — an unreachable verification service must not become a way through. `onDecision` is your alert and audit hook: it receives the derived decision (`code`, `verdict`, `outcome`, `key`, `count`, `maskedCard`, `amount`, `operation`, `conversationId`) and an error in it is logged, never turned into a payment failure.
+
+## Where the counters live
+
+`MemoryFraudStore` is the default: a fixed window per key, capped at 10 000 entries so a bot rotating fake identities cannot grow it forever. It fits one process. Several servers, or a serverless checkout, need a shared store:
+
+```typescript
+fraudRules({
+  salt: process.env.FRAUD_SALT!, // the same salt on every instance, or the keys never match
+  store: {
+    async hit(key, windowMs) {
+      const count = await redis.incr(`fraud:${key}`);
+      if (count === 1) await redis.pexpire(`fraud:${key}`, windowMs);
+      return { count, resetAt: Date.now() + windowMs };
+    },
+    async peek(key) {
+      return Number((await redis.get(`fraud:${key}`)) ?? 0);
+    },
+    async distinct(group, member, windowMs) {
+      await redis.sadd(`fraud:${group}`, member);
+      await redis.pexpire(`fraud:${group}`, windowMs);
+      return { count: await redis.scard(`fraud:${group}`), resetAt: Date.now() + windowMs };
+    },
+  },
+});
+```
+
+`hit` registers an attempt, `peek` reads the live window without registering one (used by `on: 'declined'` rules), `distinct` is required by rules that count different values, `reset` is optional. All of them may be async, and the interface is only strings and numbers: anything that can count under a key with an expiry fits it, including the key-value store adapters discussed in [#116](https://github.com/czaydev/better-payment/issues/116) (`get`/`set`/`setIfAbsent`/`delete`, where `reset` is the `delete`). `payment.fraud.store` is the store in use, and `payment.fraud.reset()` clears one key or every counter:
+
+```typescript
+payment.fraud.reset(); // after a deploy, or when an operator releases a customer
+```
+
+## Card data never leaves the request
+
+Nothing a card number can be confused with is stored, logged or handed to your rules:
+
+- every grouping value (IP, email, buyer id, card, BIN, prefix, your own `key` function result) is hashed with HMAC-SHA256 using your `salt` and truncated to 16 hex characters. A store key looks like `0:ip:6f4a1c9d2b8e73a0`, never like `0:ip:85.34.78.112`;
+- CVC and expiry are never read, and no expiry can become a key;
+- rules and `onDecision` see `bin`, `prefix`, `last4` and `maskedCard` (`552879******0008`) instead of the number;
+- the log line carries `code`, `outcome`, `key`, `count` and `operation` only. No request body, no response body;
+- the store is bounded, and `payment.fraud.reset()` drops counters.
+
+The test suite (`tests/unit/plugins/fraud-rules.test.ts`) walks every string the store, the logger and your callbacks ever received and fails if 13 to 19 consecutive digits appear in any of them. For PCI-DSS and KVKK this is the practical part: you keep no card data, so the counters can live in a normal database. The `salt` is a secret: rotate it like any other, and remember that rotating it starts every window over.
+
+## The visitor address
+
+`ip` is the one key a customer can reach for, so the plugin trusts as little of it as possible:
+
+- by default the address is `buyer.ip` of the operation request — a field **your** code fills in. The plugin reads no HTTP header at all, because `X-Forwarded-For` is a header any client can set: a counter keyed on it is a counter the customer chooses, and a bot that guesses that rotates one identity per attempt instead of one per window.
+- when the request reaches you through a proxy, say so twice: name the header, and name the proxies whose word you take. `clientIp` then reads the chain from the closest proxy inward, and refuses a header on a connection that did not come from one of them.
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { clientIp, fraudRules } from 'better-payment/fraud';
+
+const ip = { headers: ['x-forwarded-for'], trustedProxies: ['10.0.0.0/8', '127.0.0.1'] };
+
+const payment = betterPayment({
+  providers: { iyzico: iyzico({ /* ... */ }) },
+  plugins: [fraudRules({ velocity: [{ key: 'ip', max: 20, window: '10m' }] })],
+  handler: {
+    // the HTTP request is here, so this is where the address is decided
+    transformRequest: (ctx) => ({
+      ...ctx.body,
+      buyer: {
+        ...ctx.body.buyer,
+        ip: clientIp({ headers: ctx.request.headers }, ip) ?? ctx.body.buyer.ip,
+      },
+    }),
+  },
+});
+```
+
+Nothing is read from a header until you name it, and a `trustedProxies` list that does not match the connection makes `clientIp` answer with the connection instead — the customer cannot step outside the window they are in by writing a header. Where the address comes from is your infrastructure: on a serverless host the connection is the load balancer's, so `cf-connecting-ip` or `x-real-ip` behind the platform's own range is the usual answer (set the range, not only the header). If your app already keeps the request per attempt — middleware, `AsyncLocalStorage` — hand it to the plugin with `resolveIp: () => ({ headers, socketAddress })` and the same `ip` rules, and it resolves the address for every guarded operation itself; `keys.ip` overrides any key outright. Whatever the source, the value is hashed before it becomes a store key.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `velocity` | — | The counting rules, in order |
+| `rules` | — | Your own rules, after the counters and the BIN/amount checks |
+| `blockBins` | — | BINs or `[from, to]` ranges to refuse, 6 to 8 digits |
+| `maxAmount` | — | Refuse amounts above this |
+| `verdict` | `'block'` | Verdict of rules that do not set one |
+| `window` | `'10m'` | Default window of the velocity rules |
+| `operations` | the four payment and 3DS inits | Which operations are guarded |
+| `store` | `new MemoryFraudStore()` | Counter backend, sync or async |
+| `salt` | random per process | Secret of the derived keys. Set it when instances share a store |
+| `keys` | — | `(ctx) => string` overrides of where an identity comes from, e.g. take the IP from your own server-side value |
+| `resolveIp` | — | `(ctx) => ({ headers, socketAddress })`: the HTTP request of the attempt, for the plugin to read the address from |
+| `ip` | trust nothing | `{ headers, trustedProxies }`: which header may carry the visitor, and which proxies may be believed |
+| `challenge` | — | Async check that can clear a `block` verdict |
+| `onDecision` | — | Called for every trigger, blocked, flagged or cleared |
+
+## Error codes
+
+| `errorCode` | `code` | Customer-facing message |
+| ----------- | ------ | ----------------------- |
+| `FRAUD_BLOCKED` | `FRAUD_SUSPECTED` | This payment was not accepted. Please contact us or use another payment method. |
+| `RATE_LIMITED` | `FRAUD_SUSPECTED` | Too many payment attempts from here. Please try again later. |
+| `BLOCKED_BIN` | `FRAUD_SUSPECTED` | This card is not accepted. |
+| `AMOUNT_LIMIT` | `FRAUD_SUSPECTED` | This card is not accepted for amounts this high. |
+| `THREEDS_REQUIRED` | `THREEDS_FAILED` | This payment needs 3D Secure verification. |
+| `FRAUD_CHALLENGE_FAILED` | `FRAUD_SUSPECTED` | Verification failed. Please try again. |
+
+The messages are the English defaults in `FRAUD_ERROR_MESSAGES`. [`localizedErrors`](/docs/plugins/localized-errors) translates them (and any `code` your own rule returns) into Turkish, and `messages` of that plugin overrides the wording.
+
+## What this plugin does not do
+
+- **It is not a captcha check and not an HTTP throttle.** A token proving a human pressed the button, and a limit on how often one endpoint may be called, belong to the request layer; this plugin is the state over attempts. Use it next to them, not instead of them.
+- **It never guards a provider callback or a 3D Secure completion.** `completeThreeDSPayment` is the bank reporting the outcome of a payment the customer already finished: refusing one strands a paid order. Passing it in `operations` throws a `ConfigurationError` instead of letting you do it by accident. Refunds, cancels, captures and queries are not guarded either.
+- **It never retries and never reports success.** A refusal short-circuits the operation before the provider is called, so nothing is sent to the bank and nothing is retried. A `flag` verdict does the opposite on purpose: the payment runs.
+- **It does not decide for you.** No `distinct` values per buyer is a crime and no BIN range is malicious by itself; the lists and the limits are yours, from your acquirer's reports and your own chargebacks.

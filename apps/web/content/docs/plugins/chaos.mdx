@@ -30,7 +30,7 @@ const payment = betterPayment({
 });
 ```
 
-A failure is returned as a normal result and the provider is not called. `NETWORK_ERROR` returns a `pending` result, the way a lost response does; every other code returns a `failure`. After hooks and [payment events](/docs/concepts/events) run for injected results too, so `localizedErrors` translates them and your `payment.failed` listeners see them.
+A failure is returned as a normal result and the provider is not called. `NETWORK_ERROR` returns a `pending` result, the way a lost response does; every other code returns a `failure`. After hooks and [payment events](/docs/concepts/events) run for injected results too, so `i18n` translates them and your `payment.failed` listeners see them.
 
 ## Options
 

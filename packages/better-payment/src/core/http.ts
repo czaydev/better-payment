@@ -57,6 +57,11 @@ export class HttpError extends Error {
   readonly code?: string;
   readonly response?: HttpResponse;
   readonly config: HttpRequestConfig;
+  /**
+   * Which attempt failed, counting the first one (1 = no retry happened).
+   * Set by `request()` when it gives up, so callers can report the retry count.
+   */
+  attempts?: number;
 
   constructor(
     message: string,
@@ -145,7 +150,10 @@ export class HttpClient {
           error instanceof HttpError &&
           (error.isNetworkError ||
             (!!error.response && !!retry?.statusCodes?.includes(error.response.status)));
-        if (!retryableError || attempt >= attempts) throw error;
+        if (!retryableError || attempt >= attempts) {
+          if (error instanceof HttpError) error.attempts = attempt;
+          throw error;
+        }
         await new Promise<void>((resolve) => setTimeout(resolve, retry?.delay ?? 1000));
       }
     }

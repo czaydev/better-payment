@@ -8,7 +8,15 @@ import type { PaymentProviderConfig } from '../../core/PaymentProvider';
  *   sign and verify hash keys
  * - merchantKey: the merchant key sent with every payment request
  */
+/** Payment institutions on Sipay's platform */
+export type SipayBrand = 'sipay' | 'qnbpay';
+
 export interface SipayConfig extends PaymentProviderConfig {
+  /**
+   * The institution: `sipay` (default) or `qnbpay`, which runs the same API on its
+   * own hosts. Selects the default URLs and the provider id.
+   */
+  brand?: SipayBrand;
   appId: string;
   appSecret: string;
   merchantKey: string;

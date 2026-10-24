@@ -30,7 +30,7 @@ const payment = betterPayment({
 });
 ```
 
-Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERROR`, kaybolan bir yanıt gibi `pending` sonuç döndürür; diğer tüm kodlar `failure` döndürür. Enjekte edilen sonuçlar için de after hook'lar ve [ödeme olayları](/docs/concepts/events) çalışır; yani `localizedErrors` bunları çevirir ve `payment.failed` dinleyicileriniz bunları görür.
+Hata normal bir sonuç olarak döner ve sağlayıcı çağrılmaz. `NETWORK_ERROR`, kaybolan bir yanıt gibi `pending` sonuç döndürür; diğer tüm kodlar `failure` döndürür. Enjekte edilen sonuçlar için de after hook'lar ve [ödeme olayları](/docs/concepts/events) çalışır; yani `i18n` bunları çevirir ve `payment.failed` dinleyicileriniz bunları görür.
 
 ## Seçenekler [#options]
 

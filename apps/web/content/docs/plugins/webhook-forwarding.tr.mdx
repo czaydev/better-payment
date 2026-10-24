@@ -1,0 +1,120 @@
+---
+title: Webhook Forwarding
+description: Ödeme olaylarını diğer mikroservislere HMAC-SHA256 imzalı webhook olarak iletir.
+---
+
+<Since version="0.12.0" />
+
+Uygulamalar ödeme durumlarını genellikle diğer servislere (sipariş takip, stok yönetimi, muhasebe/ERP, CRM sistemleri) bildirme ihtiyacı duyar. Her projede sıfırdan webhook gönderme, HMAC imzalama, yeniden deneme (retry) ve hata yakalama mekanizması kurmak zaman alıcıdır.
+
+`webhookForwarding` eklentisi, [ödeme olaylarını](/docs/concepts/events) HMAC-SHA256 ile imzalanmış JSON webhook bildirimlerine dönüştürür. Üstel geri çekilme (exponential backoff) ile yeniden dener ve kart bilgilerini otomatik olarak temizler. Yavaş veya yanıt vermeyen harici servisler ana ödeme akışını asla engellemez ya da başarısızlığa uğratmaz.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { webhookForwarding } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    webhookForwarding({
+      endpoints: [
+        {
+          url: 'https://orders.myshop.com/webhooks/payments',
+          secret: process.env.ORDERS_WEBHOOK_SECRET!,
+          events: ['payment.succeeded', 'refund.succeeded'],
+        },
+        {
+          url: 'https://analytics.myshop.com/webhooks/all-events',
+          secret: process.env.ANALYTICS_WEBHOOK_SECRET!,
+          events: ['*'], // all payment events
+        },
+      ],
+      retry: {
+        attempts: 3,
+        delay: 1000,
+      },
+    }),
+  ],
+});
+```
+
+## İstek gövdesi (Payload) [#payload-structure]
+
+Harici servise iletilen her `POST` isteği olay detaylarını ve hassas verilerden arındırılmış işlem sonucunu içerir:
+
+```json
+{
+  "event": "payment.succeeded",
+  "timestamp": 1729267200000,
+  "provider": "iyzico",
+  "operation": "createPayment",
+  "paymentId": "12345678",
+  "conversationId": "order-1001",
+  "amount": "150.00",
+  "currency": "TRY",
+  "result": {
+    "status": "success",
+    "paymentId": "12345678",
+    "price": "150.00",
+    "paidPrice": "150.00"
+  }
+}
+```
+
+Kart numarası, CVV ve kart sahibi bilgileri gönderilmeden önce güvenlik amacıyla otomatik olarak filtrelenir.
+
+## Alıcı serviste webhook doğrulaması [#verifying-webhooks-on-the-receiver]
+
+Her istek `x-signature` ve `x-better-payment-signature` başlıklarında HMAC-SHA256 imzasını, `x-signature-timestamp` başlığında ise zaman damgasını taşır.
+
+Alıcı serviste imza doğrulaması `verifyForwardedWebhook` fonksiyonuyla saniyeler içinde yapılabilir:
+
+```typescript
+import { verifyForwardedWebhook } from 'better-payment/plugins';
+
+// In your Express / Next.js / Hono handler:
+export async function POST(req: Request) {
+  const signature = req.headers.get('x-signature')!;
+  const rawBody = await req.text();
+
+  const isValid = await verifyForwardedWebhook(
+    rawBody,
+    signature,
+    process.env.ORDERS_WEBHOOK_SECRET!
+  );
+
+  if (!isValid) {
+    return new Response('Invalid webhook signature', { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+  console.log(`Received event: ${payload.event} for payment ${payload.paymentId}`);
+
+  return new Response('OK', { status: 200 });
+}
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `endpoints` | — | `url`, `secret` ve `events` içeren hedef webhook listesi |
+| `retry` | `{ attempts: 3, delay: 1000 }` | Başarısız istekler için deneme sayısı ve bekleme süresi |
+| `timeout` | `10000` | İstek zaman aşımı süresi (milisaniye) |
+| `fetch` | global `fetch` | Özel fetch uygulaması |
+| `onError` | logger | `(error, endpoint, payload) => void`: iletim başarısız olduğunda çağrılır |
+| `waitUntil` | — | Sunucusuz ortamlarda arka plan görevini canlı tutar (örn. Vercel `waitUntil` veya Cloudflare `ctx.waitUntil`) |
+
+## Endpoint ayarları [#endpoint-configuration]
+
+| Alan | Tip | Açıklama |
+| ---- | --- | -------- |
+| `url` | `string` | Olayın iletileceği hedef URL |
+| `secret` | `string` | Paylaşılan HMAC gizli anahtarı |
+| `events` | `(PaymentEventType \| '*')[]` | İletilecek olay tipleri. Varsayılan: `['*']` |
+| `headers` | `Record<string, string>` | Gönderilecek isteğe eklenecek özel başlıklar |
+| `retry` | `{ attempts?: number, delay?: number }` | Bu endpoint'e özel yeniden deneme kuralı |

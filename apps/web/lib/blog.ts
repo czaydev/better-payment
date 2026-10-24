@@ -1,7 +1,7 @@
 import { blog } from "@/.source/server";
 import { loader } from "fumadocs-core/source";
 import { toFumadocsSource } from "fumadocs-mdx/runtime/server";
-import { i18n, type Locale } from "@/lib/i18n/config";
+import { i18n, localeSettings, type Locale } from "@/lib/i18n/config";
 
 export const blogSource = loader({
   baseUrl: "/blog",
@@ -32,7 +32,7 @@ export function readingMinutes(post: BlogPost): number {
 }
 
 export function formatDate(date: Date, lang: Locale): string {
-  return new Intl.DateTimeFormat(lang === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.DateTimeFormat(localeSettings(lang).intlLocale, {
     year: "numeric",
     month: "long",
     day: "numeric",

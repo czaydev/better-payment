@@ -3,7 +3,7 @@ title: Introduction
 description: A unified, type-safe payment gateway library for Node.js and Turkish payment providers.
 ---
 
-**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — through one TypeScript API.
+**Better Payment** lets you integrate Turkish payment providers — iyzico, PayTR, Akbank, Parampos, Sipay, Kuveyt Türk, Garanti BBVA, Yapı Kredi, QNB, VakıfBank, Albaraka Türk, Denizbank and the EST banks (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) — through one TypeScript API.
 
 ## Why Better Payment?
 
@@ -22,17 +22,25 @@ Every payment provider has its own SDK, request format, signature scheme and err
 | Provider | Non-3D | 3D Secure | Refund | Cancel | Status | BIN | Installments |
 |----------|--------|-----------|--------|--------|--------|-----|--------------|
 | iyzico   | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| PayTR    | ✅ ¹ | ✅ iFrame | ✅ | ✅ ² | ✅ | ✅ | ✅ |
+| PayTR    | ✅ ¹ | ✅ iFrame / Direct API | ✅ | ✅ ² | ✅ | ✅ | ✅ |
 | Akbank   | ✅ | ✅ 3D_PAY | ✅ | ✅ | ✅ | — | — |
 | Parampos | ✅ (TRY) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Sipay    | ✅ ⁴ | ✅ paySmart3D | ✅ | ✅ ⁴ | ✅ | ✅ | ✅ |
+| QNBpay ⁵ | ✅ | ✅ paySmart3D | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Kuveyt Türk | — | ✅ KT Pay Gate | ✅ | ✅ ³ | ✅ | — | — |
 | EST (İş Bankası, Ziraat, Halkbank, TEB, Şekerbank) | ✅ | ✅ 3D / 3D Pay / 3D Host | ✅ | ✅ | ✅ | — | — |
+| Denizbank | ✅ | ✅ 3D Model | ✅ | ✅ | — | — | — |
+| Albaraka Türk | ✅ | ✅ 3D | ✅ | ✅ | ✅ | — | — |
+| VakıfBank | ✅ | ✅ MPI + VPOS (3DS) | ✅ | ✅ | — | — | — |
+| Yapı Kredi | ✅ | ✅ Posnet OOS | ✅ | ✅ | — | — | — |
+| QNB | ✅ | ✅ 3D Model / 3D Pay | ✅ | ✅ | ✅ | — | — |
+| Garanti BBVA | ✅ | ✅ 3D / 3D_PAY / GarantiPay | ✅ | ✅ | ✅ | — | — |
 
 ¹ Your PayTR account must be approved for non-3D payments.
 ² PayTR has no void endpoint, so `cancel()` issues a full refund.
 ³ Kuveyt Türk cancels on the same day, before end of day; after that, use `refund()`.
 ⁴ Sipay has no void endpoint: `cancel()` refunds the rest of the payment, which Sipay processes as a void on the same day. Sipay must also approve your account for non-3D payments.
+⁵ QNBpay runs on Sipay's platform (`qnbpay()`), so Sipay's notes apply. It has not been verified with a test merchant yet.
 
 ## Quick Example
 

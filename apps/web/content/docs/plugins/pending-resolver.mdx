@@ -1,0 +1,85 @@
+---
+title: Pending Payment Resolver
+description: Resolve timed out payments (NETWORK_ERROR) by querying the provider on a schedule without double charging.
+---
+
+<Since version="0.12.0" />
+
+When a payment provider doesn't answer (timeout or network disruption), better-payment returns `status: 'pending'` with `code: 'NETWORK_ERROR'`. In these cases, the money may or may not have been charged by the bank. Manually following up risks charging a customer twice or never delivering an order.
+
+The `pendingResolver` plugin automatically captures every `NETWORK_ERROR` payment, queries the provider using safe read-only status checks (`getPayment`), and emits final outcome events (`payment.succeeded` or `payment.failed`).
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { pendingResolver } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    pendingResolver({
+      schedule: ['30s', '2m', '10m', '1h'],
+      giveUpAfter: '24h',
+    }),
+  ],
+});
+```
+
+## Resolving Pending Payments
+
+Because serverless environments (AWS Lambda, Vercel) have no background timers, call `payment.pending.resolve()` from your cron job or scheduled function:
+
+```typescript
+// Call from your cron worker or scheduled background task
+const summary = await payment.pending.resolve();
+console.log(
+  `Checked: ${summary.checked}, Succeeded: ${summary.succeeded}, Failed: ${summary.failed}, Unresolved: ${summary.unresolved}`
+);
+```
+
+When a pending payment resolves:
+- If successful, it emits `payment.succeeded` with `event.resolvedFrom: 'pending'`.
+- If failed, it emits `payment.failed` with `event.resolvedFrom: 'pending'`.
+- If the payment exceeds `giveUpAfter`, it emits `payment.unresolved` so your support team can review it manually.
+
+A payment is only marked successful when the provider's status query confirms it; a timeout, an HTTP error or a still-pending answer keeps the payment in the queue for the next scheduled check. Overlapping calls to `payment.pending.resolve()` are also safe: each payment is claimed by exactly one resolver before the provider is queried, so it never resolves (and never emits a terminal event) twice. Durable stores can implement the optional `claim(id)` method of `PendingStore` to extend that guarantee across server instances.
+
+```typescript
+payment.on('payment.succeeded', async (event) => {
+  if (event.resolvedFrom === 'pending') {
+    console.log(`Payment ${event.paymentId} was successfully recovered after initial timeout!`);
+  }
+  await markOrderPaid(event.conversationId);
+});
+
+payment.on('payment.unresolved', async (event) => {
+  console.warn(`Payment ${event.paymentId} gave up after threshold. Manual review needed.`);
+});
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `schedule` | `['30s', '2m', '10m', '1h']` | Schedule of retry query delays |
+| `giveUpAfter` | `'24h'` | Maximum duration to keep retrying before emitting `payment.unresolved` |
+| `store` | `MemoryPendingStore` | Storage backend for pending payments (`PendingStore`) |
+| `endpoint` | `false` | Registers privileged HTTP endpoint `POST /pending/resolve` for webhook crons |
+
+## Dashboard & Inspection Methods
+
+The plugin attaches helper methods to `payment.pending`:
+
+```typescript
+// List all unresolved payments
+const pendingList = await payment.pending.list();
+
+// Get details for a specific payment
+const item = await payment.pending.get('PMT-12345');
+
+// Manually delete a payment from the pending queue
+await payment.pending.delete('PMT-12345');
+```

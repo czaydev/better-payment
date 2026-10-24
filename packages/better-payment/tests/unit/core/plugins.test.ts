@@ -416,6 +416,56 @@ describe('handler with plugins', () => {
     expect((await handler.handle(post('/api/pay/router/admin', {}))).status).toBe(403);
   });
 
+  it('refuses form bodies on POST endpoints unless acceptForm is set (CSRF)', async () => {
+    const callback = definePlugin({
+      id: 'bank',
+      endpoints: {
+        callback: {
+          method: 'POST',
+          path: '/bank/callback',
+          acceptForm: true,
+          handler: (ctx) => ({ orderId: ctx.body?.orderId }),
+        },
+      },
+    });
+    const payment = betterPayment({
+      providers: { mock: new MockProvider() },
+      plugins: [quote, callback],
+      handler: { authorize: () => true },
+    });
+    const form = (path: string, contentType: string) =>
+      payment.handler.handle({
+        method: 'POST',
+        url: path,
+        headers: { 'content-type': contentType },
+        body: 'orderId=1&binNumber=454360',
+      });
+
+    for (const type of ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain']) {
+      expect((await form('/api/pay/router/admin', type)).status).toBe(415);
+    }
+    expect(await form('/api/pay/bank/callback', 'application/x-www-form-urlencoded')).toMatchObject(
+      { status: 200, body: { orderId: '1' } }
+    );
+  });
+
+  it('answers 503 when an onRequest hook throws', async () => {
+    const quoteSpy = vi.fn(() => 'ok');
+    const broken = definePlugin({
+      id: 'guard',
+      onRequest: () => {
+        throw new Error('store down');
+      },
+      endpoints: { quote: { method: 'POST', path: '/guarded', handler: quoteSpy } },
+    });
+    const payment = betterPayment({ providers: { mock: new MockProvider() }, plugins: [broken] });
+
+    const res = await payment.handler.handle(post('/api/pay/guarded', {}));
+
+    expect(res.status).toBe(503);
+    expect(quoteSpy).not.toHaveBeenCalled();
+  });
+
   it('requires authorize for privileged endpoints and rejects reserved or duplicate paths', () => {
     const payment = betterPayment({ providers: { mock: new MockProvider() }, plugins: [quote] });
     expect(() => payment.handler).toThrow(/plugin:router\/admin/);

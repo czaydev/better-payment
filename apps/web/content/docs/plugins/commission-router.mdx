@@ -1,0 +1,252 @@
+---
+title: Commission router
+description: Send each payment to the cheapest eligible provider from your own commission rate tables.
+---
+
+<Since version="0.12.0" />
+
+`commissionRouter` routes each new payment to the provider that costs you least, according to the commission contracts you configure. It never estimates a rate: every cost comes from one of your rate lines, and every decision comes with a quote that explains why each provider was chosen or excluded.
+
+The router is a separate, tree-shakable entry point: `better-payment/commission-router`.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico, paytr, type PaymentResponse } from 'better-payment';
+import { commissionRouter, type RoutedResult } from 'better-payment/commission-router';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  defaultProvider: 'iyzico',
+  plugins: [
+    commissionRouter({
+      strategy: 'lowest-cost',
+      rates: [
+        { provider: 'iyzico', rate: '1.10', fixed: '0.10', installments: [1] },
+        { provider: 'paytr', rate: '1.05', installments: [1, 3, 6] },
+      ],
+      policy: {
+        prefer: ['paytr'],
+        shareCap: { maxShare: 0.7, window: 100 },
+      },
+    }),
+  ],
+});
+
+const result: RoutedResult<PaymentResponse> = await payment.createPayment(request);
+console.log(result.provider); // 'paytr' for 1,000.00 TRY, one installment
+```
+
+The numbers above are examples. Replace them with your own contracts; the plugin never guesses rates.
+
+## Rate table
+
+Each line says what one provider charges for a kind of payment. A line without a filter applies to every value of that field.
+
+| Field | Default | Meaning |
+| ----- | ------- | ------- |
+| `provider` | required | Configured provider id |
+| `rate` | required | Percentage commission, up to 4 decimals: `'1.10'` is 1.10% |
+| `fixed` | `0` | Fixed fee per transaction, up to 2 decimals |
+| `installments` | every count | Installment counts the line covers, e.g. `[1, 3, 6]` |
+| `threeDS` | both | `true` for 3D Secure operations only, `false` for non-3DS only |
+| `cardFamily` | any | Card family/program, e.g. `'Bonus'` |
+| `cardAssociation` | any | `VISA`, `MASTER_CARD`, `TROY`, `AMERICAN_EXPRESS`... |
+| `cardType` | any | `CREDIT_CARD`, `DEBIT_CARD`, `PREPAID_CARD`... |
+| `bankName` | any | Issuing bank name |
+| `commercial` | any | `true` for commercial cards, `false` for consumer cards |
+| `currencies` | any | Currency codes the line applies to, e.g. `['TRY']` |
+| `minAmount`, `maxAmount` | unbounded | Inclusive bounds on the paid amount |
+| `validFrom`, `validTo` | always | Validity window; `validFrom` is inclusive, `validTo` exclusive |
+
+Card fields are matched case-insensitively. A provider may have several lines; the cheapest line that matches the payment is the provider's cost.
+
+Costs are computed in integer minor units with exact integer arithmetic, never with floats. A percentage that lands on half a minor unit is rounded half up: 0.95% of 50.00 TRY is 0.475 TRY, which becomes 48 kuruş, plus a 0.05 TRY fixed fee, for 0.53 TRY. Amounts are capped at 13 integer digits so every comparison stays exact.
+
+## How a provider is chosen
+
+1. Each configured provider is evaluated against the payment: currency, installment count, 3D Secure, card filters, amount bounds and rate validity.
+2. Providers without a matching line are reported in `excluded` with a reason; `isHealthy` can remove more.
+3. Eligible providers are ranked by total cost. On equal cost, `policy.prefer` wins, then the order of the rate table.
+4. `policy.override` and `policy.shareCap` can change the winner (see below).
+5. The first candidate is used for the payment.
+
+Every exclusion has a stable reason code, so a quote explains a decision without reading plugin logs:
+
+| Reason | Meaning |
+| ------ | ------- |
+| `no-rate-line` | The provider has no lines, or none apply at all |
+| `rate-not-yet-valid`, `rate-expired` | The matching line is outside its validity window |
+| `amount-below-min`, `amount-above-max` | The paid amount is outside the line's bounds |
+| `currency-not-supported` | The line is for other currencies |
+| `installment-not-supported` | The line does not cover this installment count |
+| `threeds-not-supported` | The line is for the other 3D Secure mode |
+| `card-unknown` | A card filter needs a classification that is not available |
+| `card-mismatch` | The classified card does not match the filter |
+| `provider-unhealthy` | `isHealthy` returned `false` |
+| `share-cap` | One more payment would exceed `policy.shareCap` |
+
+## Quote before you pay
+
+`payment.router.quote()` prices a payment without moving any money:
+
+```typescript
+const quote = await payment.router.quote({
+  binNumber: '552879',
+  price: '1000.00',
+  installment: 1,
+  currency: 'TRY',
+  conversationId: 'order-1001',
+});
+
+console.log(quote.selected); // 'paytr'
+console.log(quote.selectionReason); // 'lowest-cost'
+for (const candidate of quote.candidates) {
+  console.log(candidate.provider, candidate.cost, candidate.reason);
+}
+```
+
+```text
+paytr 10.50 TRY lowest-cost
+iyzico 11.10 TRY higher-cost
+```
+
+`quote()` validates its input and throws `ValidationError` for an invalid amount, installment count, currency or BIN. `binNumber` must be the 6-8 digit BIN prefix, never a full card number. A full card number in an automatic payment is reduced to its first 8 digits before the lookup, and the BIN and the PAN are never logged or returned.
+
+The quote contains:
+
+| Field | Contents |
+| ----- | -------- |
+| `amount` | Formatted price, exact minor units, currency, installments, 3D Secure |
+| `card` | Classification only (bank, family, type, association, commercial); never the BIN |
+| `selected` | The provider the payment would use, or `null` |
+| `selectionReason` | `lowest-cost`, `preferred-on-tie`, `override` or `fallback` |
+| `candidates` | Eligible providers, the chosen one first, with cost and reason |
+| `excluded` | Every other configured provider with a reason and detail |
+| `notes` | Policy and lookup problems worth surfacing |
+| `strategy` | `'lowest-cost'` |
+
+`payment.router.status()` reports routing counts in the share window and BIN-cache usage; `payment.router.reset()` clears both counters.
+
+## Routing policies
+
+### Ties
+
+When two providers cost exactly the same, `policy.prefer` decides. Without it, the provider whose first matching line appears earlier in `rates` wins, so quotes are deterministic.
+
+### Share cap
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  policy: { shareCap: { maxShare: 0.5, window: 100 } },
+});
+```
+
+`maxShare` is the maximum share of the last `window` routing decisions one provider may take. A provider that would exceed it is skipped (reason `share-cap`) and the next cheapest eligible provider is used. When every eligible provider is at the cap, the cheapest one is still used and a note says so; a payment is never failed because of the cap. `policy.override` bypasses the cap.
+
+The window is kept in process memory. With several application instances each instance enforces its own window, so the effective global share can be higher than `maxShare`.
+
+### Per-order override
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  policy: {
+    override: ({ conversationId, amount, candidates }) =>
+      conversationId === 'vip-42' ? 'paytr' : null,
+  },
+});
+```
+
+The override receives the operation, `conversationId`, the amount, the eligible providers (cheapest first) and the card classification. It returns a provider id, or a nullish value to keep the normal ranking. Returning a provider that is not eligible is ignored with a note; an override can never bypass a currency, card or health filter. Overrides also bypass the share cap.
+
+## Fallback without double charges
+
+A fallback is the retry after a failure. The safety rule is simple: **a payment is retried only when the error proves that no charge happened**.
+
+- The defaults are `INVALID_REQUEST` and `PROVIDER_ERROR`; narrow the list with `fallbackOn`.
+- `NETWORK_ERROR`, every card decline, `THREEDS_FAILED`, `INVALID_HASH`, `UNKNOWN` and pending outcomes are never retried. Listing them in `fallbackOn` throws a `ConfigurationError` at construction.
+- A retry uses the next candidate from the same quote, so it is the next-cheapest provider. At most two fallbacks are tried (three attempts in total).
+- If the fallback call itself throws, the outcome is unknown: the error is rethrown and nothing else is tried.
+- A result is never turned into a success without the provider's confirmation.
+
+`fallback` lists providers that have no rate line yet (for example a contract still being negotiated). They are used, in order, only when no rate line matches. A provider excluded by a hard filter (currency, card, health...) is never used as a fallback.
+
+## Refunds, cancels and status calls
+
+When a payment succeeds, the router remembers which provider handled it and sends `refund`, `cancel`, `getPayment`, `capture`, `voidAuthorization` and `completeThreeDSPayment` for that payment id to the same provider. Those calls always run on the payment object; a call on a provider (`payment.iyzico.refund()`) is never moved.
+
+The default store is in-memory, bounded (10 000 payments) and expires entries after 90 days. A multi-instance deployment must pass a shared `store`, otherwise a refund handled by another instance falls back to the default provider:
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  store: {
+    get: (paymentId) => storage.get(`route:${paymentId}`),
+    set: (paymentId, provider) => storage.set(`route:${paymentId}`, provider),
+  },
+});
+```
+
+## BIN lookup and cache
+
+Card filters need a BIN classification. Pass `binLookup`; it receives at most the first 8 digits (then 6 if the 8-digit lookup knows nothing), so a full card number never leaves the router:
+
+```typescript
+commissionRouter({
+  rates: [/* ... */],
+  binLookup: async (bin) => bankBinService.lookup(bin),
+  cache: { maxEntries: 2048, ttlMs: 12 * 60 * 60 * 1000 },
+});
+```
+
+Any function with that shape works, including `lookupBin` from the BIN package (issue #153, PR #252) or a provider's `binCheck()`. The interface is injected, so the router has no dependency on either.
+
+The cache is always bounded and expiring: 1 024 entries and 24 hours by default. Unknown BINs are cached as unknown; a failing lookup is treated as unknown and not cached. Without `binLookup`, lines with card filters report `card-unknown` and only unfiltered lines compete.
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `strategy` | `'lowest-cost'` | The only supported strategy |
+| `rates` | required | Commission rate table |
+| `fallback` | `[]` | Providers without a rate line, in order |
+| `binLookup` | — | Injected BIN classification |
+| `cache` | `{ maxEntries: 1024, ttlMs: 86400000 }` | Bounds of the BIN cache |
+| `policy.prefer` | `[]` | Tie preference order |
+| `policy.shareCap` | — | `{ maxShare, window: 100 }` |
+| `policy.override` | — | `(context) => providerId \| null` |
+| `store` | `MemoryRoutingStore` | payment id → provider mapping |
+| `isHealthy` | — | `(providerId) => boolean \| Promise<boolean>` for new payments |
+| `fallbackOn` | `INVALID_REQUEST`, `PROVIDER_ERROR` | Errors that prove no charge |
+| `now` | `Date.now` | Clock seam for validity and the cache |
+
+The plugin also serves `POST /api/pay/router/quote` from the handler (relative to `basePath`). The JSON body is the same as `quote()` input; invalid input returns `400 { error }`. The endpoint is public like a quote: it moves no money.
+
+## Worked example
+
+A fictional contract table, used for the calculations below:
+
+| Provider | Card | Installments | Rate | Fixed |
+| -------- | ---- | ------------ | ---- | ----- |
+| `alpha` | any | 1 | 1.10% | 0.10 TRY |
+| `beta` | any | 1, 3, 6 | 1.25% | — |
+| `gamma` | Bonus | 1, 3, 6 | 0.95% | 0.05 TRY |
+| `delta` | any | 1 | 1.00% | 0.25 TRY |
+
+- **1 000.00 TRY, one installment, Bonus card:** gamma costs 9.50 + 0.05 = 9.55, delta 10.00 + 0.25 = 10.25, alpha 11.00 + 0.10 = 11.10, beta 12.50. Gamma wins.
+- **1 000.00 TRY, three installments, Bonus card:** the alpha and delta lines cover only one installment, so they are excluded with `installment-not-supported`. Gamma wins over beta.
+- **50.00 TRY, one installment, Bonus card:** gamma costs 0.475 → 0.48 (half up) + 0.05 = 0.53; delta 0.75, alpha 0.65 and beta 0.63. Gamma wins.
+- **1 000.00 TRY, one installment, unknown BIN:** gamma is excluded with `card-unknown`; delta wins.
+
+## Limitations
+
+- The table is yours to maintain. The router never estimates, updates or discovers rates.
+- The commission is a ranking value. It is not the amount the provider settles, and better-payment never charges a price derived from it.
+- A stored-card payment has no card number to classify. Lines with card filters report `card-unknown` for it; quote with an explicit `binNumber` if you need to price it.
+- Health checks and the share window are per process, not global.
+- Retries are bounded to the candidates of one quote (three attempts including the first), so a payment never walks through every provider.

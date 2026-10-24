@@ -1,0 +1,111 @@
+---
+title: MCP Server
+description: Expose Better Payment as a Model Context Protocol (MCP) server for AI agents.
+---
+
+<Since version="0.12.0" />
+
+The `mcp` plugin exposes Better Payment as a standard Model Context Protocol (MCP) server over HTTP JSON-RPC 2.0. This allows AI assistants and autonomous agents (such as Claude Desktop, Cursor, Copilot, or custom LLM agents) to query payment status, check BINs, retrieve installment options, and initiate refunds or cancellations safely.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { mcp } from 'better-payment/plugins';
+
+const AGENT_TOKEN = process.env.MCP_AGENT_SECRET!; // a secret of its own, not your API keys
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    mcp({
+      path: '/mcp',
+      readOnly: false,
+      authorize: (req, tool) => {
+        const header = req.headers['authorization'] ?? req.headers['Authorization'];
+        if (header !== `Bearer ${AGENT_TOKEN}`) return false;
+        // A read-only agent token: the write tools stay unreachable
+        return tool !== 'refund' && tool !== 'cancel' ? true : process.env.MCP_ALLOW_WRITES === '1';
+      },
+      // The IP the provider sees on refunds and cancellations. Behind a proxy,
+      // read the header your edge actually sets (and strips client copies of).
+      getClientIp: (req) => req.headers['cf-connecting-ip'],
+      onToolCall: ({ tool, provider, isError, durationMs }) => {
+        console.log(`MCP tool ${tool} on ${provider}: ${isError ? 'failed' : 'ok'} in ${durationMs}ms`);
+      },
+    }),
+  ],
+  // The MCP endpoints are privileged: the handler refuses to build without this hook
+  handler: {
+    basePath: '/api/pay',
+    authorize: ({ request }) =>
+      (request.headers['authorization'] ?? request.headers['Authorization']) === `Bearer ${AGENT_TOKEN}`,
+  },
+});
+```
+
+Mounting `betterPayment` with the HTTP handler (Next.js, Fastify, Express, Hono, Elysia, etc.) automatically registers:
+- `POST /mcp` — JSON-RPC 2.0 protocol endpoint (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`).
+- `GET /mcp/info` — Health and server metadata inspection endpoint.
+
+## Available Tools
+
+The MCP server registers the following tools:
+
+| Tool | Type | Description |
+| ---- | ---- | ----------- |
+| `getPayment` | Read | Fetch payment status and details by provider and payment ID. |
+| `binCheck` | Read | Look up card issuer, brand, card type, and family from first 6-8 digits of a card. |
+| `installmentInfo` | Read | Query available installment options and interest rates for a given BIN and price. |
+| `refund` | Write | Refund an entire payment or specific amount. Protected by authorization check. |
+| `cancel` | Write | Void or cancel a transaction. Protected by authorization check. |
+
+## Authentication
+
+Both endpoints are declared `privileged`, like refunds are on the [handler](/docs/concepts/handler):
+
+- The handler will not build without an `authorize` hook once this plugin is registered, so an accidentally public MCP route is a configuration error instead of an open endpoint. That hook runs first and a request it rejects never reaches a tool — `initialize`, `tools/list` and `tools/call` included.
+- The plugin's own `authorize(request, tool)` runs before every tool call, so one agent token can be limited to the read tools.
+- Write tools (`refund`, `cancel`) additionally require the `authorize` option: with no authorizer configured, they answer `401` even though the handler hook let the request through.
+- `readOnly: true` takes the write tools out of `tools/list` entirely, so an agent cannot even see them.
+
+## Protocol
+
+- **Version negotiation:** the server speaks `2025-06-18`, `2025-03-26` and `2024-11-05`. `initialize` echoes the client's `protocolVersion` when the server speaks it and answers its own newest version otherwise, together with `serverInfo` and `capabilities.tools`.
+- **Notifications** (`notifications/initialized`, any message without an `id`) are answered with `202 Accepted` and an empty body, as the Streamable HTTP transport expects.
+- **JSON-RPC errors** (unknown method, invalid request, a tool this server does not expose) come back as `200 OK` with an `error` object in the body: the JSON-RPC spec attaches the error to the response envelope, not to the HTTP status. Non-200 answers are reserved for transport and authorization failures: `403` from the handler hook, `401` from the plugin authorizer, `405` for the wrong method, `400` for a body that is not valid JSON.
+- **Tool failures** — a provider that throws, a provider that answers `failure`, missing arguments — are a successful JSON-RPC result with `isError: true` and the message in the content, so the client shows the reason to the model instead of dropping the call.
+
+## Client IP
+
+Providers require the customer IP on refunds and cancellations. The endpoint context only carries the request headers, so by default the plugin reads `cf-connecting-ip`, then `x-real-ip` — headers an edge proxy overwrites rather than appends to. `x-forwarded-for` is deliberately not trusted by default: any client can put whatever it likes in that header. Nothing validates the two trusted headers for you either: they only mean something when your edge sets them and drops client-supplied copies, which is your deployment's job, not the library's. If your platform only exposes `x-forwarded-for` behind a proxy that sanitizes it, read it yourself in `getClientIp`. With no IP to read, a write tool is refused instead of being attributed to a placeholder address.
+
+## Card data safety
+
+Tool results are sanitized before they reach the model:
+
+- Card-shaped keys (`card`, `cardNumber`, `cvv`, `securityCode`, `expireMonth`/`expiryMonth`, `expireYear`/`expiryYear`, `cardHolderName`, `pan`) are dropped.
+- Every remaining string — including error messages and nested provider payloads — has each 16-19 digit run masked to `************1111`, keeping only the last four digits. A long numeric order id can be masked too; that is the safe direction for a response an LLM reads.
+- The `authorize`, `getClientIp` and `onToolCall` hooks get the request headers and the sanitized arguments, never a raw card number.
+
+## Audit trail
+
+- `refund` and `cancel` run through the provider proxy, so they emit the normal [payment events](/docs/concepts/events): `payment.on('refund.succeeded', ...)` and the [`notifications`](/docs/plugins/notifications) plugin see an agent refund exactly like a refund made from your own code.
+- Every tool call, including the read-only ones, writes one line to the library [logger](/docs/concepts/handler): `mcp: tool 'refund' called` with the tool, provider and duration. Request and response bodies are never logged.
+- A call the authorizer denies never reaches a tool, but it still lands in the same trail: `mcp: tool 'refund' denied` in the log and `isError: true` with the reason in `onToolCall`.
+- `onToolCall` is your own extra hook: tool, sanitized arguments, sanitized result or failure message, `isError`, `durationMs`, provider, resolved IP and timestamp.
+
+## Options
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `path` | `string` | `'/mcp'` | Base path for the MCP JSON-RPC endpoint. |
+| `tools` | `McpToolName[]` | all tools | Which tools the server exposes. |
+| `readOnly` | `boolean` | `false` | When `true`, omits write tools (`refund`, `cancel`). |
+| `authorize` | `(req, tool) => boolean \| Promise<boolean>` | — | Runs before every tool call; required for the write tools. |
+| `getClientIp` | `(req) => string \| undefined` | `cf-connecting-ip`, then `x-real-ip` | Resolves the IP passed to write operations. |
+| `serverName` | `string` | `'better-payment-mcp'` | Name reported in `serverInfo`. |
+| `serverVersion` | `string` | Better Payment version | Version reported in `serverInfo`. |
+| `onToolCall` | `(details) => void` | — | Audit hook called after each tool invocation. |

@@ -1,0 +1,75 @@
+---
+title: Veri Maskeleme (PCI DSS & KVKK)
+description: Kart hamili verilerini, CVV ve kişisel bilgileri loglarda, olaylarda ve denetim kayıtlarında otomatik olarak maskeleyin.
+---
+
+<Since version="0.12.0" />
+
+Ödeme istekleri kredi kartı numaraları (PAN), güvenlik kodları (CVC/CVV), son kullanma tarihleri, T.C. Kimlik Numarası (TCKN), telefon numaraları ve adres bilgileri taşır. Bu verilerin açık halde log dosyalarına yazılması veya iç olay dinleyicilerine (event listeners) dağıtılması **PCI DSS** (Gereksinim 3: Kart Hamili Verilerinin Korunması) ve **KVKK** (Kişisel Verilerin Korunması Kanunu) mevzuatlarına aykırıdır.
+
+`redact` eklentisi, hassas kart ve kimlik verilerinin log çıktılarında, ödeme olaylarında ve denetim izlerinde otomatik olarak maskelenmesini sağlar; bu esnada ödeme sağlayıcısına (sanal POS) iletilen orijinal ödeme isteğine kesinlikle dokunmaz.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { redact } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ apiKey: '...', secretKey: '...' }),
+  },
+  plugins: [
+    redact({
+      // Masking style for card numbers
+      card: 'first6last4', // e.g. 545454******5454
+      // More patterns to mask in string values (TCKN 11-digit numbers are always masked)
+      custom: [/\bTR\d{24}\b/g], // IBAN
+    }),
+  ],
+});
+
+// Event listeners receive masked data
+payment.on('payment.succeeded', (event) => {
+  // event.request.paymentCard.cardNumber === '545454******5454'
+  // event.request.paymentCard.cvc === '***'
+  // event.request.buyer.identityNumber === '<redacted>'
+  console.log('Payment completed for:', event.request);
+});
+```
+
+## Nasıl Çalışır? [#how-it-works]
+
+1. **Banka / Sağlayıcıya Değişmeden İletim**: Gerçek kart ve müşteri verileri doğrudan ödeme sağlayıcısına iletilir, ödeme akışında hiçbir kesinti veya hata oluşmaz.
+2. **Olay Yükü Maskeleme**: `after` kancasında, olay dinleyicilerine (`payment.succeeded`, `payment.failed` vb.) iletilen `request` ve `result` nesnelerinin kopyaları maskelenir. Çağrının döndürdüğü sonuç da maskelenmiş sonuçtur; yalnızca `paymentId`, `conversationId`, `threeDSHtmlContent`, `redirectUrl`, `checkoutFormContent`, `paymentPageUrl`, `token` ve `storedCard` sağlayıcının gönderdiği gibi kalır.
+3. **Logger Sarmalama**: `betterPayment({ logger })` ile bir logger yapılandırıldıysa, `debug`, `info` ve `error` metodları sarmalanarak loglanan tüm metin ve meta veriler hassas anahtarlara ve PAN desenlerine karşı filtrelenir.
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `fields` | — | Maskelenecek ek nesne anahtarları; her zaman maskelenen varsayılanlara (`cardNumber`, `cardHolderName`, `cvc`, `cvv`, `securityCode`, `expireMonth`, `expireYear`, `identityNumber`, `gsmNumber`, `phoneNumber`, `password`, sağlayıcı sırları...) eklenir |
+| `card` | `'first6last4'` | Kart maskeleme formatı: `'first6last4'`, `'last4'`, `'none'` veya özel `(pan) => string` |
+| `custom` | — | Metin içinde maskelenecek ek RegExp desenleri; yerleşik 11 haneli TCKN desenine eklenir |
+| `maskString` | `'<redacted>'` | Genel maskeleme metni |
+| `redactLogger` | `true` | Log çıktılarını otomatik maskelemek için yapılandırılmış logger'ı sarmalar |
+| `redactEvents` | `true` | Olay dinleyicilerine gitmeden önce olay yükünü maskeler |
+
+## Manuel Maskeleme Yardımcısı [#manual-redaction-helper]
+
+Eklenti, uygulama kodunuzda kullanabilmeniz için ödeme nesnesine bir `redact` alanı ekler:
+
+```typescript
+// Mask card number
+payment.redact.maskCard('5528790000000008');
+// => '552879******0008'
+
+// Mask arbitrary objects or logs
+const safeObject = payment.redact.mask({
+  orderId: 'ORD-1',
+  cardNumber: '5528790000000008',
+  cvc: '123',
+  identityNumber: '12345678901',
+});
+// => { orderId: 'ORD-1', cardNumber: '552879******0008', cvc: '***', identityNumber: '<redacted>' }
+```

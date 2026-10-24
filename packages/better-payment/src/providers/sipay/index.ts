@@ -3,6 +3,7 @@ import {
   withProviderDefaults,
   ProviderType,
   type ProviderDefinition,
+  type RemoteProviderType,
 } from '../../core/BetterPaymentConfig';
 import type { HttpClient, HttpResponse } from '../../core/http';
 import { PaymentProvider } from '../../core/PaymentProvider';
@@ -46,6 +47,7 @@ import {
   verifySipayPaymentHash,
 } from './utils';
 import type {
+  SipayBrand,
   SipayConfig,
   Sipay3DCallbackData,
   SipayOperationResponse,
@@ -77,11 +79,21 @@ class SipayTokenError extends BetterPaymentError {
   constructor(
     message: string,
     readonly statusCode: string | undefined,
-    readonly response: unknown
+    readonly response: unknown,
+    provider: string
   ) {
-    super(message, 'PROVIDER_ERROR', 'sipay');
+    super(message, 'PROVIDER_ERROR', provider);
   }
 }
+
+/**
+ * Payment institutions on Sipay's platform (the same ccpayment API on their own
+ * hosts): each brand's display name and provider id with default URLs
+ */
+const SIPAY_BRANDS: Record<SipayBrand, { name: string; type: RemoteProviderType }> = {
+  sipay: { name: 'Sipay', type: ProviderType.SIPAY },
+  qnbpay: { name: 'QNBpay', type: ProviderType.QNBPAY },
+};
 
 type SipayResult = SipayPaymentResult | SipayStatusResponse | SipayOperationResponse;
 
@@ -134,24 +146,36 @@ export class Sipay extends PaymentProvider<SipayConfig> {
   constructor(config: SipayConfig) {
     super(config);
 
-    this.client = this.createHttpClient('sipay', {
+    this.client = this.createHttpClient(this.providerId, {
       timeout: 30000,
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     });
   }
 
+  /** `brand` (default `sipay`): the institution and its provider id */
+  private get providerId(): SipayBrand {
+    return this.config.brand ?? 'sipay';
+  }
+
+  private get providerName(): string {
+    return SIPAY_BRANDS[this.providerId]?.name ?? 'Sipay';
+  }
+
   protected validateConfig(): void {
+    if (!SIPAY_BRANDS[this.providerId]) {
+      throw new ConfigurationError(`Unknown Sipay brand: ${this.config.brand}`, 'sipay');
+    }
     const missing = (['appId', 'appSecret', 'merchantKey'] as const).filter(
       (key) => !this.config[key]
     );
     if (missing.length > 0) {
       throw new ConfigurationError(
-        `Sipay configuration is missing: ${missing.join(', ')}`,
-        'sipay'
+        `${this.providerName} configuration is missing: ${missing.join(', ')}`,
+        this.providerId
       );
     }
     if (!this.config.baseUrl) {
-      throw new ConfigurationError('Sipay baseUrl is required', 'sipay');
+      throw new ConfigurationError(`${this.providerName} baseUrl is required`, this.providerId);
     }
   }
 
@@ -225,7 +249,7 @@ export class Sipay extends PaymentProvider<SipayConfig> {
         ...extra,
       } as T);
     }
-    return this.withErrorCode(failureResult<T>('Sipay', error, fallback, extra));
+    return this.withErrorCode(failureResult<T>(this.providerName, error, fallback, extra));
   }
 
   /** errorCode / errorMessage of a failed result: the bank's code first, then Sipay's */
@@ -277,9 +301,10 @@ export class Sipay extends PaymentProvider<SipayConfig> {
     const value = data.data?.token;
     if (!value) {
       throw new SipayTokenError(
-        `Sipay did not issue a token: ${data.status_description || 'unknown error'}`,
+        `${this.providerName} did not issue a token: ${data.status_description || 'unknown error'}`,
         nonEmpty(data.status_code),
-        data
+        data,
+        this.providerId
       );
     }
     this.token = { value, expiresAt: Date.now() + TOKEN_LIFETIME_MS };
@@ -446,7 +471,7 @@ export class Sipay extends PaymentProvider<SipayConfig> {
         responseType: 'text',
       });
       const html = typeof data === 'string' ? data : JSON.stringify(data ?? '');
-      const rejection = Sipay.rejectionOf(html);
+      const rejection = Sipay.rejectionOf(html, this.providerName);
 
       if (rejection) {
         return this.withErrorCode({
@@ -473,15 +498,15 @@ export class Sipay extends PaymentProvider<SipayConfig> {
   }
 
   /** The error of a rejected paySmart3D request, or undefined for a 3D Secure page */
-  private static rejectionOf(body: string): SipayResult | undefined {
+  private static rejectionOf(body: string, name: string): SipayResult | undefined {
     const text = body.trim();
-    if (!text) return { status_description: 'Sipay returned an empty response' };
+    if (!text) return { status_description: `${name} returned an empty response` };
     if (text.startsWith('{')) {
       try {
         const json = JSON.parse(text) as SipayPaymentResponse;
         return { ...json, ...(json.data ?? {}) } as SipayResult;
       } catch {
-        return { status_description: 'Sipay returned an invalid response' };
+        return { status_description: `${name} returned an invalid response` };
       }
     }
     const fields = parseSipayForm(text);
@@ -514,8 +539,8 @@ export class Sipay extends PaymentProvider<SipayConfig> {
         status: PaymentStatus.FAILURE,
         errorCode: 'INVALID_HASH',
         errorMessage: verified
-          ? 'The callback does not match its Sipay hash key'
-          : 'The Sipay hash key is missing or invalid',
+          ? `The callback does not match its ${this.providerName} hash key`
+          : `The ${this.providerName} hash key is missing or invalid`,
         rawResponse: callbackData,
       });
     }
@@ -645,7 +670,7 @@ export class Sipay extends PaymentProvider<SipayConfig> {
           ...(isSuccessCode(payment.status_code)
             ? {
                 errorCode: 'NOT_CANCELLABLE',
-                errorMessage: `Sipay payment ${request.paymentId} is ${payment.transaction_status ?? 'not cancellable'}`,
+                errorMessage: `${this.providerName} payment ${request.paymentId} is ${payment.transaction_status ?? 'not cancellable'}`,
               }
             : {}),
           rawResponse: payment,
@@ -741,7 +766,7 @@ export class Sipay extends PaymentProvider<SipayConfig> {
           ...(isSuccessCode(payment.status_code)
             ? {
                 errorCode: 'NOT_CANCELLABLE',
-                errorMessage: `Sipay payment ${request.paymentId} is not an open pre-authorization`,
+                errorMessage: `${this.providerName} payment ${request.paymentId} is not an open pre-authorization`,
               }
             : {}),
           rawResponse: payment,
@@ -773,9 +798,9 @@ export class Sipay extends PaymentProvider<SipayConfig> {
     );
     if (!isSuccessCode(data?.status_code) || !Array.isArray(data.data) || !data.data.length) {
       throw new BetterPaymentError(
-        `Sipay getpos failed: ${data?.status_description || 'no installment options'}`,
+        `${this.providerName} getpos failed: ${data?.status_description || 'no installment options'}`,
         'PROVIDER_ERROR',
-        'sipay'
+        this.providerId
       );
     }
     return data.data;
@@ -853,7 +878,20 @@ export class Sipay extends PaymentProvider<SipayConfig> {
 /**
  * The Sipay provider, for
  * `betterPayment({ providers: { sipay: sipay({ appId, appSecret, merchantKey }) } })`.
- * The base URL follows `mode` unless `baseUrl` is set.
+ * `brand` selects another institution on Sipay's platform (`qnbpay`). The base
+ * URL follows `mode` unless `baseUrl` is set.
  */
 export const sipay = (config: SipayConfig): ProviderDefinition<Sipay> =>
-  defineProvider((ctx) => new Sipay(withProviderDefaults(ProviderType.SIPAY, config, ctx)));
+  defineProvider((ctx) => {
+    const type = SIPAY_BRANDS[config.brand ?? 'sipay']?.type;
+    if (type) return new Sipay(withProviderDefaults(type, config, ctx));
+    // Unknown brand: validateConfig reports it
+    return new Sipay({ ...withProviderDefaults(ProviderType.SIPAY, config, ctx) });
+  });
+
+/**
+ * QNBpay, on Sipay's platform:
+ * `betterPayment({ providers: { qnbpay: qnbpay({ appId, appSecret, merchantKey }) } })`.
+ */
+export const qnbpay = (config: Omit<SipayConfig, 'brand'>): ProviderDefinition<Sipay> =>
+  sipay({ ...config, brand: 'qnbpay' });

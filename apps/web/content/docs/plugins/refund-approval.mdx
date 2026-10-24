@@ -1,0 +1,87 @@
+---
+title: Refund Approval Workflow
+description: Hold refunds and cancellations above a monetary threshold until reviewed and approved by an authorized manager.
+---
+
+<Since version="0.12.0" />
+
+Refunds move money out of your business. In many organizations, customer support agents or automated systems should only initiate refunds up to a safe limit, while larger refunds must be reviewed and approved by finance or team managers.
+
+The `refundApproval` plugin intercepts refunds and cancellations above a specified threshold, saves them to a pending queue, and requires an authorized teammate to approve or reject them. Requesters are strictly prevented from approving their own refunds (separation of duties).
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { refundApproval } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    refundApproval({
+      threshold: 1000, // Refunds over 1,000 TRY require approval
+      approvers: (user) => user.role === 'finance' || user.role === 'manager',
+      notify: async (req) => {
+        await sendSlackAlert(`Refund of ${req.amount} ${req.currency} requires approval: ${req.id}`);
+      },
+    }),
+  ],
+});
+```
+
+## How It Works
+
+1. **Below threshold**: Refunds below or equal to `threshold` execute immediately on the provider. An amount that cannot be read strictly (`'1,500.00'`, `'abc'`) waits for approval.
+2. **Cancellations**: A cancel request carries no amount, so every cancellation waits for approval unless `cancelAmount` returns the payment's amount from your own records and it is within `threshold`.
+3. **Above threshold**: Intercepted by a `before` hook. Returns `status: 'pending'` with code `REFUND_APPROVAL_REQUIRED` and an `approvalId`.
+4. **Approval**: An authorized teammate calls `payment.refunds.approve(id, { by: user })`. The plugin checks permissions and executes the refund on the provider. Approving the same request twice refunds once.
+5. **Rejection**: Calling `payment.refunds.reject(id, { by: user, reason })` drops the refund without touching the provider.
+
+```typescript
+// Review pending refunds
+const pending = await payment.refunds.list({ status: 'pending' });
+
+// Approve a refund (executed by finance manager)
+await payment.refunds.approve(approvalId, {
+  by: { id: 'usr_finance_1', role: 'finance' },
+});
+
+// Reject a refund
+await payment.refunds.reject(approvalId, {
+  by: { id: 'usr_finance_1', role: 'finance' },
+  reason: 'Product return inspection failed',
+});
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `threshold` | *(required)* | Monetary limit above which refunds require approval |
+| `store` | `MemoryRefundApprovalStore` | Storage backend for pending approvals (`RefundApprovalStore`) |
+| `approvers` | Any user except requester | Function validating whether user has approval rights |
+| `notify` | — | Callback triggered when a new approval request is created |
+| `getActor` | — | Resolves the signed-in user of an HTTP request (session or token). Required by the approve and reject endpoints |
+| `cancelAmount` | — | `(request, provider) => amount` of the payment a cancellation voids, from your own records |
+
+Set `requestedBy` on the refund request on your server, from the signed-in user, not from what the client sent: the self-approval check compares it with the approver.
+
+## HTTP Endpoints
+
+The plugin provides privileged endpoints for approval dashboards and admin tools:
+
+- `GET /api/pay/refunds/pending`: Lists pending approval requests.
+- `POST /api/pay/refunds/approve`: Body `{ id }`.
+- `POST /api/pay/refunds/reject`: Body `{ id, reason }`.
+
+The approver is always the user `getActor` returns for the request, never a value in the body. Without `getActor` the approve and reject endpoints answer `403`. A refused approval (self-approval, a user `approvers` rejects) answers `403`, an unknown or already handled request `400`.
+
+```typescript
+refundApproval({
+  threshold: 1000,
+  approvers: (user) => user.role === 'finance',
+  getActor: async (request) => (await getSession(request.headers))?.user,
+});
+```

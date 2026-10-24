@@ -1,0 +1,120 @@
+---
+title: Webhook Forwarding
+description: Forward payment events to other microservices as HMAC-SHA256 signed webhooks.
+---
+
+<Since version="0.12.0" />
+
+Applications often need to notify external services (order fulfilment, inventory systems, ERPs, CRM platforms) about payment events. Writing bespoke webhook sending, HMAC signing, retry and delivery logic in every app is repetitive and error-prone.
+
+The `webhookForwarding` plugin turns [payment events](/docs/concepts/events) into signed JSON webhooks with HMAC-SHA256 signatures, exponential backoff retries, and sensitive card data sanitization. Slow or unreachable webhook targets run asynchronously and will never block or fail the primary payment.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { webhookForwarding } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    webhookForwarding({
+      endpoints: [
+        {
+          url: 'https://orders.myshop.com/webhooks/payments',
+          secret: process.env.ORDERS_WEBHOOK_SECRET!,
+          events: ['payment.succeeded', 'refund.succeeded'],
+        },
+        {
+          url: 'https://analytics.myshop.com/webhooks/all-events',
+          secret: process.env.ANALYTICS_WEBHOOK_SECRET!,
+          events: ['*'], // all payment events
+        },
+      ],
+      retry: {
+        attempts: 3,
+        delay: 1000,
+      },
+    }),
+  ],
+});
+```
+
+## Payload structure
+
+Each HTTP `POST` request carries a JSON payload with event details and the sanitized operation result:
+
+```json
+{
+  "event": "payment.succeeded",
+  "timestamp": 1729267200000,
+  "provider": "iyzico",
+  "operation": "createPayment",
+  "paymentId": "12345678",
+  "conversationId": "order-1001",
+  "amount": "150.00",
+  "currency": "TRY",
+  "result": {
+    "status": "success",
+    "paymentId": "12345678",
+    "price": "150.00",
+    "paidPrice": "150.00"
+  }
+}
+```
+
+Card numbers, CVVs, and sensitive cardholder details are automatically stripped before sending.
+
+## Verifying webhooks on the receiver
+
+Each request includes the HMAC-SHA256 signature in the `x-signature` and `x-better-payment-signature` headers, plus `x-signature-timestamp`.
+
+Receivers can verify the payload using `verifyForwardedWebhook`:
+
+```typescript
+import { verifyForwardedWebhook } from 'better-payment/plugins';
+
+// In your Express / Next.js / Hono handler:
+export async function POST(req: Request) {
+  const signature = req.headers.get('x-signature')!;
+  const rawBody = await req.text();
+
+  const isValid = await verifyForwardedWebhook(
+    rawBody,
+    signature,
+    process.env.ORDERS_WEBHOOK_SECRET!
+  );
+
+  if (!isValid) {
+    return new Response('Invalid webhook signature', { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+  console.log(`Received event: ${payload.event} for payment ${payload.paymentId}`);
+
+  return new Response('OK', { status: 200 });
+}
+```
+
+## Options
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `endpoints` | — | List of target webhooks with `url`, `secret`, and `events` |
+| `retry` | `{ attempts: 3, delay: 1000 }` | Retry attempts and base delay (ms) with exponential backoff |
+| `timeout` | `10000` | HTTP request timeout in milliseconds |
+| `fetch` | global `fetch` | Custom fetch implementation |
+| `onError` | logger | `(error, endpoint, payload) => void` called on delivery failures |
+| `waitUntil` | — | Extends serverless runtime lifetime (e.g. Vercel `waitUntil` or Cloudflare `ctx.waitUntil`) |
+
+## Endpoint configuration
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `url` | `string` | The target destination URL |
+| `secret` | `string` | Shared HMAC secret key |
+| `events` | `(PaymentEventType \| '*')[]` | Events forwarded to this endpoint. Defaults to `['*']` |
+| `headers` | `Record<string, string>` | Custom headers attached to outgoing requests |
+| `retry` | `{ attempts?: number, delay?: number }` | Override retry policy for this specific endpoint |

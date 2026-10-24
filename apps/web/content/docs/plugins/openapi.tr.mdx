@@ -1,0 +1,123 @@
+---
+title: OpenAPI ve Scalar Referansı
+description: Ödeme handler endpoint'leri için OpenAPI 3.1 şema üreticisi ve etkileşimli Scalar API dokümantasyonu.
+---
+
+<Since version="0.12.0" />
+
+Frontend geliştiricileri, mobil ekipler ve entegrasyon paydaşları, ödeme servisinin hangi rotaları sunduğunu, hangi istek gövdelerini kabul ettiğini ve nasıl yanıtlar döndüğünü bilmek ister.
+
+`openAPI` eklentisi; tanımlı tüm sağlayıcıları, çekirdek handler rotalarını ve aktif plugin endpoint'lerini otomatik olarak tarayarak iki şey sunar:
+1. `${path}/openapi.json` adresinde geçerli bir **OpenAPI 3.1.0** şema dokümanı.
+2. `${path}` adresinde çalışan hızlı ve etkileşimli bir **Scalar API Reference** dokümantasyon sayfası.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico, paytr } from 'better-payment';
+import { openAPI } from 'better-payment/plugins';
+
+const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+    paytr: paytr({ /* ... */ }),
+  },
+  plugins: [
+    openAPI({
+      path: '/reference', // serves /api/pay/reference and /api/pay/reference/openapi.json
+      info: {
+        title: 'Checkout Payment API',
+        version: '1.0.0',
+        description: 'Interactive API reference for web and mobile checkout endpoints',
+      },
+    }),
+  ],
+});
+```
+
+## Sunulan Rotalar [#served-routes]
+
+Varsayılan handler taban yolu `/api/pay` olduğunda:
+
+| Rota | Metot | Açıklama |
+| ---- | ----- | -------- |
+| `/api/pay/reference` | `GET` | Etkileşimli Scalar API dokümantasyon sayfası |
+| `/api/pay/reference/openapi.json` | `GET` | Ham OpenAPI 3.1.0 JSON spesifikasyonu |
+
+## Dokümante Edilen Çekirdek Uç Noktalar [#documented-core-endpoints]
+
+Şema yalnızca handler'ınızın sunduğu rotaları listeler: `handler.allowedActions` içindeki aksiyonlar (varsayılan olarak `payment/complete-3ds`, `callback`, `installment` ve `bin-check`) ve `GET /health`; `servers` girdisi handler'ın `basePath` değeridir. Başka aksiyonları açtığınızda onlar da görünür. `authorize` hook'u gerektiren rotalar `security: [{ bearerAuth: [] }]` ile işaretlenir. Tüm liste şöyledir:
+- **Ödemeler:** `POST /{provider}/payment`, `POST /{provider}/payment/init-3ds`, `POST /{provider}/payment/complete-3ds`, `GET /{provider}/payment/{paymentId}`
+- **Geri Bildirimler:** `POST /{provider}/callback`
+- **İade ve İptal:** `POST /{provider}/refund`, `POST /{provider}/cancel` (Bearer yetkilendirme işaretli)
+- **Ön Provizyon:** `POST /{provider}/authorize`, `POST /{provider}/authorize/init-3ds`, `POST /{provider}/capture`, `POST /{provider}/void`
+- **Kartlar ve BIN Sorgusu:** `POST /{provider}/cards/save`, `POST /{provider}/cards/list`, `POST /{provider}/cards/delete`, `POST /{provider}/bin-check`
+- **Taksit Tablosu:** `POST /{provider}/installment`
+- **Sistem Kontrolü:** `GET /health`
+
+## Canlı ortam ve erişim [#production-and-access]
+
+Referans `mode: 'production'` içinde kapalıdır: `disabled: false` vermediğiniz sürece iki rota da 404 döner. `mode: 'sandbox'` içinde `disabled: true` vermediğiniz sürece açıktır. Canlı ortamda yalnızca kendi ekibinize göstermek için `privileged: true` verin. Rotalar bu durumda handler'ın `authorize` hook'undan geçer ve hook zorunlu olur:
+
+```typescript
+const payment = betterPayment({
+  mode: 'production',
+  providers: { /* ... */ },
+  plugins: [openAPI({ disabled: false, privileged: true })],
+  handler: {
+    authorize: (ctx) => ctx.request.headers.authorization === `Bearer ${process.env.DOCS_TOKEN}`,
+  },
+});
+```
+
+## Özel Eklenti (Plugin) Uç Noktalarını Dokümante Etme [#documenting-custom-plugin-endpoints]
+
+Tüm resmi veya özel eklentiler kendi endpoint'lerine `openapi` metadatası ekleyebilir:
+
+```typescript
+import { definePlugin } from 'better-payment';
+
+const inventoryPlugin = definePlugin({
+  id: 'inventory',
+  endpoints: {
+    checkStock: {
+      method: 'GET',
+      path: '/inventory/check',
+      privileged: true,
+      openapi: {
+        summary: 'Check product availability',
+        description: 'Queries warehouse stock before initializing checkout',
+        tags: ['Inventory'],
+      },
+      handler: async (ctx) => {
+        return { available: true };
+      },
+    },
+  },
+});
+```
+
+Yetkili endpoint'ler (`privileged: true`) otomatik olarak `security: [{ bearerAuth: [] }]` ile işaretlenir.
+
+## Scalar betiği [#the-scalar-script]
+
+Referans sayfası `@scalar/api-reference` betiğini jsDelivr'den sabit bir sürümle yükler; yeni bir Scalar sürümü, `better-payment` yayınlanmadan müşteri alan adındaki sayfayı değiştiremez. Başka bir sürüm sabitlemek veya betiği kendi sunucunuzdan vermek için `scalarScriptUrl` kullanın:
+
+```typescript
+openAPI({
+  path: '/reference',
+  scalarScriptUrl: '/assets/scalar/api-reference.js', // self-hosted, no CDN
+});
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Varsayılan | Açıklama |
+| ------- | ---------- | -------- |
+| `path` | `'/reference'` | Handler taban yoluna göre dokümantasyon yolu |
+| `info.title` | `'Better Payment API'` | OpenAPI şemasında ve sayfa başlığında gösterilecek ad |
+| `info.version` | `'1.0.0'` | API sürüm numarası |
+| `info.description` | — | Dokümantasyon açıklaması |
+| `disabled` | `mode: 'production'` içinde `true`, `mode: 'sandbox'` içinde `false` | `true` olduğunda iki rota da 404 döner |
+| `privileged` | `false` | `true` olduğunda iki rota handler'ın `authorize` hook'undan geçer; hook zorunlu olur |
+| `scalarScriptUrl` | sabit jsDelivr adresi | Scalar referans arayüzü betiğinin adresi; CDN'i tamamen kaldırmak için kendi betik adresinizi verin |

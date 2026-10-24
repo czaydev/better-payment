@@ -175,11 +175,18 @@ export async function verifyPayTRCallback(
 }
 
 /**
- * user_basket: base64(JSON([[name, "unit price in TL", quantity], ...]))
+ * iFrame API user_basket: base64(JSON([[name, "unit price in TL", quantity], ...]))
  */
 export function formatPayTRBasket(items: PayTRBasketItem[]): string {
+  return toBase64(formatPayTRDirectBasket(items));
+}
+
+/**
+ * Direct API user_basket: JSON only; URL/HTML escaping is handled by the transport.
+ */
+export function formatPayTRDirectBasket(items: PayTRBasketItem[]): string {
   const basket = items.map((item) => [item.name, formatPayTRAmount(item.price), item.quantity]);
-  return toBase64(JSON.stringify(basket));
+  return JSON.stringify(basket);
 }
 
 /**

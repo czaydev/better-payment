@@ -9,6 +9,7 @@ import { ProviderNotEnabledError, ConfigurationError } from './errors';
 import {
   BetterPaymentHandler,
   type BetterPaymentHandlerOptions,
+  type BetterPaymentRequest,
   type BetterPaymentResponse,
 } from './BetterPaymentHandler';
 import {
@@ -16,11 +17,13 @@ import {
   type AfterHook,
   type BeforeHook,
   type BetterPaymentPlugin,
+  type EndpointInfo,
   type OperationContext,
   type PaymentEndpoint,
   type PaymentOperation,
   type PaymentOperations,
   type PluginContext,
+  type RequestContext,
   type ResponseContext,
 } from './plugin';
 import {
@@ -59,6 +62,18 @@ export interface RegisteredEndpoint extends PaymentEndpoint {
   name: string;
 }
 
+/** A frozen copy of an endpoint without its handler, for other plugins */
+function endpointInfo(endpoint: RegisteredEndpoint): EndpointInfo {
+  return Object.freeze({
+    pluginId: endpoint.pluginId,
+    name: endpoint.name,
+    method: endpoint.method,
+    path: endpoint.path,
+    privileged: endpoint.privileged === true,
+    openapi: endpoint.openapi,
+  });
+}
+
 /** @internal Options of `run()` */
 interface RunOptions {
   routable: boolean;
@@ -82,6 +97,10 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   private readonly plugins: readonly BetterPaymentPlugin[];
   private readonly beforeHooks: BeforeHook[] = [];
   private readonly afterHooks: AfterHook[] = [];
+  private readonly requestHooks: {
+    pluginId: string;
+    hook: NonNullable<BetterPaymentPlugin['onRequest']>;
+  }[] = [];
   private readonly responseHooks: {
     pluginId: string;
     hook: NonNullable<BetterPaymentPlugin['onResponse']>;
@@ -133,6 +152,7 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
     }
     this.defaultProviderId = options.defaultProvider ?? (ids.length === 1 ? ids[0] : undefined);
 
+    const endpoints = this.endpoints;
     this.context = {
       providerIds: ids,
       errorCodes: this.$ERROR_CODES,
@@ -140,6 +160,10 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
       mode,
       logger: options.logger,
       use: (id) => this.use(id),
+      emit: (event) => this.emitEvent(event),
+      get endpoints() {
+        return endpoints.map(endpointInfo);
+      },
     };
 
     const pluginIds = new Set<string>();
@@ -153,6 +177,7 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
       pluginIds.add(plugin.id);
       this.beforeHooks.push(...(plugin.hooks?.before ?? []));
       this.afterHooks.push(...(plugin.hooks?.after ?? []));
+      if (plugin.onRequest) this.requestHooks.push({ pluginId: plugin.id, hook: plugin.onRequest });
       if (plugin.onResponse)
         this.responseHooks.push({ pluginId: plugin.id, hook: plugin.onResponse });
       for (const [type, listener] of Object.entries(plugin.events ?? {})) {
@@ -254,7 +279,13 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
     for (const hook of this.afterHooks) {
       if (hook.matcher && !hook.matcher(after)) continue;
       const out = await hook.handler(after);
-      if (out) after = { ...after, result: out.result } as typeof after;
+      if (out) {
+        after = {
+          ...after,
+          ...(out.result !== undefined ? { result: out.result } : {}),
+          ...(out.request !== undefined ? { request: out.request } : {}),
+        } as typeof after;
+      }
     }
 
     if (emit) await this.emit(operation, after.provider, after.request, after.result);
@@ -273,6 +304,21 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
     return provider;
   }
 
+  /** @internal Emits an event to registered listeners */
+  async emitEvent(event: PaymentEvent): Promise<void> {
+    const listeners = [
+      ...(this.listeners.get(event.type) ?? []),
+      ...(this.listeners.get('*') ?? []),
+    ];
+    for (const listener of listeners) {
+      try {
+        await listener(event);
+      } catch (cause) {
+        throw new EventListenerError(event, event.result, cause);
+      }
+    }
+  }
+
   /** @internal Emits the event of an operation result, if it has one */
   async emit(
     operation: PaymentOperation,
@@ -282,17 +328,36 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   ): Promise<void> {
     const event = eventFor(operation, provider, request, result);
     if (!event) return;
-    const listeners = [
-      ...(this.listeners.get(event.type) ?? []),
-      ...(this.listeners.get('*') ?? []),
-    ];
-    for (const listener of listeners) {
+    await this.emitEvent(event);
+  }
+
+  /** @internal Runs the plugins' onRequest hooks on an incoming handler request */
+  async interceptRequest(
+    request: BetterPaymentRequest,
+    ctx: RequestContext
+  ): Promise<BetterPaymentResponse | undefined> {
+    for (const { pluginId, hook } of this.requestHooks) {
       try {
-        await listener(event);
-      } catch (cause) {
-        throw new EventListenerError(event, result, cause);
+        const response = await hook(request, ctx);
+        if (response) return response;
+      } catch (error) {
+        this.context.logger?.error(
+          `onRequest of plugin '${pluginId}' failed`,
+          error instanceof Error ? error : new Error(String(error))
+        );
+        // Fail closed: the hook is a guard (rate limit, IP filter) that could not decide
+        return {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+          body: {
+            error: true,
+            message: 'Service unavailable',
+            timestamp: new Date().toISOString(),
+          },
+        };
       }
     }
+    return undefined;
   }
 
   /** @internal Runs the plugins' onResponse hooks on a handler response */

@@ -1,13 +1,13 @@
 import { getPosts, postSlug } from "@/lib/blog";
 import { resolveAuthors } from "@/lib/authors";
-import { SITE_URL, isLocale, localePath } from "@/lib/i18n/config";
+import { LOCALES, SITE_URL, isLocale, localePath } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
 const escape = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function generateStaticParams() {
-  return [{ lang: "en" }, { lang: "tr" }];
+  return LOCALES.map((lang) => ({ lang }));
 }
 
 export async function GET(_request: Request, ctx: RouteContext<"/[lang]/blog/rss.xml">) {

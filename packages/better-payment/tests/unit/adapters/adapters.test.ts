@@ -18,6 +18,7 @@ import { toNextJsHandler } from 'better-payment/next';
 import { toExpressHandler, toNodeHandler } from 'better-payment/express';
 import { toHonoHandler } from 'better-payment/hono';
 import { toFastifyPlugin } from 'better-payment/fastify';
+import { toNestHandler } from 'better-payment/nestjs';
 import { toElysiaHandler } from 'better-payment/elysia';
 import { toReactRouterHandler } from 'better-payment/react-router';
 import { mockPaymentRequest } from '../../fixtures/payment-data';
@@ -150,6 +151,42 @@ const adapters: Record<string, () => Promise<Send>> = {
     return listen(createServer(app));
   },
   'node:http (toNodeHandler)': async () => listen(createServer(toNodeHandler(createPayment()))),
+  // A platform-express controller: `@All('*')` calling the adapter with the injected
+  // Express req/res — exactly what a Nest `@Controller()` wildcard route does.
+  'NestJS (platform-express)': async () => {
+    const handler = toNestHandler(createPayment());
+    const app = express();
+    app.all('/api/pay/*path', (req, res, next) => handler(req, res, next));
+    return listen(createServer(app));
+  },
+  // A platform-fastify controller: the adapter with the injected Fastify req/reply.
+  // The raw form-urlencoded callbacks reach the handler because the parser keeps them
+  // as text, like better-payment/fastify does.
+  'NestJS (platform-fastify)': async () => {
+    const handler = toNestHandler(createPayment());
+    const app = Fastify();
+    app.addContentTypeParser(
+      'application/x-www-form-urlencoded',
+      { parseAs: 'string' },
+      (_request, body: string, done) => done(null, body)
+    );
+    app.all('/api/pay/', async (request, reply) => handler(request, reply));
+    app.all('/api/pay/*', async (request, reply) => handler(request, reply));
+    await app.ready();
+    return async (method, path, body, contentType) => {
+      const res = await app.inject({
+        method: method as 'GET' | 'POST',
+        url: path,
+        payload: body,
+        headers: contentType ? { 'content-type': contentType } : {},
+      });
+      return {
+        status: res.statusCode,
+        headers: Object.fromEntries(Object.entries(res.headers).map(([k, v]) => [k, String(v)])),
+        text: res.body,
+      };
+    };
+  },
 };
 
 const FORM = 'application/x-www-form-urlencoded';
@@ -228,6 +265,12 @@ describe.each(Object.entries(adapters))('%s', (_name, create) => {
     const health = await send('GET', '/api/pay/health');
     expect(health.status).toBe(200);
     expect(JSON.parse(health.text)).toMatchObject({ status: 'ok' });
+  });
+
+  it('answers 404 for an unknown sub-path, like every other adapter', async () => {
+    const res = await send('GET', '/api/pay/unknown-provider/payment');
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.text)).toMatchObject({ error: true });
   });
 });
 

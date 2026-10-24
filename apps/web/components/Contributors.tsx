@@ -5,12 +5,13 @@ import { GitHubIcon } from "@/components/icons";
 import { contributors } from "@/lib/contributors";
 import { buttonVariants } from "@/lib/button-variants";
 import type { Dictionary } from "@/lib/i18n/dictionary";
-import type { Locale } from "@/lib/i18n/config";
+import { hasContribGuide, type Locale } from "@/lib/i18n/config";
 
 const repository = "https://github.com/czaydev/better-payment";
 
 export default function Contributors({ lang, t }: { lang: Locale; t: Dictionary["contributors"] }) {
-  const guide = `${repository}/blob/main/CONTRIBUTING${lang === "tr" ? ".tr" : ""}.md`;
+  // Only languages with their own CONTRIBUTING.<code>.md in the registry link to it
+  const guide = `${repository}/blob/main/CONTRIBUTING${hasContribGuide(lang) ? `.${lang}` : ""}.md`;
   return (
     <section id="contribute" className="scroll-mt-24 border-y border-border bg-card px-5 py-24 sm:px-8 md:py-28">
       <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20">

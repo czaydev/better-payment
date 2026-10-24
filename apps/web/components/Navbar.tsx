@@ -8,7 +8,7 @@ import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  AlertTriangle, ArrowUpRight, Bell, BookOpen, Box, Building2, Bug, ChevronDown, ChevronRight, Clock, Code2,
+  AlertTriangle, ArrowUpRight, Bell, BookOpen, Box, Building2, Bug, Check, ChevronDown, ChevronRight, Clock, Code2,
   CreditCard, Download, FlaskConical, Globe, Layers, Lock, Menu, Package, PenLine, Plug, Puzzle, Rocket, Route, Settings,
   Shield, ShoppingBasket, Sparkles, Wallet, X, type LucideIcon,
 } from "lucide-react";
@@ -16,7 +16,7 @@ import { GitHubIcon } from "@/components/icons";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
-import { LOCALE_NAMES, localePath, type Locale } from "@/lib/i18n/config";
+import { LOCALES, localeName, localePath, type Locale } from "@/lib/i18n/config";
 import { switchLocale, switchLocalePath } from "@/lib/i18n/switch";
 import { withBasePath } from "@/lib/base-path";
 import { GITHUB_URL, MENU_KEYS, menus, type MenuIcon, type MenuKey } from "@/lib/nav-menu";
@@ -31,29 +31,81 @@ const icons: Record<MenuIcon, LucideIcon | typeof GitHubIcon> = {
   package: Package, settings: Settings, building: Building2, bug: Bug, box: Box, pen: PenLine,
 };
 
-/** Switches the language and stays on the same page */
-function LanguageSwitch({ lang, label }: { lang: Locale; label: string }) {
+/** Menu of every supported language; switches to the same page in the chosen one */
+function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
   const pathname = usePathname();
-  const other: Locale = lang === "tr" ? "en" : "tr";
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (root.current && !root.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const menuItems = LOCALES.map((target) => {
+    const current = target === lang;
+    return (
+      <Link
+        key={target}
+        href={switchLocalePath(target, pathname)}
+        hrefLang={target}
+        aria-current={current ? "true" : undefined}
+        // Not prefetched: the other language is opened with a full load (see switchLocale)
+        prefetch={false}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          setOpen(false);
+          if (current) return;
+          switchLocale(target, pathname);
+        }}
+        className={cn(
+          "flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+          current ? "text-foreground bg-accent/50" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+        )}
+      >
+        <span className="font-mono uppercase">{target}</span>
+        <span>{localeName(target, lang)}</span>
+        {current && <Check className="size-3.5 shrink-0 text-primary" />}
+      </Link>
+    );
+  });
+
   return (
-    <Link
-      href={switchLocalePath(other, pathname)}
-      hrefLang={other}
-      // Not prefetched: the other language is opened with a full load (see switchLocale)
-      prefetch={false}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-        event.preventDefault();
-        switchLocale(other, pathname);
-      }}
-      aria-label={`${label}: ${LOCALE_NAMES[other]}`}
-      className={cn(
-        buttonVariants({ variant: "ghost", size: "sm" }),
-        "text-muted-foreground hover:text-foreground h-8 px-2.5 text-xs font-medium font-mono uppercase",
+    <div ref={root} className="relative">
+      <button
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "text-muted-foreground hover:text-foreground h-8 gap-1 px-2 text-xs font-medium font-mono uppercase"
+        )}
+      >
+        <Globe className="size-3.5" />
+        {lang}
+        <ChevronDown className={cn("size-3 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute top-full end-0 z-50 mt-1 min-w-40 rounded-lg border border-border bg-card p-1 shadow-[0_18px_40px_-18px_var(--bp-shadow)]"
+        >
+          {menuItems}
+        </div>
       )}
-    >
-      {other}
-    </Link>
+    </div>
   );
 }
 
@@ -249,7 +301,7 @@ export default function Navbar({
         {/* Desktop actions */}
         <div className="hidden flex-1 items-center justify-end gap-1.5 pl-6 lg:flex" onMouseEnter={hideSoon}>
           <ThemeToggle label={t.theme} />
-          <LanguageSwitch lang={lang} label={t.language} />
+          <LanguageMenu lang={lang} label={t.language} />
           <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
           <a
             href={GITHUB_URL}
@@ -350,7 +402,7 @@ export default function Navbar({
           <Separator className="my-1.5" />
           <div className="flex gap-2 pt-2 pb-1">
             <ThemeToggle label={t.theme} className="h-9 shrink-0" />
-            <LanguageSwitch lang={lang} label={t.language} />
+            <LanguageMenu lang={lang} label={t.language} />
             <a
               href={GITHUB_URL}
               target="_blank"

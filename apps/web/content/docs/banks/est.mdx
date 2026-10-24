@@ -14,6 +14,15 @@ uses the same shared test host. Each bank has its own page with examples:
 | [Şekerbank (EST)](/docs/banks/sekerbank) | `sekerbank` | `https://sanalpos.sekerbank.com.tr` |
 | [TEB (EST)](/docs/banks/teb) | `teb` | `https://sanalpos.teb.com.tr` |
 | [Ziraat Bankası (EST)](/docs/banks/ziraat) | `ziraat` | `https://sanalpos2.ziraatbank.com.tr` |
+| Akbank (older virtual POS) | `akbankest` | `https://www.sanalakpos.com` |
+| Halkbank Macedonia | `halkbankmkd` | `https://epay.halkbank.mk` |
+
+<Since version="0.12.0" />
+
+`akbankest` is for merchants still on Akbank's older EST virtual POS (sanalakpos.com); Akbank's
+newer JSON API is the separate [`akbank`](/docs/banks/akbank) provider. `halkbankmkd` is Halkbank
+Macedonia (Halk Banka AD Skopje); send `currency: 'MKD'` for Macedonian denars (sent as `807`).
+Both hosts answered the XML API (for a made-up store) but have not been tried with a real store.
 
 ## Several EST banks in one app
 
@@ -40,3 +49,57 @@ const payment = betterPayment({
 
 await payment.ziraat.createPayment(request);
 ```
+
+## Girogate
+
+<Since version="0.12.0" />
+
+Girogate adds alternative payment methods to the EST gate, such as iDEAL (Netherlands), Sofort,
+giropay, EPS, Bancontact, Przelewy24, Trustly, Multibanco, Boleto and Alipay. The bank enables it
+per store, with the methods your agreement covers. Pass `girogate` instead of a card; the store type
+must be `3d_pay` or `3d_pay_hosting`, because the bank collects the payment:
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    isbank: est({
+      bank: 'isbank',
+      clientId: process.env.ISBANK_CLIENT_ID!,
+      username: process.env.ISBANK_API_USER!,
+      password: process.env.ISBANK_API_PASSWORD!,
+      storeKey: process.env.ISBANK_STORE_KEY!,
+      storeType: '3d_pay', // or '3d_pay_hosting'
+    }),
+  },
+});
+
+const init = await payment.isbank.initThreeDSPayment({
+  ...paymentRequest, // no paymentCard
+  currency: 'EUR',
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/isbank/payment/complete-3ds',
+  girogate: { method: 'IDEAL', country: 'NL' },
+});
+// result.status after the callback: 'success', 'failure', or 'pending' for a method that settles later
+```
+
+`method` is one of `EST_GIROGATE_METHODS` and `country` is the customer's ISO 3166 country code.
+Some methods need more about the customer, taken from the request: the email (`buyer.email`) for
+Przelewy24, Zimpler and the Asian methods, the phone (`buyer.gsmNumber`) for giropay, Dragonpay,
+eNETS, SingPost and the Thai banks, and a customer id (`buyer.id`) for Entercash, Trustly and
+AstroPay. Override them in `girogate` (`email`, `phone`, `consumerId`). They are covered by the hash.
+Use the currency the method works in (EUR for iDEAL, PLN for Przelewy24, SEK for Trustly in Sweden and so on).
+
+The callback is completed like `3d_pay`: an approved payment is confirmed with an order status query.
+A method that settles later (a bank transfer or voucher) can come back as `Response: Pending`. The
+ver3 hash covers the values but not their field names, so the callback alone cannot tell which order
+is pending. Pass the order from your records as a separate argument,
+`completeThreeDSPayment(callbackBody, { orderId })`, never inside the body: when it matches, the
+result is `pending` with the order id, and you check it later with `getPayment()`. Without it, as
+through the default handler (which passes only the bank's POST), the result is `pending` without
+ids. A callback for another order is rejected as `INVALID_HASH`, and so is an `orderId` added to the
+body, since the HASH must cover every posted field.
+
+<Callout type="warn">
+  Checked on the shared EST test environment, whose test store has no Girogate: the gate accepted the form and its hash (including the customer fields) and answered `Not a girogate merchant`, which comes back as a failure. A Girogate payment has not been run end to end.
+</Callout>
