@@ -1,0 +1,49 @@
+---
+title: Yeni Sağlayıcı Değerlendirmesi — Moka, Papara ve Lidio
+description: 40 numaralı issue takibi. Sipay zaten yayınlandı, bu sayfa kalan adayları karşılaştırır ve sırada hangi sağlayıcının uygulanacağını önerir.
+---
+
+[#40](https://github.com/czaydev/better-payment/issues/40) numaralı issue hangi ödeme
+kuruluşlarının desteklenmeye değer olduğunu sordu: Sipay, Moka, Papara ve Lidio.
+O zamandan beri Sipay sağlayıcısı yayınlandı (bkz. [Sipay](/docs/providers/sipay)),
+bu sayfa kalan üç adayı aynı ölçütlerle değerlendirir: API tarzı, 3D Secure akışı,
+iade ve durum sorgulama desteği, test ortamı, dokümantasyon kalitesi ve pazaryeri
+yol haritasına uyum.
+
+## Karşılaştırma [#comparison]
+
+| Ölçüt | Moka | Papara | Lidio |
+| --- | --- | --- | --- |
+| API tarzı | Moka United geliştirici portalı üzerinden REST ve SOAP API'leri, bayi (alt üye işyeri) uçları | API anahtarlı REST üye işyeri API'si, ödeme ve defter uçları | Kart ödemeleri ve tokenizasyon platformu, sınır ötesi için Worldline ortaklığı |
+| 3D Secure | Desteklenir, 3D kayıt ve kayıtlı kart akışları dahil | 3D özellikli barındırılan ödeme sayfası | Ağ geçidi üzerinden desteklenir |
+| İade ve durum | İade, iptal ve durum sorgulama dokümante edilmiş | İade ucu dokümante edilmiş | Ağ geçidi API'si üzerinden iade ve durum |
+| Test ortamı ve dokümantasyon | Test bilgileri içeren herkese açık geliştirici portalı | Herkese açık API referansı, çeşitli dillerde SDK'lar | Dokümantasyon mevcut, kurumsal katılım süreci |
+| Pazaryeri uyumu | Yerleşik bayi ve alt üye işyeri modeli, parçalı ödeme yol haritasına uyar | Yerleşik parçalı ödeme modeli yok | Tokenizasyon gücü (54 milyon tokenize kart bildiriliyor), yerleşik parçalı model yok |
+| Yasal durum | Lisanslı ödeme kuruluşu, normal faaliyet | Yasa dışı bahis soruşturması kapsamında Ekim 2025'te TCMB lisansı iptal etti, kayyum atandı — aşağıya bakın | Lisanslı ödeme kuruluşu, uluslararası ödemeler için TCMB onaylı ortaklık |
+
+## Papara — şimdilik hariç [#papara--excluded-for-now]
+
+Mayıs 2025'te Türk makamları yasa dışı bahis soruşturması kapsamında Papara'nın
+kurucusu dahil 13 kişiyi gözaltına aldı, Tasarruf Mevduatı Sigorta Fonu (TMSF)
+kayyum olarak atandı ve Ekim 2025'te Merkez Bankası Papara'nın elektronik para
+lisansını iptal etti. Lisansı iptal edilmiş bir kuruluşa sağlayıcı entegrasyonu
+yapmak üye işyerlerinin para akışını riske atar, bu yüzden yasal durum netleşene
+kadar Papara hariç tutulmuştur. Yalnızca geçerli bir lisans iade edilirse yeniden
+değerlendirin.
+
+## Karar [#decision]
+
+1. **Sırada Moka.** Pazaryeri parçalı ödeme çalışmasının ihtiyaç duyduğu yerleşik
+   alt üye işyeri modeline sahip tek adaydır ve test bilgileri içeren herkese açık
+   bir geliştirici portalına sahiptir.
+2. **İkinci Lidio.** Lisanslı ve tokenizasyonda güçlüdür, kayıtlı kartlar ve tekrarlayan
+   ödemelerden sonra iyi bir uyum sağlar. Test ortamı erişimi ve tam iade davranışı
+   henüz doğrulanmalıdır.
+3. **Papara beklemede**, lisans durumu çözülene kadar.
+
+## Uygulamadan önce gerekenler [#still-needed-before-implementation]
+
+Bu depodaki her sağlayıcı gibi seçilen adayın da gerçek test ortamına karşı
+doğrulanması gerekir (bkz. test ortamı doğrulama issueları): 3D ödeme, iade, iptal,
+durum sorgulama ve webhook teslimatı; ayrıca mevcut sağlayıcı sayfa formatını takip
+eden Türkçe dokümantasyon sayfaları.
