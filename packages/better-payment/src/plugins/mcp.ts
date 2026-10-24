@@ -224,7 +224,11 @@ function sanitizeOutput(value: unknown): unknown {
 }
 
 function trimSlashes(path: string): string {
-  return path.replace(/^\/+|\/+$/g, '');
+  let start = 0;
+  let end = path.length;
+  while (start < end && path[start] === '/') start++;
+  while (end > start && path[end - 1] === '/') end--;
+  return path.slice(start, end);
 }
 
 /** A provider result that reports a failed operation */
