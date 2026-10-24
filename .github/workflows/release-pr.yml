@@ -54,7 +54,10 @@ jobs:
           BASE: ${{ github.ref_name }}
           TITLE: "${{ github.ref_name == 'beta' && 'chore(release): version packages (beta)' || 'chore(release): version packages' }}"
         run: |
-          if ! ls .changeset/*.md 2>/dev/null | grep -qv '/README\.md$'; then
+          # After `changeset pre exit` the pending changesets are all in .changeset/pre/, and
+          # version-packages makes the stable version from them.
+          exiting=$(node -p "(() => { try { return require('./.changeset/pre.json').mode === 'exit' } catch { return false } })()")
+          if { [ "$BASE" != "main" ] || [ "$exiting" != "true" ]; } && ! ls .changeset/*.md 2>/dev/null | grep -qv '/README\.md$'; then
             echo "No changesets on $BASE; nothing to release."
             exit 0
           fi
