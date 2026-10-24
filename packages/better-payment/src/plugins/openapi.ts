@@ -62,7 +62,11 @@ export interface OpenAPISpec {
 }
 
 function trimSlashes(p: string): string {
-  return p.replace(/^\/+|\/+$/g, '');
+  let start = 0;
+  let end = p.length;
+  while (start < end && p[start] === '/') start++;
+  while (end > start && p[end - 1] === '/') end--;
+  return p.slice(start, end);
 }
 
 /** The handler action behind each documented core route */
@@ -413,11 +417,12 @@ export function buildOpenAPISpec(
       if (ep.pluginId === 'openapi') continue;
 
       const pathKey = ep.path.startsWith('/') ? ep.path : `/${ep.path}`;
-      if (!paths[pathKey]) {
+      if (!Object.prototype.hasOwnProperty.call(paths, pathKey)) {
         paths[pathKey] = {};
       }
 
       const methodKey = ep.method.toLowerCase();
+      if (methodKey !== 'get' && methodKey !== 'post') continue;
       paths[pathKey][methodKey] = {
         summary: ep.openapi?.summary ?? `${ep.name} (${ep.pluginId})`,
         description: ep.openapi?.description ?? `Plugin endpoint provided by ${ep.pluginId}`,
