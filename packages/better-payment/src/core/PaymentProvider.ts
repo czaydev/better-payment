@@ -19,6 +19,10 @@ import {
   DeleteCardRequest,
   DeleteCardResponse,
   PaymentStatus,
+  ReconciledTransaction,
+  ReconciliationListRequest,
+  ReconciliationReport,
+  ReconciliationRunRequest,
 } from '../types';
 import { BetterPaymentLogger } from './logger';
 import type { RetryConfig } from './retry';
@@ -241,6 +245,32 @@ export abstract class PaymentProvider<
     throw new BetterPaymentError(
       'Installment info is not supported by this provider',
       'NOT_SUPPORTED'
+    );
+  }
+
+  /**
+   * A day range of the provider's transactions, normalized (read-only).
+   *
+   * No provider implements this itself: the reconciliation sources of
+   * `better-payment/reconciliation` do, and `reconciliationPlugin()` routes the
+   * operation to them. Providers without a documented transaction-list API
+   * therefore answer NOT_SUPPORTED.
+   */
+  async listTransactions(_request: ReconciliationListRequest): Promise<ReconciledTransaction[]> {
+    throw this.notSupported(
+      'Daily transaction lists',
+      'no transaction-list API is documented for this provider'
+    );
+  }
+
+  /**
+   * Matches local orders against the provider's transaction list (read-only).
+   * Needs `reconciliationPlugin()` from `better-payment/reconciliation`.
+   */
+  async reconcile(_request: ReconciliationRunRequest): Promise<ReconciliationReport> {
+    throw this.notSupported(
+      'Reconciliation',
+      'configure reconciliationPlugin({ sources }) from better-payment/reconciliation'
     );
   }
 }

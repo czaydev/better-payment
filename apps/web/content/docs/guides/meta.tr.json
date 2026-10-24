@@ -4,6 +4,7 @@
   "pages": [
     "writing-plugins",
     "custom-providers",
+    "reconciliation",
     "test-cards",
     "migration-0-5"
   ]

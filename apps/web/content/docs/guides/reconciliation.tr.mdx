@@ -1,0 +1,152 @@
+---
+title: Mutabakat
+description: Bir sağlayıcının günlük işlemlerini listeleyin, normalize edin ve hiçbir ödemeyi değiştirmeden kendi siparişlerinizle eşleştirin.
+---
+
+Mutabakat API'si bir gün için tek bir soruya yanıt verir: **sağlayıcı gerçekte neyi tahsil etti?** Callback'i kaybolmuş ama başarılı olmuş ödemeleri, sağlayıcı panelinden yapılmış iadeleri, komisyonları ve sağlayıcının hiç tahsil etmediği siparişleri bulur. Salt okunurdur: ödeme oluşturmaz, iade etmez, iptal etmez, yeniden çalıştırmaz ve sipariş durumunu değiştirmez.
+
+## Hızlı başlangıç [#quick-start]
+
+Rapor almak istediğiniz her sağlayıcı için bir kaynak ekleyin ve plugin'i kaydedin. Sağlayıcı id'si ile kaynak id'si aynı olmalıdır.
+
+```typescript
+import { betterPayment, paytr } from 'better-payment';
+import { paytrReconciliation, reconciliationPlugin } from 'better-payment/reconciliation';
+
+const paytrConfig = {
+  merchantId: process.env.PAYTR_MERCHANT_ID!,
+  merchantKey: process.env.PAYTR_MERCHANT_KEY!,
+  merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
+};
+
+const payment = betterPayment({
+  providers: { paytr: paytr(paytrConfig) },
+  plugins: [reconciliationPlugin({ sources: [paytrReconciliation(paytrConfig)] })],
+});
+
+const day = '2026-10-19';
+const transactions = await payment.listTransactions({ from: day, to: day });
+
+const report = await payment.reconcile({
+  from: day,
+  to: day,
+  orders: [{ orderId: 'ORD-1', amount: '149.90', currency: 'TRY', status: 'success' }],
+});
+
+console.log(report.matched, report.mismatched, report.missingInProvider);
+```
+
+`listTransactions()` sağlayıcı satırlarını `provider`, `transactionId`, `orderId`, `type` (`sale`, `refund`, `void`, `settlement`, `other`), `amount`, `fee`, `currency`, `status` ve `date` alanlarıyla döndürür. Tutarlar para biriminin en küçük biriminde ondalık string'dir (TRY için `"149.90"`, JPY için `"1500"`); asla float değildir. Satırlarda kart numarası veya müşteri verisi bulunmaz.
+
+`payment.listTransactions()` çağrısı yapılandırılmış tüm kaynaklara sorar. Tek bir kaynağa sormak için `provider` geçin; yalnızca o sağlayıcının kaynağını kullanmak için işlemi sağlayıcı üzerinde çağırın (`payment.paytr.listTransactions()`).
+
+Plugin olmadan bağımsız facade'ı kullanın:
+
+```typescript
+import { createReconciliation, iyzicoReconciliation } from 'better-payment/reconciliation';
+
+const reconciliation = createReconciliation({
+  sources: [
+    iyzicoReconciliation({
+      apiKey: process.env.IYZICO_API_KEY!,
+      secretKey: process.env.IYZICO_SECRET_KEY!,
+      // iyzico's public docs do not enumerate the report's status codes. Map the
+      // successful code of your account, or every row stays `unknown`.
+      statusMap: { '2': 'success' },
+    }),
+  ],
+});
+
+const orders = await loadOrders('2026-10-19'); // your own order store
+const report = await reconciliation.reconcile(orders, { from: '2026-10-19', to: '2026-10-19' });
+```
+
+## Eşleştirme nasıl çalışır [#how-matching-works]
+
+Siparişler sağlayıcı satırlarıyla `orderId` üzerinden eşleştirilir. Rapor her siparişi ve her işlemi sınıflandırır, belirsiz bir durumu asla kendisi çözmez:
+
+| Rapor alanı | Anlamı |
+| --- | --- |
+| `matched` | Sipariş ile sağlayıcı satışı id, tutar ve para biriminde anlaşıyor. `providerStatus` yalnızca sağlayıcı satırı başarılıysa `confirmed` olur; `unknown` raporun durum belirtmediği anlamına gelir, parayı doğrulanmamış sayın. |
+| `mismatched` | Sipariş iki tarafta da var ama uyuşmuyor: `amount`, `currency`, `status`, `refund` (iadeler iade edilmiş siparişi karşılamıyor) veya `order-not-marked-success` (sağlayıcı ödemeyi kesinleştirmiş, siparişiniz hâlâ pending ya da failed). |
+| `missingInProvider` | Ödenmiş veya iade edilmiş işaretlediğiniz sipariş için sağlayıcıda hiç işlem yok. |
+| `unknownInMerchant` | Yerel siparişi olmayan satış, iade veya iptal: panelden yapılmış iade, kaybolmuş callback ya da başka bir sisteme ait işlem. |
+| `ambiguous` | Birden fazla başarılı satış aynı sipariş id'sini paylaşıyor; bu çift tahsilat olabilir. İkisi de listelenir, hiçbiri seçilmez. |
+| `duplicateTransactionIds` | Sayfa veya pencere örtüşmesiyle iki kez gelen satırlar. Raporda ve toplamlarda bir kez sayılır. |
+| `totals` | Para birimi başına satış, iade, komisyon ve işlem sayısı; tam ondalık string olarak. |
+
+Tahsilatı olmayan `failed` ya da `cancelled` sipariş tutarlıdır ve `matched` içinde görünür. Tahsil edilmiş ama iptal işaretlenmiş sipariş, bir void veya iade karşılamıyorsa `mismatched` olur. Reconcile iki tarafı da değiştirmez; raporu inceleyip kayıtlarınızı kendiniz düzeltin.
+
+## Sağlayıcı desteği [#provider-support]
+
+Bir sağlayıcı yalnızca kendi herkese açık dokümanı tarih aralığı işlem raporu tanımlıyorsa desteklenir. Normalize kaynak `better-payment/reconciliation` içindedir.
+
+| Sağlayıcı | Kaynak | Notlar |
+| --- | --- | --- |
+| PayTR | `paytrReconciliation()` | `/rapor/islem-dokumu`; en fazla 3 günlük pencereler. Raporda benzersiz satır id'si yoktur; id sipariş, tarih, tür ve tutardan deterministik olarak üretilir. |
+| iyzico | `iyzicoReconciliation()` | Reporting API, istek başına bir gün. Sepet kalemi satırları varsayılan olarak ödeme id'si ve tür başına toplanır; ham satırlar için `aggregateByPayment: false`. Durum kodları `statusMap` gerektirir, yoksa satırlar `unknown` olur. |
+| Akbank | `akbankReconciliation()` | txnCode 1009, istek başına bir gün. 9999'dan fazla satırı olan gün `VPS-2235` döner; sayfalamak için `batchStep` ayarlayın, yoksa çağrı kesik bir gün döndürmek yerine hata verir. |
+| Parampos | `paramposReconciliation()` | `TP_Islem_Izleme`, tüm pencere tek yanıtta. Tutarlar ve tarihler Param'ın virgül ve `dd.MM.yyyy HH:mm:ss` biçimlerini kullanır. |
+
+Diğer tüm sağlayıcılar (`sipay`, `qnbpay`, `est`, `isbank`, `ziraat`, `halkbank`, `teb`, `sekerbank`, `akbankest`, `halkbankmkd`, `denizbank`, `vakifbank`, `yapikredi`, `qnb`, `kuveytturk`, `albaraka`, `mock`) `NOT_SUPPORTED` döndürür. Ekim 2026'da kontrol edilen herkese açık dokümanları tarih aralığı işlem raporu tanımlamıyor. Hesabınız böyle bir rapor sunuyorsa özel bir `ReconciliationSource` yazın; plugin herhangi bir kaynak id'sini kabul eder.
+
+Dokümante edilmiş dört raporun hiçbiri mutabakat veya ödeme (payout) tarihi döndürmez; bu yüzden normalize satırda bu alan yoktur. Tarihler sağlayıcının yerel işlem zamanıdır ve `YYYY-MM-DDTHH:mm:ss` (raporun saati yoksa `YYYY-MM-DD`) biçimine getirilir. Bir sorgu en fazla 92 günü kapsayabilir; her kaynak aralığı sağlayıcının kabul ettiği pencerelere böler.
+
+## Günlük zamanlanmış görev [#scheduled-daily-job]
+
+Mutabakat yeniden çalıştırılması güvenlidir: yalnızca okur. Sağlayıcı önceki günü kapattıktan sonra günde bir kez tetikleyin, siparişlerinizi veritabanından geçin ve raporu inceleme için saklayın. Ödeme kayıtları API'si (#116) bu sürümün parçası değildir; hazır olana kadar satıcı tarafını kendi sipariş deponuzdan sağlayın.
+
+```typescript
+// app/api/reconcile/route.ts
+import { NextResponse } from 'next/server';
+import { createReconciliation, paytrReconciliation } from 'better-payment/reconciliation';
+
+const reconciliation = createReconciliation({
+  sources: [
+    paytrReconciliation({
+      merchantId: process.env.PAYTR_MERCHANT_ID!,
+      merchantKey: process.env.PAYTR_MERCHANT_KEY!,
+      merchantSalt: process.env.PAYTR_MERCHANT_SALT!,
+    }),
+  ],
+});
+
+export async function GET(request: Request) {
+  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  // Yesterday in UTC; adjust if your provider closes the day in local time.
+  const day = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const orders = await loadOrders(day);
+  const report = await reconciliation.reconcile(orders, { from: day, to: day });
+
+  await saveReport(day, report);
+  return NextResponse.json({
+    matched: report.matched.length,
+    mismatched: report.mismatched.length,
+    missingInProvider: report.missingInProvider.length,
+    unknownInMerchant: report.unknownInMerchant.length,
+  });
+}
+```
+
+Vercel'de rotayı bir cron girdisiyle zamanlayın:
+
+```json
+{
+  "crons": [{ "path": "/api/reconcile", "schedule": "15 3 * * *" }]
+}
+```
+
+`mismatched`, `missingInProvider` ve `unknownInMerchant` için uyarı kurun; insan incelemesi gereken durumlar bunlardır. Bir siparişi rapora dayanarak ödenmiş işaretlemeyin — sağlayıcının onayladığı ve kendi kayıtlarınızla karşılaştırın.
+
+## Güvenlik kuralları [#safety-rules]
+
+- `reconcile()` saftır ve salt okunurdur; bir rapor döndürür ve hiçbir şeyi değiştirmez. Ödeme veya iade işlemi değildir.
+- Bir sağlayıcı satırı yalnızca sağlayıcı öyle diyorsa `success` olur. Eşlenmemiş durum kodlu iyzico satırları `unknown` kalır ve onay değil, `providerStatus: 'unknown'` üretir.
+- Tutarlar tam sayı en küçük birimlerde karşılaştırılır; böylece JPY gibi 0 ondalıklı para birimleri ve 3 ondalık geçersiz kılmaları tamdır.
+- Yinelenen satırlar `provider` + `transactionId` ile atılır; bir günü tekrar çalıştırmak veya iki örtüşen pencere çift sayıma yol açmaz.
+- İki başarılı satış aynı sipariş id'sini paylaşırsa sipariş `ambiguous` olur; kütüphane hangi tahsilatın gerçek olduğuna karar vermez.
+- Kaynaklar `RECONCILIATION_ERROR` kodlu `ReconciliationError` fırlatır. Mesajlar yalnızca sağlayıcının hata kodunu taşır, sipariş verisi ve PII içeren yanıt gövdesini asla taşımaz.
+- Kaynağı yapılandırılmamış bir sağlayıcı, hiç istek yapılmadan `NOT_SUPPORTED` fırlatır.

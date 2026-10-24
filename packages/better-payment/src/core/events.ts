@@ -18,6 +18,7 @@ type Awaitable<T> = T | Promise<T>;
  * | `payment.cancelled` | cancel, voidAuthorization: `success`                                    |
  * | `refund.succeeded`  | refund: `success`                                                       |
  * | `refund.failed`     | refund: `failure`                                                       |
+ * | `reconciliation.completed` | listTransactions, reconcile: always (read-only)                 |
  */
 export type PaymentEventType =
   | 'payment.succeeded'
@@ -28,7 +29,8 @@ export type PaymentEventType =
   | 'payment.expired'
   | 'payment.unresolved'
   | 'refund.succeeded'
-  | 'refund.failed';
+  | 'refund.failed'
+  | 'reconciliation.completed';
 
 export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.succeeded',
@@ -40,6 +42,7 @@ export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = [
   'payment.unresolved',
   'refund.succeeded',
   'refund.failed',
+  'reconciliation.completed',
 ];
 
 export interface PaymentEvent<T extends PaymentEventType = PaymentEventType> {
@@ -133,6 +136,10 @@ export function eventFor(
   } else if (operation === 'refund') {
     if (status === PaymentStatus.SUCCESS) type = 'refund.succeeded';
     else if (status === PaymentStatus.FAILURE) type = 'refund.failed';
+  } else if (operation === 'listTransactions' || operation === 'reconcile') {
+    // Read-only reporting: there is no payment outcome to report, so the event
+    // fires for every completed call and carries the rows/report in `result`.
+    type = 'reconciliation.completed';
   }
   if (!type) return undefined;
 

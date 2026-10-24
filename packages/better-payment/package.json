@@ -41,6 +41,11 @@
       "import": "./dist/routing/index.mjs",
       "require": "./dist/routing/index.js"
     },
+    "./reconciliation": {
+      "types": "./dist/reconciliation/index.d.ts",
+      "import": "./dist/reconciliation/index.mjs",
+      "require": "./dist/reconciliation/index.js"
+    },
     "./next": {
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.mjs",
