@@ -14,6 +14,7 @@ function entry(code, overrides = {}) {
     code,
     names: { en: `${code}-en`, tr: `${code}-tr` },
     nativeName: `${code}-native`,
+    flag: 'xx.svg',
     dir: 'ltr',
     enabled: true,
     ogLocale: `${code}_XX`,
@@ -91,6 +92,7 @@ test('invalid registry entries fail with a clear message', () => {
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.code = 'de'))), /\.code must be "tr"/);
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => delete tr.names.tr)), /names\.tr must be a non-empty string/);
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.nativeName = ' '))), /non-empty nativeName/);
+  assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.flag = 'flag.png'))), /flag must be an SVG file name/);
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.dir = 'sideways'))), /expected "ltr" or "rtl"/);
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.enabled = 'yes'))), /boolean enabled flag/);
   assert.throws(() => resolveLocaleRegistry(mutate((tr) => (tr.docs = 'partial'))), /expected "required" or "optional"/);
