@@ -11,9 +11,9 @@ type Awaitable<T> = T | Promise<T>;
  *
  * | Event               | Operations                                                              |
  * | ------------------- | ----------------------------------------------------------------------- |
- * | `payment.succeeded` | createPayment, completeThreeDSPayment, capture: `success`               |
+ * | `payment.succeeded` | createPayment, chargeStoredCard, completeThreeDSPayment, capture: `success` |
  * | `payment.authorized`| authorize: `success` (the amount is blocked)                            |
- * | `payment.pending`   | createPayment, completeThreeDSPayment, authorize, capture: `pending`    |
+ * | `payment.pending`   | createPayment, chargeStoredCard, completeThreeDSPayment, authorize, capture: `pending` |
  * | `payment.failed`    | the payment operations and the 3D Secure inits: `failure`               |
  * | `payment.cancelled` | cancel, voidAuthorization: `success`                                    |
  * | `refund.succeeded`  | refund: `success`                                                       |
@@ -58,7 +58,10 @@ export interface PaymentEvent<T extends PaymentEventType = PaymentEventType> {
   code?: PaymentErrorCode;
   /** The operation's result as returned to the caller */
   result: unknown;
-  /** The operation's request (callback data for 3D Secure completions) */
+  /**
+   * The operation's request (callback data for 3D Secure completions), without
+   * card data: `paymentCard` is left out and a stored card's CVC is removed.
+   */
   request: unknown;
   /** Present when a pending payment was resolved by pendingResolver */
   resolvedFrom?: 'pending';
@@ -98,10 +101,30 @@ export class EventListenerError extends BetterPaymentError {
 
 const PAYMENT_OPERATIONS = new Set<PaymentOperation>([
   'createPayment',
+  'chargeStoredCard',
   'completeThreeDSPayment',
   'authorize',
   'capture',
 ]);
+
+/**
+ * The request an event carries, without card data: a listener (or a logging
+ * plugin) must never receive a PAN or a CVC. Stored-card tokens stay, they are
+ * the only card reference a recurring charge has.
+ */
+function withoutCardData(request: unknown): unknown {
+  if (!request || typeof request !== 'object') return request;
+  const copy: Record<string, unknown> = { ...(request as Record<string, unknown>) };
+  delete copy.paymentCard;
+  if (copy.storedCard && typeof copy.storedCard === 'object') {
+    const storedCard: Record<string, unknown> = {
+      ...(copy.storedCard as Record<string, unknown>),
+    };
+    delete storedCard.cvc;
+    copy.storedCard = storedCard;
+  }
+  return copy;
+}
 
 function field(value: unknown, key: string): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -150,6 +173,6 @@ export function eventFor(
     currency: field(request, 'currency'),
     ...(code ? { code } : {}),
     result,
-    request,
+    request: withoutCardData(request),
   };
 }

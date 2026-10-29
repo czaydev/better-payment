@@ -48,7 +48,7 @@ export type {
 } from './core/BetterPaymentConfig';
 
 export { PaymentProvider } from './core/PaymentProvider';
-export type { PaymentProviderConfig } from './core/PaymentProvider';
+export type { PaymentProviderConfig, ProviderCapabilities } from './core/PaymentProvider';
 export { HttpClient, HttpError } from './core/http';
 /** WebCrypto helpers for custom providers (signatures, constant-time comparison) */
 export { hmac, digest, safeEqual, toBase64, toHex, randomHex } from './core/crypto';
@@ -96,6 +96,8 @@ export type {
   BuiltBasket,
 } from './core/basket';
 
+export { addBillingMonths, billingOrderId } from './core/recurring';
+
 export { VERSION } from './version';
 
 export { PaymentErrorCode, ISO8583_ERROR_CODES } from './core/error-codes';
@@ -113,6 +115,7 @@ export {
   BasketItem,
   PaymentRequest,
   PaymentResponse,
+  RecurringPaymentRequest,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
   RefundRequest,

@@ -1,0 +1,131 @@
+---
+title: Tekrarlayan ödemeler
+description: Her fatura dönemi için kayıtlı karttan, sağlayıcıdan bağımsız tek bir API ile tahsilat yapın.
+---
+
+<Since version="0.12.0" />
+
+Abonelik, müşterinin 3D Secure ile yaptığı ilk ödemeden sonra sizin daha sonra, müşteri orada yokken başlattığınız tahsilatlardır. Bu sonraki tahsilatlar **merchant-initiated** (kayıtlı kart) ödemelerdir: sağlayıcı kayıtlı kart token'larını ve açık bir tekrarlayan ödeme işaretini ister; kart sahibi her birini onaylayamaz.
+
+`chargeStoredCard()` böyle tek bir tahsilatı çalıştırır ve normal bir `PaymentResponse` döndürür. Zamanlama — ne zaman tahsil edilecek, ne zaman yeniden denenecek, ne zaman vazgeçilecek — uygulamanızda kalır.
+
+<Callout type="warn">
+  Tekrarlayan tahsilat gerçek paradır. Sonucunu bilmediğiniz bir tahsilatı asla yeniden denemeyin: `NETWORK_ERROR` ile `pending` dönen bir sonuç zaten tahsil edilmiş olabilir. Önce doğrulayın (bkz. [Yeniden denemeler](#retries-and-idempotency)).
+</Callout>
+
+## Akış [#the-flow]
+
+1. Müşteri ilk dönemi 3D Secure ve `saveCard` ile öder. Dönen `customerToken` ve `cardToken` değerlerini saklayın.
+2. Sonraki her dönem için bu token'larla ve döneme ait sabit bir sipariş kimliğiyle `chargeStoredCard()` çağırın.
+3. `success`, `pending` (bilinmiyor) ve `failure` (reddedildi) durumlarını ayrı ele alın.
+4. Abonelik bittiğinde zamanlamayı durdurun ve müşteri isterse kartı silin.
+
+## İlk ödemede kartı kaydet [#save-the-card-on-the-first-payment]
+
+Sağlayıcının normal 3D Secure akışını kullanın; `saveCard`, tamamlama sonucunda token'ları döndürür. iyzico ve PayTR'de çalışır.
+
+```typescript
+const init = await payment.iyzico.initThreeDSPayment({
+  ...order,
+  saveCard: true, // or { customerToken } to add the card to an existing customer
+  callbackUrl: `${appUrl}/api/pay/iyzico/payment/complete-3ds`,
+});
+
+// The customer completes 3D Secure; the result arrives at the callback:
+const first = await payment.iyzico.completeThreeDSPayment(callbackBody);
+if (first.status === 'success' && first.storedCard) {
+  await db.subscriptions.saveTokens(subscriptionId, first.storedCard);
+}
+```
+
+PayTR, Direct API ödemesi sırasında kartı saklar (`store_card=1`) ve `utoken` değerini sonuçta ya da bildirimde döndürür; `ctoken` için `listCards()` kullanın. Bkz. [Kayıtlı kartlar](/docs/payments/stored-cards).
+
+## Bir fatura dönemini tahsil et [#charge-a-billing-period]
+
+`chargeStoredCard()` `storedCard`, `recurring: true` ve bir `conversationId` ister. Kimlik dönemi tanımlar, böylece yeniden deneme tanınabilir; `billingOrderId()` her sağlayıcının kabul ettiği bir kimlik üretir (yalnızca harf ve rakam).
+
+```typescript
+import { addBillingMonths, billingOrderId } from 'better-payment';
+
+const periodStart = addBillingMonths(subscription.startedAt, subscription.period);
+const result = await payment.chargeStoredCard({
+  ...order, // price, paidPrice, currency, buyer, addresses, basketItems
+  storedCard: {
+    customerToken: subscription.customerToken,
+    cardToken: subscription.cardToken,
+  },
+  recurring: true,
+  conversationId: billingOrderId(`sub${subscription.id}`, periodStart), // sub42202602
+});
+
+switch (result.status) {
+  case 'success':
+    await db.subscriptions.markPaid(subscription.id, periodStart, result.paymentId);
+    break;
+  case 'pending':
+    // The outcome is unknown: verify, do not charge again
+    await db.subscriptions.markUnknown(subscription.id, periodStart);
+    break;
+  default:
+    await db.subscriptions.markFailed(subscription.id, periodStart, result.code);
+}
+```
+
+`addBillingMonths()` kısa ayların sonuna sabitler (31 Ocak + 1 ay = 28/29 Şubat) ve UTC gece yarısı döndürür; böylece 31'ine sabitlenmiş aylık plan çalışmaya devam eder. Fiyatlar kütüphanenin her yerinde olduğu gibi ondalık string olarak kalır.
+
+## Yeniden denemeler ve idempotency [#retries-and-idempotency]
+
+- `chargeStoredCard()` sağlayıcıyı **bir kez** çağırır. Ödemeyi asla yeniden denemez.
+- `pending` / `NETWORK_ERROR` yanıt gelmediği anlamına gelir; sağlayıcı tahsil etmiş olabilir. Bir şey yapmadan önce `getPayment(conversationId)` (ya da sağlayıcı paneli) ile sorgulayın.
+- Kesin bir `failure` (red) dunning politikanıza göre daha sonra yeniden denenebilir. Bir sonraki döneme yalnızca onaylanmış bir başarıdan sonra geçin.
+- [HTTP handler](/docs/concepts/handler) arkasında her tahsilat için `Idempotency-Key` gönderin: aynı anahtar sağlayıcıyı yeniden çağırmadan ilk yanıtı döndürür. Birden fazla örnek çalıştırıyorsanız paylaşılan bir store (Redis, veritabanı) kullanın.
+- `billingOrderId()` bir dönem için sabittir: aynı abonelik ve ay her zaman aynı kimliği üretir.
+
+## Sağlayıcı desteği [#provider-support]
+
+| Sağlayıcı | Tekrarlayan kayıtlı kart tahsilatı | Gönderilen |
+| --------- | ---------------------------------- | ---------- |
+| iyzico | evet | `cardUserKey` + `cardToken` ile Non-3D `/payment/auth` ve `paymentGroup: SUBSCRIPTION` |
+| PayTR | evet | `non_3d=1`, `recurring_payment=1`, `utoken` + `ctoken` ile Direct API |
+| Diğerleri | hayır | `chargeStoredCard()` `NOT_SUPPORTED` ile reddeder |
+
+iyzico'da kart saklama, PayTR'de Kart Saklama ve hesapta Non-3D izni açık olmalıdır. İlk ödemede kart sahibi her zaman vardır ve sağlayıcının istediği yerde 3D Secure ile tamamlanır.
+
+## iyzico abonelikleri ve bu API [#iyzico-subscriptions-vs-this-api]
+
+iyzico'nun kendi Subscription API'si (`initializeSubscription()`, `createPricingPlan()`, ...) planı ve zamanlamayı iyzico'da tutar; kayıtlı karttan iyzico tahsil eder. Faturalama takvimini, yeniden denemeleri ve raporlamayı iyzico'nun üstlenmesini istiyorsanız onu kullanın.
+
+`chargeStoredCard()` zamanlamayı uygulamanızda tutar ve iyzico ile PayTR'de aynı şekilde çalışır. Her dönem için bir `PaymentResponse` döndürür, böylece kendi sipariş durumunuz tek doğru kaynak olur. Sağlayıcıda fiyat planı ya da abonelik oluşturmaz.
+
+## HTTP handler [#http-handler]
+
+Route ayrıcalıklıdır; yalnızca bir `authorize` hook'uyla birlikte etkinleştirilebilir ve `Idempotency-Key` destekler:
+
+```typescript
+const handler = payment.createHandler({
+  allowedActions: ['recurring/charge'],
+  authorize: isAdmin,
+});
+
+// POST /api/pay/paytr/recurring/charge
+// { ...RecurringPaymentRequest }
+```
+
+## Olaylar [#events]
+
+Tahsilat, `operation: 'chargeStoredCard'` ile olağan ödeme olaylarını yayınlar: `payment.succeeded`, `payment.pending` ve `payment.failed`. Olay isteği kayıtlı kart token'larını taşır ama kart verisi taşımaz (PAN yok, CVC yok).
+
+```typescript
+payment.on('payment.succeeded', async (event) => {
+  if (event.operation !== 'chargeStoredCard') return;
+  await db.subscriptions.markPaid(event.conversationId!, event.paymentId);
+});
+```
+
+## Sınırlar [#limits]
+
+Kütüphane abonelik durumunu zamanlamaz ve saklamaz: cron, kuyruklar ve dunning sizin işinizdir. Müşterinin tekrarlayan tahsilatlara onay verdiğini de doğrulamaz; mandate metni ve onay kaydı sizin sorumluluğunuzdadır. Sağlayıcının tekrarlayan ödeme izni yoksa sağlayıcı tahsilatı reddeder; kütüphane başka bir akışa düşmez.
+
+## Doğrulama [#verification]
+
+iyzico'nun kayıtlı kart davranışı, sahte HTTP ile birim testlerinde kapsanır; gecelik sandbox işi kayıtlı kart ödemelerini kapsar. PayTR'nin tekrarlayan ödeme alanları PayTR'nin resmi dokümanına göre uygulanmıştır ve canlı bir PayTR hesabında çalıştırılmamıştır.

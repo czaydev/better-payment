@@ -16,7 +16,7 @@ With no options, the handler exposes only:
 - `GET /health`
 
 Enable everything else explicitly with `allowedActions`. Refund, cancel, payment
-lookup and subscription management also need an `authorize` hook; without
+lookup, recurring charges and subscription management also need an `authorize` hook; without
 one, creating the handler throws.
 
 ```typescript
@@ -83,6 +83,7 @@ Paths are relative to `basePath` (default `/api/pay`).
 | POST | `/:provider/payment/init-3ds` | `payment/init-3ds` | `initThreeDSPayment()` | — |
 | POST | `/paytr/payment/token` | `payment/token` | `createPaymentWithToken()` | — |
 | GET | `/:provider/payment/:id` | `payment/get` | `getPayment()` | — 🔒 |
+| POST | `/:provider/recurring/charge` | `recurring/charge` | `chargeStoredCard()` | — 🔒 |
 | POST | `/:provider/refund` | `refund` | `refund()` | — 🔒 |
 | POST | `/:provider/cancel` | `cancel` | `cancel()` | — 🔒 |
 | POST | `/:provider/authorize` | `authorize` | `authorize()` | — |
@@ -141,7 +142,7 @@ Providers deliver callbacks more than once: PayTR resends a notification until i
 
 Duplicates are recognized by a SHA-256 hash of the callback body. A forged body can never match a stored response.
 
-Mutating routes (`payment`, `payment/init-3ds`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, iyzico checkout/PWI/subscription management) also honor an **`Idempotency-Key`** header. Send a unique key per operation, for example a UUID or `refund-<orderId>`:
+Mutating routes (`payment`, `payment/init-3ds`, `recurring/charge`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, iyzico checkout/PWI/subscription management) also honor an **`Idempotency-Key`** header. Send a unique key per operation, for example a UUID or `refund-<orderId>`:
 
 - The same key and the same body return the first response, marked `Idempotent-Replayed: true`, without calling the provider again.
 - The same key with a different body returns `422`.

@@ -27,9 +27,9 @@ Events are emitted for every provider, and for calls made on the payment object,
 
 | Event | Emitted when |
 | ----- | ------------ |
-| `payment.succeeded` | `createPayment`, `completeThreeDSPayment` or `capture` succeeds |
+| `payment.succeeded` | `createPayment`, `chargeStoredCard`, `completeThreeDSPayment` or `capture` succeeds |
 | `payment.authorized` | `authorize` succeeds: the amount is blocked on the card |
-| `payment.pending` | `createPayment`, `completeThreeDSPayment`, `authorize` or `capture` returns `pending`, for example with `NETWORK_ERROR` |
+| `payment.pending` | `createPayment`, `chargeStoredCard`, `completeThreeDSPayment`, `authorize` or `capture` returns `pending`, for example with `NETWORK_ERROR` |
 | `payment.failed` | a payment operation, `initThreeDSPayment` or `initThreeDSAuthorize` fails |
 | `payment.cancelled` | `cancel` or `voidAuthorization` succeeds |
 | `refund.succeeded` | `refund` succeeds |
@@ -59,6 +59,8 @@ interface PaymentEvent {
 ```
 
 The listener of a specific event gets the narrowed type: in `payment.on('payment.failed', (event) => ...)`, `event.type` is `'payment.failed'`.
+
+`event.request` never carries card data: `paymentCard` is left out and a stored card's `cvc` is removed. Stored-card tokens stay, so a recurring listener can identify the card without holding a PAN.
 
 `amount` and `currency` come from the request. The callback of a 3D Secure payment carries no amount, so they are missing there: look the order up by `conversationId`.
 

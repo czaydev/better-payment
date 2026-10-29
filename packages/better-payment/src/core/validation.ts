@@ -16,6 +16,12 @@ export interface PaymentValidationRules {
   storedCard?: boolean;
   /** The provider can save the card during the payment (`saveCard`) */
   saveCard?: boolean;
+  /**
+   * This payment type supports `recurring: true`: a merchant-initiated charge
+   * on a stored card, without the cardholder present (direct payments of
+   * providers with card-on-file support)
+   */
+  recurring?: boolean;
   /** Basket item prices must add up to `price` (iyzico) */
   basketMatchesPrice?: boolean;
   /** At least one basket item */
@@ -203,6 +209,20 @@ export function validatePaymentRequest(
   }
   if (request.saveCard && !rules.saveCard) {
     v.add('saveCard', 'is not supported by this provider for this payment type');
+  }
+  // `recurring` is only ever set to `true` deliberately (a merchant-initiated
+  // charge); a stored-card payment that leaves it out stays a normal
+  // cardholder-initiated payment, so existing one-click flows keep working.
+  if (request.recurring === true) {
+    if (!request.storedCard) {
+      v.add(
+        'recurring',
+        'requires storedCard: a merchant-initiated charge must target a stored card'
+      );
+    }
+    if (!rules.recurring) {
+      v.add('recurring', 'is not supported by this provider for this payment type');
+    }
   }
   if (rules.required) v.required(request, rules.required);
   v.buyerFormats(request);

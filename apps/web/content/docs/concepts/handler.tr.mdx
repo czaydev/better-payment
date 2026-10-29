@@ -13,7 +13,7 @@ Hiç seçenek verilmezse handler yalnızca şunları açar:
 - kart sorguları: `installment` ve `bin-check`
 - `GET /health`
 
-Geri kalan her şeyi `allowedActions` ile açıkça etkinleştirin. İade, iptal, ödeme sorgusu ve abonelik yönetimi ayrıca bir `authorize` hook'u gerektirir; hook yoksa handler oluşturulurken hata fırlatılır.
+Geri kalan her şeyi `allowedActions` ile açıkça etkinleştirin. İade, iptal, ödeme sorgusu, tekrarlayan ödemeler ve abonelik yönetimi ayrıca bir `authorize` hook'u gerektirir; hook yoksa handler oluşturulurken hata fırlatılır.
 
 ```typescript
 const payment = betterPayment({
@@ -78,6 +78,7 @@ Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 | POST | `/:provider/payment/init-3ds` | `payment/init-3ds` | `initThreeDSPayment()` | — |
 | POST | `/paytr/payment/token` | `payment/token` | `createPaymentWithToken()` | — |
 | GET | `/:provider/payment/:id` | `payment/get` | `getPayment()` | — 🔒 |
+| POST | `/:provider/recurring/charge` | `recurring/charge` | `chargeStoredCard()` | — 🔒 |
 | POST | `/:provider/refund` | `refund` | `refund()` | — 🔒 |
 | POST | `/:provider/cancel` | `cancel` | `cancel()` | — 🔒 |
 | POST | `/:provider/authorize` | `authorize` | `authorize()` | — |
@@ -136,7 +137,7 @@ Sağlayıcılar callback'leri birden fazla kez iletir: PayTR `OK` alana kadar bi
 
 Tekrarlar, callback gövdesinin SHA-256 hash'iyle tanınır. Sahte bir gövde, saklanan bir yanıtla asla eşleşemez.
 
-Veri değiştiren route'lar (`payment`, `payment/init-3ds`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, iyzico checkout/PWI/abonelik yönetimi) ayrıca bir **`Idempotency-Key`** başlığını da dikkate alır. Her işlem için benzersiz bir anahtar gönderin; örneğin bir UUID ya da `refund-<orderId>`:
+Veri değiştiren route'lar (`payment`, `payment/init-3ds`, `recurring/charge`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, iyzico checkout/PWI/abonelik yönetimi) ayrıca bir **`Idempotency-Key`** başlığını da dikkate alır. Her işlem için benzersiz bir anahtar gönderin; örneğin bir UUID ya da `refund-<orderId>`:
 
 - Aynı anahtar ve aynı gövde, sağlayıcıyı yeniden çağırmadan ilk yanıtı `Idempotent-Replayed: true` işaretiyle döner.
 - Aynı anahtar farklı bir gövdeyle gelirse `422` döner.

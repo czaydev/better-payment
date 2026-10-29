@@ -49,6 +49,7 @@ import type {
   ListCardsResponse,
   DeleteCardRequest,
   DeleteCardResponse,
+  RecurringPaymentRequest,
 } from '../types';
 
 type AnyListener = (event: PaymentEvent) => unknown;
@@ -459,6 +460,15 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   /** Payment without 3D Secure, with the default provider */
   createPayment(request: PaymentRequest): Promise<PaymentResponse> {
     return this.call('createPayment', request);
+  }
+
+  /**
+   * Charges a stored card for one recurring billing period (merchant-initiated)
+   * with the default provider. Providers without documented support reject with
+   * `NOT_SUPPORTED`; the call never retries a charge.
+   */
+  chargeStoredCard(request: RecurringPaymentRequest): Promise<PaymentResponse> {
+    return this.call('chargeStoredCard', request);
   }
 
   /** Starts a 3D Secure payment with the default provider */

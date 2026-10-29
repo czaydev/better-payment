@@ -4,6 +4,7 @@
   "pages": [
     "pre-authorization",
     "stored-cards",
+    "recurring-payments",
     "basket"
   ]
 }

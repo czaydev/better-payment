@@ -1,0 +1,131 @@
+---
+title: Recurring payments
+description: Charge a saved card for each billing period with one provider-independent API.
+---
+
+<Since version="0.12.0" />
+
+A subscription is a first payment the customer makes with 3D Secure, followed by charges you start later, while the customer is away. Those later charges are **merchant-initiated** (card on file): the provider needs the stored-card tokens and an explicit recurring flag, and the cardholder cannot approve each one.
+
+`chargeStoredCard()` runs one such charge and returns a normal `PaymentResponse`. The schedule — when to bill, when to retry, when to give up — stays in your application.
+
+<Callout type="warn">
+  A recurring charge is real money. Never retry a charge whose outcome you do not know: a `pending` result with `NETWORK_ERROR` may already have been charged. Verify it first (see [Retries](#retries-and-idempotency)).
+</Callout>
+
+## The flow
+
+1. The customer pays the first period with 3D Secure and `saveCard`. Store the returned `customerToken` and `cardToken`.
+2. For each later period, call `chargeStoredCard()` with those tokens and a stable order id for the period.
+3. Handle `success`, `pending` (unknown) and `failure` (declined) separately.
+4. When the subscription ends, stop the schedule and delete the card if the customer asks.
+
+## Save the card on the first payment
+
+Use the normal 3D Secure flow of the provider; `saveCard` returns the tokens in the completion result. It works on iyzico and PayTR.
+
+```typescript
+const init = await payment.iyzico.initThreeDSPayment({
+  ...order,
+  saveCard: true, // or { customerToken } to add the card to an existing customer
+  callbackUrl: `${appUrl}/api/pay/iyzico/payment/complete-3ds`,
+});
+
+// The customer completes 3D Secure; the result arrives at the callback:
+const first = await payment.iyzico.completeThreeDSPayment(callbackBody);
+if (first.status === 'success' && first.storedCard) {
+  await db.subscriptions.saveTokens(subscriptionId, first.storedCard);
+}
+```
+
+PayTR stores the card (`store_card=1`) during a Direct API payment and returns the `utoken` in the result or notification; get the `ctoken` with `listCards()`. See [Stored cards](/docs/payments/stored-cards).
+
+## Charge a billing period
+
+`chargeStoredCard()` requires `storedCard`, `recurring: true` and a `conversationId`. The id identifies the period, so a retry can be recognized; `billingOrderId()` builds one that every provider accepts (letters and digits only).
+
+```typescript
+import { addBillingMonths, billingOrderId } from 'better-payment';
+
+const periodStart = addBillingMonths(subscription.startedAt, subscription.period);
+const result = await payment.chargeStoredCard({
+  ...order, // price, paidPrice, currency, buyer, addresses, basketItems
+  storedCard: {
+    customerToken: subscription.customerToken,
+    cardToken: subscription.cardToken,
+  },
+  recurring: true,
+  conversationId: billingOrderId(`sub${subscription.id}`, periodStart), // sub42202602
+});
+
+switch (result.status) {
+  case 'success':
+    await db.subscriptions.markPaid(subscription.id, periodStart, result.paymentId);
+    break;
+  case 'pending':
+    // The outcome is unknown: verify, do not charge again
+    await db.subscriptions.markUnknown(subscription.id, periodStart);
+    break;
+  default:
+    await db.subscriptions.markFailed(subscription.id, periodStart, result.code);
+}
+```
+
+`addBillingMonths()` clamps to the end of shorter months (31 January + 1 month = 28/29 February) and returns UTC midnight, so a monthly schedule anchored on the 31st keeps working. Prices stay decimal strings, as everywhere else in the library.
+
+## Retries and idempotency
+
+- `chargeStoredCard()` calls the provider **once**. It never retries a payment.
+- `pending` / `NETWORK_ERROR` means no response arrived; the provider may have charged. Query `getPayment(conversationId)` (or the provider panel) before doing anything.
+- A definitive `failure` (declined) can be retried later according to your dunning policy. Move to the next period only after a confirmed success.
+- Behind the [HTTP handler](/docs/concepts/handler), send an `Idempotency-Key` per charge: a repeated key returns the first response without calling the provider again. Use a shared store (Redis, database) when you run several instances.
+- `billingOrderId()` is stable for a period: the same subscription and month always produce the same id.
+
+## Provider support
+
+| Provider | Recurring stored-card charge | What it sends |
+| -------- | ---------------------------- | ------------- |
+| iyzico | yes | Non-3D `/payment/auth` with `cardUserKey` + `cardToken` and `paymentGroup: SUBSCRIPTION` |
+| PayTR | yes | Direct API with `non_3d=1`, `recurring_payment=1`, `utoken` + `ctoken` |
+| Others | no | `chargeStoredCard()` rejects with `NOT_SUPPORTED` |
+
+iyzico needs card storage enabled; PayTR needs Kart Saklama and the Non-3D permission on the account. The first payment always has the cardholder present and is completed with 3D Secure where the provider requires it.
+
+## iyzico subscriptions vs. this API
+
+iyzico's own Subscription API (`initializeSubscription()`, `createPricingPlan()`, ...) keeps the plan and the schedule at iyzico; iyzico charges the stored card itself. Use it when you want iyzico to own the billing calendar, retries and reporting.
+
+`chargeStoredCard()` keeps the schedule in your application and works the same on iyzico and PayTR. It returns one `PaymentResponse` per period, so your own order state stays the source of truth. It does not create a pricing plan or a subscription at the provider.
+
+## HTTP handler
+
+The route is privileged, so it can only be enabled together with an `authorize` hook, and it honors `Idempotency-Key`:
+
+```typescript
+const handler = payment.createHandler({
+  allowedActions: ['recurring/charge'],
+  authorize: isAdmin,
+});
+
+// POST /api/pay/paytr/recurring/charge
+// { ...RecurringPaymentRequest }
+```
+
+## Events
+
+A charge emits the usual payment events with `operation: 'chargeStoredCard'`: `payment.succeeded`, `payment.pending` and `payment.failed`. The event request carries the stored-card tokens but no card data (no PAN, no CVC).
+
+```typescript
+payment.on('payment.succeeded', async (event) => {
+  if (event.operation !== 'chargeStoredCard') return;
+  await db.subscriptions.markPaid(event.conversationId!, event.paymentId);
+});
+```
+
+## Limits
+
+The library does not schedule or store subscription state: cron, queues and dunning are yours. It also does not verify that the customer agreed to recurring charges; the mandate text and consent record are your responsibility. When a provider's recurring permission is missing, the provider rejects the charge; the library does not fall back to a different flow.
+
+## Verification
+
+iyzico's stored-card behavior is covered by the unit suite with mocked HTTP, and the nightly sandbox job covers stored-card payments. The PayTR recurring fields follow PayTR's official documentation and have not been run against a live PayTR account.

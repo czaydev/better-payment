@@ -6,7 +6,8 @@ import {
 } from '../../core/BetterPaymentConfig';
 import type { HttpClient, HttpRequestConfig } from '../../core/http';
 import { fromBase64, randomHex } from '../../core/crypto';
-import { PaymentProvider, PaymentProviderConfig } from '../../core/PaymentProvider';
+import { PaymentProvider, type PaymentProviderConfig } from '../../core/PaymentProvider';
+import type { ProviderCapabilities } from '../../core/PaymentProvider';
 import { ConfigurationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
@@ -112,6 +113,18 @@ const IYZICO_CARD_PAYMENT_RULES: PaymentValidationRules = {
   saveCard: true,
 };
 
+/**
+ * Direct (NON-3D) payments additionally accept `recurring: true`: iyzico
+ * documents paying with a stored card without 3DS ("Create Payment with Stored
+ * Card (NON3D)", suitable for subscription cycles), marking the payment with
+ * `paymentGroup: "SUBSCRIPTION"`.
+ * https://docs.iyzico.com/en/advanced/card-storage
+ */
+const IYZICO_DIRECT_PAYMENT_RULES: PaymentValidationRules = {
+  ...IYZICO_CARD_PAYMENT_RULES,
+  recurring: true,
+};
+
 export interface IyzicoConfig extends PaymentProviderConfig {
   apiKey: string;
   secretKey: string;
@@ -158,6 +171,12 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
     if (!this.config.baseUrl) {
       throw new ConfigurationError('iyzico baseUrl is required', 'iyzico');
     }
+  }
+
+  get capabilities(): ProviderCapabilities {
+    // Stored-card NON-3D and 3DS payments, recurring (MIT) included:
+    // https://docs.iyzico.com/en/advanced/card-storage
+    return { storedCard: true, recurring: true };
   }
 
   protected errorCodeTable(): Record<string, PaymentErrorCode> {
@@ -267,7 +286,10 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
       installment: 1,
       basketId: request.basketId,
       paymentChannel: 'WEB',
-      paymentGroup: 'PRODUCT',
+      // `recurring: true` marks a subscription-period charge; iyzico documents
+      // paymentGroup SUBSCRIPTION for stored-card recurring payments.
+      // https://docs.iyzico.com/en/advanced/card-storage
+      paymentGroup: request.recurring ? 'SUBSCRIPTION' : 'PRODUCT',
       paymentCard: this.mapPaymentCard(request),
       buyer: {
         id: request.buyer.id,
@@ -364,7 +386,12 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
    * Direct payment (without 3D Secure)
    */
   async createPayment(request: PaymentRequest): Promise<PaymentResponse> {
-    return this.cardPayment('/payment/auth', request, 'Payment failed');
+    return this.cardPayment(
+      '/payment/auth',
+      request,
+      'Payment failed',
+      IYZICO_DIRECT_PAYMENT_RULES
+    );
   }
 
   /** Pre-authorization (`/payment/preauth`): blocks the amount without charging it */
@@ -375,10 +402,11 @@ export class Iyzico extends PaymentProvider<IyzicoConfig> {
   private async cardPayment(
     path: string,
     request: PaymentRequest,
-    fallback: string
+    fallback: string,
+    rules: PaymentValidationRules = IYZICO_CARD_PAYMENT_RULES
   ): Promise<PaymentResponse> {
     try {
-      this.validatePayment(request, IYZICO_CARD_PAYMENT_RULES);
+      this.validatePayment(request, rules);
       const iyzicoRequest = this.mapToIyzicoRequest(request);
       const response = await this.sendRequest<IyzicoPaymentResponse>(path, iyzicoRequest);
 

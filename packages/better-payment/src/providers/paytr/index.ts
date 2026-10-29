@@ -6,6 +6,7 @@ import {
 } from '../../core/BetterPaymentConfig';
 import type { HttpClient, HttpRequestConfig } from '../../core/http';
 import { PaymentProvider } from '../../core/PaymentProvider';
+import type { ProviderCapabilities } from '../../core/PaymentProvider';
 import { ConfigurationError, ValidationError } from '../../core/errors';
 import { failureResult, FailureResult } from '../../core/failure';
 import type { PaymentValidationRules } from '../../core/validation';
@@ -126,6 +127,14 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
     return this.config.testMode ? '1' : '0';
   }
 
+  get capabilities(): ProviderCapabilities {
+    // Stored-card payments (Kart Saklama) and recurring merchant-initiated
+    // charges with recurring_payment=1 + non_3d=1:
+    // https://dev.paytr.com/direkt-api/kart-saklama-api/kayitli-kart-tekrarlayan-odeme
+    // Requires the Non3D permission to be enabled on the PayTR account.
+    return { storedCard: true, recurring: true };
+  }
+
   private get lang(): string {
     return (this.config.locale || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr';
   }
@@ -178,6 +187,9 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         card: true,
         storedCard: true,
         saveCard: true,
+        // Direct API supports recurring charges on stored cards; see the
+        // capabilities getter for the doc link.
+        recurring: true,
       });
       merchantOid = this.resolveMerchantOid(request.conversationId);
       const installmentCount =
@@ -223,6 +235,10 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
         user_address: request.billingAddress?.address || request.shippingAddress?.address || '',
         user_phone: request.buyer.gsmNumber,
         user_basket: this.buildBasket(request.basketItems, 'direct'),
+        // Merchant-initiated charge on a stored card. PayTR requires Non-3D
+        // (`non_3d=1`, above) and does not include this field in paytr_token:
+        // https://dev.paytr.com/direkt-api/kart-saklama-api/kayitli-kart-tekrarlayan-odeme
+        ...(request.recurring ? { recurring_payment: '1' } : {}),
         ...this.cardFields(request),
       };
 
