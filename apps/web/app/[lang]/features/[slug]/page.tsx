@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, BookOpen, Check, ShoppingBag } from "lucide-react";
-import { PageShell, PageHero, Section, SectionHead, Card, CodeCard, DarkBlock, LinkCard, ArrowChip } from "@/components/page/primitives";
+import { ArrowRight, BookOpen, Check, ShoppingBag, X } from "lucide-react";
+import { PageShell, PageHero, Section, SectionHead, Card, CodeCard, ProofBlock, LinkCard, ArrowChip } from "@/components/page/primitives";
 import { FeatureVisual } from "@/components/page/feature-visuals";
 import { buttonVariants } from "@/lib/button-variants";
 import { FEATURES_DATA, FEATURE_SLUGS, loc, type FeatureSlug } from "@/lib/features-data";
@@ -30,20 +30,12 @@ export default async function FeatureDetailPage({ params }: PageProps<"/[lang]/f
   const feature = FEATURES_DATA[slug as FeatureSlug];
   if (!feature) notFound();
   const isTr = lang === "tr";
-  const Icon = feature.icon;
   const others = FEATURE_SLUGS.filter((s) => s !== slug);
   const next = FEATURE_SLUGS[(FEATURE_SLUGS.indexOf(feature.slug) + 1) % FEATURE_SLUGS.length];
 
   return (
     <PageShell lang={lang}>
       <PageHero
-        crumbs={[
-          { label: isTr ? "Ürün" : "Product", href: localePath(lang, "/product") },
-          { label: isTr ? "Özellikler" : "Features", href: localePath(lang, "/features") },
-          { label: loc(feature.title, lang) },
-        ]}
-        eyebrow={loc(feature.badge, lang).toLocaleLowerCase(lang).replace(/^\p{L}/u, (c) => c.toLocaleUpperCase(lang))}
-        icon={Icon}
         title={loc(feature.headline, lang)}
         lead={loc(feature.description, lang)}
         actions={
@@ -81,26 +73,36 @@ export default async function FeatureDetailPage({ params }: PageProps<"/[lang]/f
       </Section>
 
       <Section className="pt-0">
-        <DarkBlock>
+        <ProofBlock>
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <h2 className="text-title-lg sm:text-title-xl">
+              <h2 className="text-title-lg text-foreground sm:text-title-xl">
                 {isTr ? "Basit, anlaşılır ve doğrudan." : "Simple, readable, direct."}
               </h2>
               <div className="mt-8 space-y-3">
-                <div className="rounded-2xl border border-border p-5">
-                  <p className="text-caption font-medium text-danger">{isTr ? "Better Payment olmadan" : "Without Better Payment"}</p>
+                <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-danger-soft text-danger">
+                      <X className="size-4" aria-hidden />
+                    </span>
+                    <p className="text-caption font-medium text-foreground">{isTr ? "Better Payment olmadan" : "Without Better Payment"}</p>
+                  </div>
                   <p className="mt-1.5 text-body text-muted-foreground">{loc(feature.comparison.without, lang)}</p>
                 </div>
-                <div className="rounded-2xl border border-primary/60 bg-card p-5">
-                  <p className="text-caption font-medium text-success">{isTr ? "Better Payment ile" : "With Better Payment"}</p>
+                <div className="rounded-2xl border border-primary/25 bg-card p-5 shadow-sm ring-1 ring-primary/5">
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-success-soft text-success">
+                      <Check className="size-4" aria-hidden />
+                    </span>
+                    <p className="text-caption font-medium text-foreground">{isTr ? "Better Payment ile" : "With Better Payment"}</p>
+                  </div>
                   <p className="mt-1.5 text-body text-foreground">{loc(feature.comparison.with, lang)}</p>
                 </div>
               </div>
             </div>
-            <CodeCard filename={feature.codeFilename} code={feature.codeSnippet} className="border border-border bg-background" />
+            <CodeCard filename={feature.codeFilename} code={feature.codeSnippet} />
           </div>
-        </DarkBlock>
+        </ProofBlock>
       </Section>
 
       <Section className="pt-0">

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Bell, Check, CreditCard, Lock, ShieldCheck, X } from "lucide-react"
+import { highlight } from "@/components/Code";
 import type { FeatureSlug } from "@/lib/features-data";
 import type { Locale } from "@/lib/i18n/config";
 import { cn } from "@/lib/utils"
@@ -24,8 +25,10 @@ function Frame({ title, children, className }: { title: string; children: ReactN
   );
 }
 
-const Mono = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <span className={cn("font-mono text-meta", className)}>{children}</span>
+const Mono = ({ children, className, syntax = false }: { children: ReactNode; className?: string; syntax?: boolean }) => (
+  <span className={cn("font-mono text-meta", className)}>
+    {syntax && typeof children === "string" ? highlight(children) : children}
+  </span>
 );
 
 function Basket({ lang }: { lang: L }) {
@@ -75,7 +78,7 @@ function PreAuth({ lang }: { lang: L }) {
         {nodes.map((n, i) => (
           <div key={n.label} className="flex flex-1 items-center gap-2">
             <div className={cn("flex-1 rounded-2xl border p-3", n.on ? "border-primary bg-card" : "border-dashed border-border-strong bg-transparent")}>
-              <Mono className="text-foreground">{n.label}</Mono>
+              <Mono syntax className="text-foreground">{n.label}</Mono>
               <p className="mt-1 text-caption text-muted-foreground">{n.sub}</p>
             </div>
             {i < nodes.length - 1 && <ArrowRight className="size-4 shrink-0 text-muted-foreground" />}
@@ -107,7 +110,7 @@ function StoredCards({ lang }: { lang: L }) {
         <div className="space-y-2">
           <div className="rounded-2xl border border-border bg-card p-3">
             <p className="text-caption text-muted-foreground">{t(lang, "Uygulamanıza dönen", "What your app stores")}</p>
-            <Mono className="mt-1 block truncate text-foreground">card_tok_8f3a…c91</Mono>
+            <Mono syntax className="mt-1 block truncate text-foreground">card_tok_8f3a…c91</Mono>
           </div>
           <div className="flex items-center gap-2 rounded-2xl bg-tint px-3 py-2.5 text-body-sm text-accent-text">
             <Check className="size-4" /> {t(lang, "Ham kart verisi sunucunuza uğramaz", "Raw card data never touches your server")}
@@ -136,7 +139,7 @@ function Handler({ lang }: { lang: L }) {
             </span>
             <div className="flex-1 rounded-2xl border border-border bg-card px-4 py-2.5">
               <p className="text-body-sm font-medium text-foreground">{s.label}</p>
-              <Mono className="text-muted-foreground">{s.mono}</Mono>
+              <Mono syntax className="text-muted-foreground">{s.mono}</Mono>
             </div>
           </li>
         ))}
@@ -160,7 +163,7 @@ function Events({ lang }: { lang: L }) {
       <ul className="space-y-2">
         {log.map(([name, time, dot], i) => (
           <li key={name} className={cn("flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-2.5", i === 2 && "border-primary")}>
-            <span className="flex items-center gap-3"><i className={cn("size-2 rounded-full", dot)} /><Mono className="text-foreground">{name}</Mono></span>
+            <span className="flex items-center gap-3"><i className={cn("size-2 rounded-full", dot)} /><Mono syntax className="text-foreground">{name}</Mono></span>
             <Mono className="text-muted-foreground">{time}</Mono>
           </li>
         ))}
@@ -194,7 +197,7 @@ function ErrorCodes({ lang }: { lang: L }) {
         ))}
       </ul>
       <div className="mt-3 rounded-2xl bg-primary px-4 py-3 text-center text-primary-foreground">
-        <Mono>error.code === &quot;INSUFFICIENT_FUNDS&quot;</Mono>
+        <Mono syntax>{`error.code === "INSUFFICIENT_FUNDS"`}</Mono>
       </div>
     </Frame>
   );
@@ -205,15 +208,15 @@ function Plugins({ lang }: { lang: L }) {
   return (
     <Frame title={t(lang, "Eklenti hattı", "Plugin pipeline")}>
       <div className="flex flex-col">
-        <div className="rounded-2xl border border-border bg-card px-4 py-2.5 text-center"><Mono className="text-foreground">createPayment(order)</Mono></div>
+        <div className="rounded-2xl border border-border bg-card px-4 py-2.5 text-center"><Mono syntax className="text-foreground">createPayment(order)</Mono></div>
         {chain.map((c) => (
           <div key={c}>
             <span className="mx-auto block h-3 w-px bg-border-strong" aria-hidden />
-            <div className="rounded-2xl border border-dashed border-border-strong bg-tint/50 px-4 py-2.5 text-center"><Mono className="text-accent-text">use({c})</Mono></div>
+            <div className="rounded-2xl border border-dashed border-border-strong bg-tint/50 px-4 py-2.5 text-center"><Mono syntax className="text-accent-text">{`use(${c})`}</Mono></div>
           </div>
         ))}
         <span className="mx-auto block h-3 w-px bg-border-strong" aria-hidden />
-        <div className="rounded-2xl bg-primary px-4 py-2.5 text-center text-primary-foreground"><Mono>provider.request()</Mono></div>
+        <div className="rounded-2xl bg-primary px-4 py-2.5 text-center text-primary-foreground"><Mono syntax>provider.request()</Mono></div>
       </div>
     </Frame>
   );
@@ -231,13 +234,13 @@ function CustomProviders({ lang }: { lang: L }) {
       <ul className="space-y-2">
         {files.map((x) => (
           <li key={x.f} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-2.5">
-            <Mono className="text-foreground">{x.f}</Mono><Mono className="text-muted-foreground">{x.note}</Mono>
+            <Mono className="text-foreground">{x.f}</Mono><Mono syntax className="text-muted-foreground">{x.note}</Mono>
           </li>
         ))}
       </ul>
       <div className="mt-4 flex flex-wrap gap-1.5">
         {methods.map((m) => (
-          <span key={m} className="inline-flex items-center gap-1 rounded-full bg-tint px-2.5 py-1 font-mono text-meta text-accent-text"><Check className="size-3" />{m}</span>
+          <span key={m} className="inline-flex items-center gap-1 rounded-full bg-tint px-2.5 py-1 font-mono text-meta text-accent-text"><Check className="size-3" />{highlight(`${m}()`)}</span>
         ))}
       </div>
       <p className="mt-4 text-caption text-muted-foreground">{t(lang, "≈ 50 satırda sözleşme tamam.", "≈ 50 lines to fulfil the contract.")}</p>

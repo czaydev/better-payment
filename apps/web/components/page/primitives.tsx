@@ -5,6 +5,7 @@ import { ArrowUpRight, ChevronRight, Terminal, type LucideIcon } from "lucide-re
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import RevealOnScroll from "@/components/RevealOnScroll";
+import { highlight } from "@/components/Code";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/i18n/config";
 import { cn } from "@/lib/utils";
@@ -187,10 +188,22 @@ export function DarkBlock({ className, children, ...props }: React.ComponentProp
   );
 }
 
+/** Theme-aware proof surface for dense comparison and integration sections. */
+export function ProofBlock({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("rounded-card border border-border bg-surface p-8 shadow-[0_24px_70px_-52px_var(--bp-shadow)] sm:p-12", className)}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function CodeCard({ filename, code, className }: { filename: string; code: string; className?: string }) {
   return (
-    <div className={cn("panel-dark overflow-hidden rounded-card", className)}>
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+    <div className={cn("overflow-hidden rounded-card border border-border bg-card shadow-sm", className)}>
+      <div className="flex items-center justify-between border-b border-border bg-background/60 px-6 py-4">
         <span className="flex items-center gap-2 font-mono text-meta text-muted-foreground">
           <Terminal className="size-3.5 text-accent-text" />
           {filename}
@@ -198,7 +211,7 @@ export function CodeCard({ filename, code, className }: { filename: string; code
         <span className="rounded-badge border border-border px-2 py-0.5 font-mono text-micro text-muted-foreground">TypeScript</span>
       </div>
       <pre className="overflow-x-auto p-6 font-mono text-meta leading-code text-foreground/90">
-        <code>{code}</code>
+        <code>{highlight(code)}</code>
       </pre>
     </div>
   );
@@ -216,7 +229,7 @@ export function PageHero({
   children,
 }: {
   crumbs?: Array<{ label: string; href?: string }>;
-  eyebrow: string;
+  eyebrow?: string;
   icon?: LucideIcon;
   title: ReactNode;
   lead: ReactNode;
@@ -230,7 +243,7 @@ export function PageHero({
         <div className={cn("grid items-center gap-10", visual && "lg:grid-cols-[1.05fr_0.95fr] lg:gap-14")}>
           <div className="bp-enter min-w-0">
             {crumbs && <Crumbs items={crumbs} />}
-            <Eyebrow icon={icon} className="mb-5">{eyebrow}</Eyebrow>
+            {eyebrow && <Eyebrow icon={icon} className="mb-5">{eyebrow}</Eyebrow>}
             <h1 className="max-w-3xl text-display-md text-foreground sm:text-display-lg">{title}</h1>
             <p className="mt-6 max-w-xl text-body-lg leading-relaxed text-muted-foreground">{lead}</p>
             {actions && <div className="mt-8 flex flex-wrap items-center gap-3">{actions}</div>}

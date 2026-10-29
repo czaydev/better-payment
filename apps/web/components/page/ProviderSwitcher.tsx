@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { highlight } from "@/components/Code";
 import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
@@ -16,6 +17,11 @@ const PROVIDERS = [
 export default function ProviderSwitcher({ resultLabel }: { resultLabel: string }) {
   const [active, setActive] = useState<(typeof PROVIDERS)[number]["id"]>("iyzico");
   const current = PROVIDERS.find((p) => p.id === active)!;
+  const snippet = `const payment = createBetterPayment({
+  defaultProvider: "${active}",
+});
+
+await payment.createPayment(order);`;
 
   return (
     <div className="rounded-card border border-border bg-card p-3">
@@ -37,18 +43,9 @@ export default function ProviderSwitcher({ resultLabel }: { resultLabel: string 
         ))}
       </div>
 
-      <div className="panel-dark mt-3 rounded-[26px] p-5 font-mono text-meta leading-code">
-        <p>
-          <span className="text-muted-foreground">const</span> payment = createBetterPayment({"{"}
-        </p>
-        <p className="pl-4">
-          defaultProvider: <span className="rounded bg-tint px-1.5 py-0.5 text-accent-text transition-all">&quot;{active}&quot;</span>,
-        </p>
-        <p>{"});"}</p>
-        <p className="mt-3">
-          <span className="text-muted-foreground">await</span> payment.createPayment(order);
-        </p>
-      </div>
+      <pre className="panel-dark mt-3 overflow-x-auto rounded-[26px] p-5 font-mono text-meta leading-code text-foreground">
+        <code>{highlight(snippet)}</code>
+      </pre>
 
       <div className="mt-3 flex items-center justify-between rounded-[26px] border border-border bg-surface px-5 py-4">
         <div>
