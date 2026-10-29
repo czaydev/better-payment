@@ -1,0 +1,48 @@
+---
+title: Evaluating New Providers — Moka, Papara and Lidio
+description: Follow-up to issue 40. Sipay already shipped, so this page compares the remaining candidates and recommends which provider to implement next.
+---
+
+Issue [#40](https://github.com/czaydev/better-payment/issues/40) asked which payment
+institutions are worth supporting: Sipay, Moka, Papara and Lidio. Since then the
+Sipay provider shipped (see [Sipay](/docs/providers/sipay)), so this page evaluates
+the three remaining candidates against the same criteria: API style, 3D Secure flow,
+refund and status support, sandbox availability, documentation quality, and fit with
+the marketplace roadmap.
+
+## Comparison
+
+| Criteria | Moka | Papara | Lidio |
+| --- | --- | --- | --- |
+| API style | REST and SOAP APIs, dealer (sub-merchant) endpoints via the Moka United developer portal | REST merchant API with API key, checkout and ledger endpoints | Card payments and tokenization platform, Worldline partnership for cross-border |
+| 3D Secure | Supported, including 3D enrollment and stored-card flows | Hosted checkout with 3D | Supported through the gateway |
+| Refund and status | Refund, void and status queries documented | Refund endpoint documented | Refund and status via gateway API |
+| Sandbox and docs | Public developer portal with test credentials | Public API reference, SDKs in several languages | Docs available, enterprise onboarding |
+| Marketplace fit | Native dealer and sub-merchant model, matches the split-payment roadmap | No native split-payment model | Tokenization strength (54M tokenized cards reported), no native split model |
+| Regulatory status | Licensed payment institution, operating normally | License revoked by the TCMB in October 2025 during the illegal-betting investigation, trustee appointed — see below | Licensed payment institution, TCMB-authorized partnership for international payments |
+
+## Papara — excluded for now
+
+In May 2025 Turkish authorities detained 13 people including Papara's founder as part
+of an illegal-betting investigation, appointed the Savings Deposit Insurance Fund
+(TMSF) as trustee, and in October 2025 the Central Bank revoked Papara's electronic
+money license. Building a provider integration on a revoked license would put
+merchants' money flows at risk, so Papara is excluded until there is regulatory
+clarity. Revisit only if a valid license is reinstated.
+
+## Decision
+
+1. **Moka next.** It is the only candidate with a native sub-merchant model, which
+   the marketplace split-payment work needs, and it has a public developer portal
+   with test credentials.
+2. **Lidio second.** Licensed and strong on tokenization, a good fit after stored
+   cards and recurring payments land. Sandbox access and exact refund semantics
+   still need verification.
+3. **Papara on hold** until the license situation is resolved.
+
+## Still needed before implementation
+
+Like every provider in this repository, the chosen candidate must be verified
+against its real test environment (see the sandbox-verification issues): 3D payment,
+refund, void, status query and webhook delivery, plus Turkish-language docs pages
+for the new provider following the existing provider page format.
