@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, BookOpen, Building2, Check, Wallet } from "lucide-react";
-import { PageShell, PageHero, Section, SectionHead, Card, CodeCard, DarkBlock, StepsCard, LinkCard, ArrowChip, StatTiles } from "@/components/page/primitives";
+import { PageShell, PageHero, Section, SectionHead, Card, CodeCard, ProofBlock, StepsCard, LinkCard, ArrowChip, StatTiles } from "@/components/page/primitives";
 import ProviderBanner, { LogoTile } from "@/components/page/ProviderBanner";
 import { buttonVariants } from "@/lib/button-variants";
 import { PROVIDER_META } from "@/lib/provider-meta";
@@ -115,20 +115,20 @@ export default async function ProviderDetailPage({ params }: PageProps<"/[lang]/
       </Section>
 
       <Section className="pt-0">
-        <DarkBlock>
+        <ProofBlock>
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
             <div>
               <div className="mb-6 flex items-center gap-3">
                 <LogoTile src={meta.logo} w={meta.w} h={meta.h} name={provider.name} size="md" />
               </div>
-              <h2 className="text-title-lg sm:text-title-xl">{isTr ? "Tek satırla bağlayın." : "Connect in one config."}</h2>
+              <h2 className="text-title-lg text-foreground sm:text-title-xl">{isTr ? "Tek satırla bağlayın." : "Connect in one config."}</h2>
               <p className="mt-4 text-body-lg text-muted-foreground">
                 {isTr ? "Kimlik bilgilerinizi verin, geri kalanı Better Payment halleder." : "Hand over your credentials; Better Payment handles the rest."}
               </p>
             </div>
-            <CodeCard filename={`payment-${provider.slug}.ts`} code={provider.configCode} className="border border-border bg-background" />
+            <CodeCard filename={`payment-${provider.slug}.ts`} code={provider.configCode} />
           </div>
-        </DarkBlock>
+        </ProofBlock>
       </Section>
 
       <Section className="pt-0">
