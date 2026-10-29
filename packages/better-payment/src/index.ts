@@ -96,6 +96,9 @@ export type {
   BuiltBasket,
 } from './core/basket';
 
+export { buildInstallmentTable } from './core/installments';
+export type { InstallmentTableRow, BuildInstallmentTableOptions } from './core/installments';
+
 export { VERSION } from './version';
 
 export { PaymentErrorCode, ISO8583_ERROR_CODES } from './core/error-codes';
