@@ -1,0 +1,145 @@
+---
+title: Barındırılan ödeme
+description: iyzico Checkout Form, PayTR iFrame ve EST barındırılan store type'ları için tek createCheckout().
+---
+
+<Since version="0.12.0" />
+
+`createCheckout()` ödemeyi sağlayıcının kendi sayfasında başlatır; kart numarası sunucunuza hiç gelmez. Aynı istek iyzico, PayTR ve EST bankalarıyla çalışır; sağlayıcı değiştirmek bir yapılandırma değişikliğidir. Barındırılan sayfası olmayan sağlayıcılar `NOT_SUPPORTED` fırlatır (bkz. [Sağlayıcılar](#providers)).
+
+## Barındırılan sayfayı oluşturmak [#create-the-hosted-page]
+
+```typescript
+const checkout = await payment.use("iyzico").createCheckout({
+  price: "100.00",
+  paidPrice: "100.00",
+  currency: "TRY",
+  basketId: "ORDER-42",
+  conversationId: "ORDER-42", // your order id; the provider's order id where it has one
+  buyer,
+  shippingAddress,
+  billingAddress,
+  basketItems,
+  returnUrl: "https://shop.example/orders/ORDER-42/return",
+  installments: [1, 3, 6], // optional
+  locale: "tr", // optional: language of the hosted page
+});
+
+if (checkout.redirectUrl) window.location.href = checkout.redirectUrl;
+else if (checkout.html)
+  document.getElementById("payment")!.innerHTML = checkout.html;
+```
+
+`CheckoutRequest` kart alanları içermez: `paymentCard`, `storedCard`, `saveCard` ve `callbackUrl` bilinçli olarak dışarıda bırakılmıştır.
+
+| Alan                          | Anlamı                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `status`                      | Sayfa hazır olduğunda `pending`; bu asla ödendi anlamına gelmez. Sayfa oluşturulamazsa `code` ile birlikte `failure`.   |
+| `redirectUrl`                 | Müşteriyi buraya gönderin: iyzico ödeme sayfası ya da PayTR'nin `/odeme/guvenli/<token>` sayfası                        |
+| `iframeUrl`                   | Aynı sayfanın `<iframe>` için hali (iyzico, PayTR)                                                                      |
+| `html`                        | Tarayıcıda render edilecek HTML: iyzico form içeriği, PayTR iframe sayfası ya da EST'in otomatik gönderilen banka formu |
+| `token`                       | `getCheckoutResult()` için tutamak                                                                                      |
+| `tokenExpireTime`             | Sağlayıcı bildiriyorsa token'ın son kullanma zamanı (iyzico)                                                            |
+| `paymentId`, `conversationId` | Varsa sağlayıcının sipariş numarası                                                                                     |
+
+## Sonucu okumak [#read-the-result]
+
+Ödemeyi yalnızca sağlayıcı doğrulayabilir. Token ile ona sorun:
+
+```typescript
+const result = await payment.use("iyzico").getCheckoutResult(checkout.token!);
+
+switch (result.status) {
+  case "success":
+    // verified by the provider: safe to mark the order as paid
+    break;
+  case "pending":
+    // the customer has not finished, or the provider has not confirmed yet
+    break;
+  default:
+    // result.code, result.errorCode and result.errorMessage describe the failure
+    break;
+}
+```
+
+<Callout type="warn">
+  Müşterinin `returnUrl` adresine dönmesi bir onay **değildir**. Sorgu
+  parametreleri imzalı değildir; `?status=success` gibi bir URL'i herkes
+  yazabilir. Siparişi yalnızca doğrulanmış bir callback'ten ya da
+  `getCheckoutResult()` sonucu `success` olduktan sonra ödendi olarak
+  işaretleyin.
+</Callout>
+
+## Callback'ler ve dönüş URL'leri [#callbacks-and-return-urls]
+
+| Sağlayıcı | `returnUrl` ne alır                                | Onay                                                                                                                            |
+| --------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| iyzico    | Checkout formunun token'ı ile imzasız bir POST     | `getCheckoutResult(token)` iyzico'nun detay API'sine sorar                                                                      |
+| PayTR     | Yalnızca müşterinin tarayıcısı (`merchant_ok_url`) | PayTR'nin sunucudan sunucuya bildirimi; hash'i handler doğrular                                                                 |
+| EST       | `okUrl` adresine imzalı POST (hatada `failUrl`)    | Handler'ın callback route'u hash'i doğrular; `3d_host` kartı orada çeker, `3d_pay_hosting` sipariş durumu sorgusuyla doğrulanır |
+
+- **iyzico:** dönüş sayfanızdaki POST'tan gelen token'ı kullanın ve sunucuda `getCheckoutResult()` çağırın.
+- **PayTR:** PayTR panelindeki Bildirim URL'sini `https://yoursite.com/api/pay/paytr/callback` olarak ayarlayın. iFrame kart kaydedemez.
+- **EST:** `3d_host` için `returnUrl` adresini handler'ın callback route'una (`/api/pay/est/callback`) yönlendirin; imzalı callback doğrulandığında kartı sunucunuz çeker. Ardından tarayıcıyı sipariş sayfanıza göndermek için `callbackRedirect` kullanın. `3d_pay_hosting` kartı banka çeker.
+
+[HTTP handler](/docs/concepts/handler) ile doğrulanmış callback siparişinizi bir kez günceller:
+
+```typescript
+const payment = betterPayment({
+  providers: { iyzico, paytr, est },
+  handler: {
+    allowedActions: ["checkout/init", "callback", "checkout/retrieve"],
+    authorize: async (ctx) =>
+      ctx.action !== "checkout/retrieve" ||
+      isAdmin(ctx.request.headers.authorization),
+    callbackRedirect: (result) =>
+      `/orders/${result.paymentId}?payment=${result.status}`,
+    onCallback: async (result) => {
+      await db.orders.updatePayment(result.paymentId!, result.status);
+    },
+  },
+});
+```
+
+## Sağlayıcılar [#providers]
+
+| Sağlayıcı                                                                     | Barındırılan model                                                       | `createCheckout()`                                          | Sonuç                                                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| iyzico                                                                        | Checkout Form                                                            | Evet: `redirectUrl`, `iframeUrl`, `html`                    | `getCheckoutResult(token)` ile detay sorgusu                                                                                 |
+| PayTR                                                                         | iFrame API (`threeDSMode: 'iframe'`, varsayılan)                         | Evet: `redirectUrl`, `iframeUrl`, `html`                    | Durum sorgusu ve bildirim. `threeDSMode: 'direct'` ile kart istekte olduğu için `NOT_SUPPORTED`                              |
+| EST                                                                           | `3d_host` ve `3d_pay_hosting` store type'ları                            | Evet: `html`, müşteriyi `/fim/est3Dgate` sayfasına gönderir | `ORDERSTATUS` sorgusu; `3d_host`'u imzalı callback kesinleştirir. `3d` ve `3d_pay` kartı istekte aldığı için `NOT_SUPPORTED` |
+| Parampos                                                                      | Bu entegrasyonda barındırılan sayfa yok: `TP_WMD_UCD` kartı istekte alır | `NOT_SUPPORTED`                                             | —                                                                                                                            |
+| Sipay, QNBpay, Akbank, Albaraka, Denizbank, Kuveyttürk, Vakıfbank, Yapı Kredi | Barındırılan checkout uygulanmadı                                        | `NOT_SUPPORTED`                                             | —                                                                                                                            |
+
+EST için bankanın barındırılan modelini açıkça yapılandırın:
+
+```typescript
+est({
+  clientId: process.env.EST_CLIENT_ID!,
+  username: process.env.EST_USERNAME!,
+  password: process.env.EST_PASSWORD!,
+  storeKey: process.env.EST_STORE_KEY!,
+  storeType: "3d_host", // or '3d_pay_hosting'
+});
+```
+
+## Handler ve client [#handler-and-client]
+
+| Route                               | İşlem               | `authorize` gerekir mi |
+| ----------------------------------- | ------------------- | ---------------------- |
+| `POST /:provider/checkout/init`     | `checkout/init`     | —                      |
+| `POST /:provider/checkout/retrieve` | `checkout/retrieve` | 🔒                     |
+
+`checkout/init` handler'da publictir; bu yüzden tutarları tarayıcıya güvenmek yerine `transformRequest` ile sunucuda oluşturun. `checkout/retrieve` ödeme ayrıntılarını açığa çıkarır ve bu nedenle bir `authorize` hook'u gerektirir. Tarayıcı client'ında `client.<provider>.createCheckout(...)` ve `getCheckoutResult(token)` var; retrieve metodunu sunucudan ya da yönetici kimlik bilgileriyle çağırın.
+
+## Kart verisi ve kart saklama [#card-data-and-card-storage]
+
+`CheckoutRequest` içinde kart numarası, CVC ya da kart sahibi adı gönderilmez; `createCheckout()` bunları döndürmez ve ödeme olayları bunları taşımaz. iyzico'da müşteri barındırılan formda kartını kaydederse `getCheckoutResult()` sonucunda `storedCard.customerToken` ve `storedCard.cardToken` gelir; bu token'ları [Kayıtlı kartlar](/docs/payments/stored-cards) sayfasında anlatıldığı gibi kullanıcınızın yanında saklayın. PayTR'nin iFrame'i kart kaydedemez.
+
+## BIN yönlendirmesi [#bin-routing]
+
+Barındırılan sayfada yönlendirmeden önce kart numarası yoktur; bu yüzden BIN tabanlı kurallar ([#279](https://github.com/czaydev/better-payment/issues/279)) `createCheckout()` içinde sağlayıcı ya da acquirer seçemez. Bunun yerine sipariş, para birimi veya sağlayıcı yapılandırmasına göre yönlendirin; BIN ancak ödemeden sonra ya da zaten güvendiğiniz başka bir kaynaktan elde edilir.
+
+## Doğrulama [#verification]
+
+iyzico, PayTR ve EST eşlemeleri, her sağlayıcının belgelenmiş barındırılan parametreleriyle ve sahte HTTP ile çalışan birim testleriyle kapsanır. Genel akış (doğrulanmış callback'e kadar `pending`, sahte callback'ler, sonuçlarda ve olaylarda kart verisi olmaması) `MockProvider` ve onun barındırılan sayfasıyla test edilir; bkz. [Test etme](/docs/concepts/testing). Bu özellik için canlı sandbox ödemesi çalıştırılmadı.

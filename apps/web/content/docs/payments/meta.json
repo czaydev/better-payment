@@ -1,9 +1,5 @@
 {
   "title": "Payments",
   "icon": "payments",
-  "pages": [
-    "pre-authorization",
-    "stored-cards",
-    "basket"
-  ]
+  "pages": ["pre-authorization", "stored-cards", "basket", "hosted-checkout"]
 }

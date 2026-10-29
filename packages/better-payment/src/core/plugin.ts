@@ -3,6 +3,8 @@ import type {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -31,14 +33,20 @@ type Awaitable<T> = T | Promise<T>;
 
 /**
  * The provider operations plugins can hook into, with their request and result
- * types. Provider-specific methods (iyzico checkout form, subscriptions, PayTR
- * token payments) are not operations: they run without hooks.
+ * types. Provider-specific methods (iyzico subscriptions, PayTR direct token
+ * payments) are not operations: they run without hooks. The unified hosted
+ * checkout (`createCheckout`/`getCheckoutResult`) IS an operation, so hooks and
+ * events apply to it like to `createPayment`.
  */
 export interface PaymentOperations {
   createPayment: { request: PaymentRequest; result: PaymentResponse };
   initThreeDSPayment: { request: ThreeDSPaymentRequest; result: ThreeDSInitResponse };
   /** The request is the provider's callback data */
   completeThreeDSPayment: { request: unknown; result: PaymentResponse };
+  /** Hosted checkout page: no card data in the request */
+  createCheckout: { request: CheckoutRequest; result: CheckoutInitResponse };
+  /** The request is the token from `createCheckout()` */
+  getCheckoutResult: { request: string; result: PaymentResponse };
   authorize: { request: PaymentRequest; result: PaymentResponse };
   initThreeDSAuthorize: { request: ThreeDSPaymentRequest; result: ThreeDSInitResponse };
   capture: { request: CaptureRequest; result: PaymentResponse };
@@ -61,6 +69,8 @@ export const PAYMENT_OPERATIONS: readonly PaymentOperation[] = [
   'createPayment',
   'initThreeDSPayment',
   'completeThreeDSPayment',
+  'createCheckout',
+  'getCheckoutResult',
   'authorize',
   'initThreeDSAuthorize',
   'capture',

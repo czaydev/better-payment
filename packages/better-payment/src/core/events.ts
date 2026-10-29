@@ -11,10 +11,10 @@ type Awaitable<T> = T | Promise<T>;
  *
  * | Event               | Operations                                                              |
  * | ------------------- | ----------------------------------------------------------------------- |
- * | `payment.succeeded` | createPayment, completeThreeDSPayment, capture: `success`               |
+ * | `payment.succeeded` | createPayment, completeThreeDSPayment, getCheckoutResult, capture: `success` |
  * | `payment.authorized`| authorize: `success` (the amount is blocked)                            |
- * | `payment.pending`   | createPayment, completeThreeDSPayment, authorize, capture: `pending`    |
- * | `payment.failed`    | the payment operations and the 3D Secure inits: `failure`               |
+ * | `payment.pending`   | createPayment, completeThreeDSPayment, getCheckoutResult, authorize, capture: `pending` |
+ * | `payment.failed`    | the payment operations, createCheckout and the 3D Secure inits: `failure` |
  * | `payment.cancelled` | cancel, voidAuthorization: `success`                                    |
  * | `refund.succeeded`  | refund: `success`                                                       |
  * | `refund.failed`     | refund: `failure`                                                       |
@@ -99,6 +99,7 @@ export class EventListenerError extends BetterPaymentError {
 const PAYMENT_OPERATIONS = new Set<PaymentOperation>([
   'createPayment',
   'completeThreeDSPayment',
+  'getCheckoutResult',
   'authorize',
   'capture',
 ]);
@@ -126,7 +127,11 @@ export function eventFor(
       type = operation === 'authorize' ? 'payment.authorized' : 'payment.succeeded';
     } else if (status === PaymentStatus.PENDING) type = 'payment.pending';
     else if (status === PaymentStatus.FAILURE) type = 'payment.failed';
-  } else if (operation === 'initThreeDSPayment' || operation === 'initThreeDSAuthorize') {
+  } else if (
+    operation === 'initThreeDSPayment' ||
+    operation === 'initThreeDSAuthorize' ||
+    operation === 'createCheckout'
+  ) {
     if (status === PaymentStatus.FAILURE) type = 'payment.failed';
   } else if (operation === 'cancel' || operation === 'voidAuthorization') {
     if (status === PaymentStatus.SUCCESS) type = 'payment.cancelled';

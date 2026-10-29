@@ -1,0 +1,144 @@
+---
+title: Hosted checkout
+description: One createCheckout() for the provider's payment page — iyzico Checkout Form, PayTR iFrame and EST hosted store types.
+---
+
+<Since version="0.12.0" />
+
+`createCheckout()` starts a payment on the provider's own page, so the card number never reaches your server. The same request works with iyzico, PayTR and the EST banks; switching providers is a configuration change. Providers without a hosted page throw `NOT_SUPPORTED` (see [Providers](#providers)).
+
+## Create the hosted page
+
+```typescript
+const checkout = await payment.use("iyzico").createCheckout({
+  price: "100.00",
+  paidPrice: "100.00",
+  currency: "TRY",
+  basketId: "ORDER-42",
+  conversationId: "ORDER-42", // your order id; the provider's order id where it has one
+  buyer,
+  shippingAddress,
+  billingAddress,
+  basketItems,
+  returnUrl: "https://shop.example/orders/ORDER-42/return",
+  installments: [1, 3, 6], // optional
+  locale: "tr", // optional: language of the hosted page
+});
+
+if (checkout.redirectUrl) window.location.href = checkout.redirectUrl;
+else if (checkout.html)
+  document.getElementById("payment")!.innerHTML = checkout.html;
+```
+
+`CheckoutRequest` has no card fields: `paymentCard`, `storedCard`, `saveCard` and `callbackUrl` are deliberately left out.
+
+| Field                         | Meaning                                                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `status`                      | `pending` when the page is ready; this never means paid. `failure` with `code` when the page could not be created. |
+| `redirectUrl`                 | Send the customer here: iyzico's payment page or PayTR's `/odeme/guvenli/<token>` page                             |
+| `iframeUrl`                   | The same page for an `<iframe>` (iyzico, PayTR)                                                                    |
+| `html`                        | HTML to render: iyzico's form content, PayTR's iframe page or EST's auto-submitting bank form                      |
+| `token`                       | Handle for `getCheckoutResult()`                                                                                   |
+| `tokenExpireTime`             | Token expiry, when the provider reports it (iyzico)                                                                |
+| `paymentId`, `conversationId` | Provider order id, where available                                                                                 |
+
+## Read the result
+
+Only the provider can confirm the payment. Ask it with the token:
+
+```typescript
+const result = await payment.use("iyzico").getCheckoutResult(checkout.token!);
+
+switch (result.status) {
+  case "success":
+    // verified by the provider: safe to mark the order as paid
+    break;
+  case "pending":
+    // the customer has not finished, or the provider has not confirmed yet
+    break;
+  default:
+    // result.code, result.errorCode and result.errorMessage describe the failure
+    break;
+}
+```
+
+<Callout type="warn">
+  The customer's return to `returnUrl` is **not** a confirmation. Its query
+  parameters are not signed, so a URL such as `?status=success` may be typed by
+  anyone. Mark an order as paid only after a verified callback or a `success`
+  from `getCheckoutResult()`.
+</Callout>
+
+## Callbacks and return URLs
+
+| Provider | What `returnUrl` receives                        | Confirmation                                                                                                                               |
+| -------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| iyzico   | A POST with the checkout form's token (unsigned) | `getCheckoutResult(token)` asks iyzico's detail API                                                                                        |
+| PayTR    | The customer's browser only (`merchant_ok_url`)  | PayTR's server-to-server notification, whose hash the handler verifies                                                                     |
+| EST      | A signed POST to `okUrl` (`failUrl` on failure)  | The handler's callback route verifies the hash; `3d_host` charges the card there, `3d_pay_hosting` is confirmed with an order status query |
+
+- **iyzico:** use the token from the POST on your return page and call `getCheckoutResult()` on the server.
+- **PayTR:** set the Notification (Bildirim) URL in the PayTR panel to `https://yoursite.com/api/pay/paytr/callback`. The iFrame cannot save cards.
+- **EST:** for `3d_host`, point `returnUrl` at the handler's callback route (`/api/pay/est/callback`), because your server charges the card when the signed callback is verified. Then use `callbackRedirect` to send the browser on to your order page. `3d_pay_hosting` is charged by the bank.
+
+With the [HTTP handler](/docs/concepts/handler), the verified callback updates your order once:
+
+```typescript
+const payment = betterPayment({
+  providers: { iyzico, paytr, est },
+  handler: {
+    allowedActions: ["checkout/init", "callback", "checkout/retrieve"],
+    authorize: async (ctx) =>
+      ctx.action !== "checkout/retrieve" ||
+      isAdmin(ctx.request.headers.authorization),
+    callbackRedirect: (result) =>
+      `/orders/${result.paymentId}?payment=${result.status}`,
+    onCallback: async (result) => {
+      await db.orders.updatePayment(result.paymentId!, result.status);
+    },
+  },
+});
+```
+
+## Providers
+
+| Provider                                                                      | Hosted model                                                                   | `createCheckout()`                                 | Result                                                                                                                          |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| iyzico                                                                        | Checkout Form                                                                  | Yes: `redirectUrl`, `iframeUrl`, `html`            | Detail lookup with `getCheckoutResult(token)`                                                                                   |
+| PayTR                                                                         | iFrame API (`threeDSMode: 'iframe'`, the default)                              | Yes: `redirectUrl`, `iframeUrl`, `html`            | Status query plus the notification. With `threeDSMode: 'direct'` the card is in your request, so `NOT_SUPPORTED`                |
+| EST                                                                           | Store types `3d_host` and `3d_pay_hosting`                                     | Yes: `html` posts the customer to `/fim/est3Dgate` | `ORDERSTATUS` lookup; the signed callback settles `3d_host`. `3d` and `3d_pay` take the card in the request, so `NOT_SUPPORTED` |
+| Parampos                                                                      | No hosted page in this integration: `TP_WMD_UCD` takes the card in the request | `NOT_SUPPORTED`                                    | —                                                                                                                               |
+| Sipay, QNBpay, Akbank, Albaraka, Denizbank, Kuveyttürk, Vakıfbank, Yapı Kredi | No hosted checkout implemented                                                 | `NOT_SUPPORTED`                                    | —                                                                                                                               |
+
+For EST, configure the bank's hosted model explicitly:
+
+```typescript
+est({
+  clientId: process.env.EST_CLIENT_ID!,
+  username: process.env.EST_USERNAME!,
+  password: process.env.EST_PASSWORD!,
+  storeKey: process.env.EST_STORE_KEY!,
+  storeType: "3d_host", // or '3d_pay_hosting'
+});
+```
+
+## Handler and client
+
+| Route                               | Action              | Needs `authorize` |
+| ----------------------------------- | ------------------- | ----------------- |
+| `POST /:provider/checkout/init`     | `checkout/init`     | —                 |
+| `POST /:provider/checkout/retrieve` | `checkout/retrieve` | 🔒                |
+
+`checkout/init` is public in the handler, so build the amounts on the server with `transformRequest` instead of trusting the browser. `checkout/retrieve` exposes payment details and therefore requires an `authorize` hook. The browser client has `client.<provider>.createCheckout(...)` and `getCheckoutResult(token)`; call the retrieve method from the server, or with admin credentials.
+
+## Card data and card storage
+
+No card number, CVC or card holder name is sent in `CheckoutRequest`, returned by `createCheckout()` or carried by payment events. On iyzico, a customer who saves their card on the hosted form produces `storedCard.customerToken` and `storedCard.cardToken` in the `getCheckoutResult()` result; store those tokens next to your user, as described in [Stored cards](/docs/payments/stored-cards). PayTR's iFrame cannot save cards.
+
+## BIN routing
+
+A hosted page has no card number before the redirect, so BIN-based rules ([#279](https://github.com/czaydev/better-payment/issues/279)) cannot choose a provider or acquirer in `createCheckout()`. Route by order, currency or provider configuration instead; a BIN is only available after the payment, or from another source you already trust.
+
+## Verification
+
+The iyzico, PayTR and EST mappings are covered by unit tests with mocked HTTP, using each provider's documented hosted parameters. The generic flow (pending until a verified callback, forged callbacks, no card data in results or events) is tested with `MockProvider` and its hosted page; see [Testing](/docs/concepts/testing). No live sandbox payment was run for this feature.

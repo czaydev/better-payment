@@ -5,7 +5,7 @@ import type {
   ProviderInstance,
   ProviderSetupContext,
 } from './BetterPaymentConfig';
-import { ProviderNotEnabledError, ConfigurationError } from './errors';
+import { ProviderNotEnabledError, ConfigurationError, BetterPaymentError } from './errors';
 import {
   BetterPaymentHandler,
   type BetterPaymentHandlerOptions,
@@ -38,6 +38,8 @@ import type {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -270,7 +272,16 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
 
     if (result === undefined) {
       const provider = this.resolve(ctx.provider);
-      result = await (provider[operation] as OperationFn).call(provider, ctx.request);
+      const run = provider[operation] as OperationFn | undefined;
+      if (typeof run !== 'function') {
+        // Custom adapters that do not extend PaymentProvider may lack an
+        // optional operation: report it like the base class default does.
+        throw new BetterPaymentError(
+          `${operation} is not supported by this provider`,
+          'NOT_SUPPORTED'
+        );
+      }
+      result = await run.call(provider, ctx.request);
     }
 
     let after = { ...ctx, provider: ctx.provider ?? '', result } as Parameters<
@@ -469,6 +480,23 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   /** Completes a 3D Secure payment with the default provider */
   completeThreeDSPayment(callbackData: unknown): Promise<PaymentResponse> {
     return this.call('completeThreeDSPayment', callbackData);
+  }
+
+  /**
+   * Hosted checkout page with the default provider: the customer enters the
+   * card on the provider's page, so no card data passes through your server.
+   * `NOT_SUPPORTED` when the provider has no hosted page.
+   */
+  createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    return this.call('createCheckout', request);
+  }
+
+  /**
+   * The verified result of a hosted checkout, by the token of `createCheckout()`.
+   * Only `success` here (or a verified provider callback) may mark an order as paid.
+   */
+  getCheckoutResult(token: string): Promise<PaymentResponse> {
+    return this.call('getCheckoutResult', token);
   }
 
   /** Refunds with the default provider */

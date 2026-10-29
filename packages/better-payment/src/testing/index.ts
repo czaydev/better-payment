@@ -16,12 +16,15 @@ import {
   type PaymentProviderConfig,
 } from 'better-payment';
 import type { PaymentValidationRules } from '../core/validation';
+import { maxInstallment } from '../core/utils';
 import { hmac, randomHex, safeEqual, toHex } from '../core/crypto';
 import type {
   PaymentRequest,
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  CheckoutRequest,
+  CheckoutInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -176,6 +179,7 @@ export class MockProvider extends PaymentProvider<MockProviderConfig> {
   private readonly secret: string;
   private readonly records = new Map<string, InternalRecord>();
   private readonly cards = new Map<string, SavedCard[]>();
+  private readonly hosted = new Set<string>();
   private readonly queued: Array<{ operation: MockOperation; scenario: Scenario }> = [];
   private sequence = 0;
 
@@ -213,6 +217,7 @@ export class MockProvider extends PaymentProvider<MockProviderConfig> {
   reset(): void {
     this.records.clear();
     this.cards.clear();
+    this.hosted.clear();
     this.queued.length = 0;
     this.sequence = 0;
   }
@@ -298,6 +303,78 @@ export class MockProvider extends PaymentProvider<MockProviderConfig> {
       );
     }
     return this.settle(record, forced ?? record.scenario);
+  }
+
+  /**
+   * The mock hosted page: the customer enters the card on `redirectUrl`, not in
+   * your request. `completeCheckoutPage()` plays the customer; the returned
+   * signed callback then goes through the normal verified flow (`/mock/callback`
+   * or `completeThreeDSPayment()`). The payment is `pending` until then.
+   */
+  async createCheckout(request: CheckoutRequest): Promise<CheckoutInitResponse> {
+    try {
+      this.validatePayment(request, { required: ['returnUrl'] });
+      const amount = toMinor(request.paidPrice ?? request.price);
+      const record: InternalRecord = {
+        paymentId: this.nextId('MOCKPAY'),
+        conversationId: request.conversationId,
+        state: 'pending_3ds',
+        amount,
+        capturedAmount: amount,
+        refundedAmount: 0,
+        currency: String(request.currency ?? 'TRY'),
+        installment: maxInstallment(request.installments) ?? 1,
+        preAuth: false,
+        refunds: [],
+        createdAt: new Date().toISOString(),
+        scenario: { type: 'success' },
+      };
+      this.records.set(record.paymentId, record);
+      this.hosted.add(record.paymentId);
+      return {
+        status: PaymentStatus.PENDING,
+        redirectUrl: `https://mock.bank/checkout/${record.paymentId}`,
+        iframeUrl: `https://mock.bank/checkout/${record.paymentId}`,
+        token: record.paymentId,
+        paymentId: record.paymentId,
+        conversationId: record.conversationId,
+      };
+    } catch (error: unknown) {
+      if (error instanceof ValidationError) {
+        return this.failure('VALIDATION_ERROR', error.message, {
+          conversationId: request?.conversationId,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Plays the customer on the mock hosted page: picks the card (default
+   * `MOCK_CARDS.SUCCESS`) and returns the signed callback to post to the
+   * handler. The payment stays pending until that callback is verified.
+   */
+  async completeCheckoutPage(
+    token: string,
+    options: { cardNumber?: string; approve?: boolean } = {}
+  ): Promise<Record<string, string>> {
+    const record = this.records.get(token);
+    if (!record || !this.hosted.delete(token)) {
+      throw new ValidationError(`Unknown checkout ${token}`);
+    }
+    const cardNumber = (options.cardNumber ?? MOCK_CARDS.SUCCESS).replace(/\s/g, '');
+    record.cardNumber = cardNumber;
+    record.cardLastFour = cardNumber.slice(-4);
+    record.scenario =
+      options.approve === false
+        ? { type: 'decline', code: PaymentErrorCode.THREEDS_FAILED }
+        : (CARD_SCENARIOS[cardNumber] ?? { type: 'success' });
+    return this.threeDSCallback(token);
+  }
+
+  /** The mock's record of a hosted checkout; `pending` until the callback settles it */
+  async getCheckoutResult(token: string): Promise<PaymentResponse> {
+    return this.getPayment(token);
   }
 
   async capture(request: CaptureRequest): Promise<PaymentResponse> {

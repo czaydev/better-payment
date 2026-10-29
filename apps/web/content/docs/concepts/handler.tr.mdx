@@ -17,26 +17,34 @@ Geri kalan her şeyi `allowedActions` ile açıkça etkinleştirin. İade, iptal
 
 ```typescript
 const payment = betterPayment({
-  providers: { /* ... */ },
+  providers: {/* ... */},
   handler: {
-    basePath: '/api/pay', // default
-    allowedActions: ['payment/init-3ds', 'payment/complete-3ds', 'callback', 'refund', 'payment/get'],
+    basePath: "/api/pay", // default
+    allowedActions: [
+      "payment/init-3ds",
+      "payment/complete-3ds",
+      "callback",
+      "refund",
+      "payment/get",
+    ],
 
     authorize: async (ctx) => {
       // callbacks come from the bank or the customer's browser and are signature-checked
-      if (ctx.action === 'callback' || ctx.action === 'payment/complete-3ds') return true;
-      if (ctx.action === 'payment/init-3ds') return !!(await getSession(ctx.request.headers.cookie));
+      if (ctx.action === "callback" || ctx.action === "payment/complete-3ds")
+        return true;
+      if (ctx.action === "payment/init-3ds")
+        return !!(await getSession(ctx.request.headers.cookie));
       return isAdmin(ctx.request.headers.authorization);
     },
 
     // Build the provider request on the server; never trust the browser's amounts
     transformRequest: async (ctx) => {
-      if (ctx.action !== 'payment/init-3ds') return ctx.body;
+      if (ctx.action !== "payment/init-3ds") return ctx.body;
       const order = await db.orders.find(ctx.body?.orderId);
       return {
         price: order.total,
         paidPrice: order.total,
-        currency: 'TRY',
+        currency: "TRY",
         conversationId: order.id,
         basketId: order.id,
         callbackUrl: `${process.env.APP_URL}/api/pay/iyzico/payment/complete-3ds`,
@@ -54,7 +62,8 @@ const payment = betterPayment({
     },
 
     // Redirect the customer after 3D Secure (303 See Other)
-    callbackRedirect: (result) => `/orders/${result.paymentId}?payment=${result.status}`,
+    callbackRedirect: (result) =>
+      `/orders/${result.paymentId}?payment=${result.status}`,
 
     exposeErrors: false, // default: 500 responses do not include internal error messages
     exposeRawResponse: false, // default: responses leave out the provider's rawResponse
@@ -68,50 +77,53 @@ Birden fazla handler'a ihtiyacınız olduğunda `payment.createHandler(options)`
 
 Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 
-| Metot | Yol | İşlem | Sağlayıcı metodu | Varsayılan |
-|--------|------|--------|-----------------|---------|
-| POST | `/:provider/payment/complete-3ds` | `payment/complete-3ds` | `completeThreeDSPayment()` | ✅ |
-| POST | `/:provider/callback` | `callback` | `completeThreeDSPayment()` | ✅ |
-| POST | `/:provider/installment` | `installment` | `installmentInfo()` | ✅ |
-| POST | `/:provider/bin-check` | `bin-check` | `binCheck()` | ✅ |
-| POST | `/:provider/payment` | `payment` | `createPayment()` | — |
-| POST | `/:provider/payment/init-3ds` | `payment/init-3ds` | `initThreeDSPayment()` | — |
-| POST | `/paytr/payment/token` | `payment/token` | `createPaymentWithToken()` | — |
-| GET | `/:provider/payment/:id` | `payment/get` | `getPayment()` | — 🔒 |
-| POST | `/:provider/refund` | `refund` | `refund()` | — 🔒 |
-| POST | `/:provider/cancel` | `cancel` | `cancel()` | — 🔒 |
-| POST | `/:provider/authorize` | `authorize` | `authorize()` | — |
-| POST | `/:provider/authorize/init-3ds` | `authorize/init-3ds` | `initThreeDSAuthorize()` | — |
-| POST | `/:provider/capture` | `capture` | `capture()` | — 🔒 |
-| POST | `/:provider/void` | `void` | `voidAuthorization()` | — 🔒 |
-| POST | `/:provider/cards/save` | `cards/save` | `saveCard()` | — 🔒 |
-| POST | `/:provider/cards/list` | `cards/list` | `listCards()` | — 🔒 |
-| POST | `/:provider/cards/delete` | `cards/delete` | `deleteCard()` | — 🔒 |
-| POST | `/iyzico/checkout/init` | `checkout/init` | `initCheckoutForm()` | — |
-| POST | `/iyzico/checkout/retrieve` | `checkout/retrieve` | `retrieveCheckoutForm()` | — |
-| POST | `/iyzico/pwi/init` | `pwi/init` | `initPWIPayment()` | — |
-| POST | `/iyzico/pwi/retrieve` | `pwi/retrieve` | `retrievePWIPayment()` | — |
-| POST | `/iyzico/subscription/initialize` | `subscription/initialize` | `initializeSubscription()` | — |
-| POST | `/iyzico/subscription/{cancel,upgrade,retrieve,card-update}` | … | … | — 🔒 |
-| POST | `/iyzico/subscription/{product,pricing-plan}` | … | … | — 🔒 |
-| GET | `/health` | — | — | ✅ |
+| Metot | Yol                                                          | İşlem                     | Sağlayıcı metodu           | Varsayılan |
+| ----- | ------------------------------------------------------------ | ------------------------- | -------------------------- | ---------- |
+| POST  | `/:provider/payment/complete-3ds`                            | `payment/complete-3ds`    | `completeThreeDSPayment()` | ✅         |
+| POST  | `/:provider/callback`                                        | `callback`                | `completeThreeDSPayment()` | ✅         |
+| POST  | `/:provider/installment`                                     | `installment`             | `installmentInfo()`        | ✅         |
+| POST  | `/:provider/bin-check`                                       | `bin-check`               | `binCheck()`               | ✅         |
+| POST  | `/:provider/payment`                                         | `payment`                 | `createPayment()`          | —          |
+| POST  | `/:provider/payment/init-3ds`                                | `payment/init-3ds`        | `initThreeDSPayment()`     | —          |
+| POST  | `/paytr/payment/token`                                       | `payment/token`           | `createPaymentWithToken()` | —          |
+| GET   | `/:provider/payment/:id`                                     | `payment/get`             | `getPayment()`             | — 🔒       |
+| POST  | `/:provider/refund`                                          | `refund`                  | `refund()`                 | — 🔒       |
+| POST  | `/:provider/cancel`                                          | `cancel`                  | `cancel()`                 | — 🔒       |
+| POST  | `/:provider/authorize`                                       | `authorize`               | `authorize()`              | —          |
+| POST  | `/:provider/authorize/init-3ds`                              | `authorize/init-3ds`      | `initThreeDSAuthorize()`   | —          |
+| POST  | `/:provider/capture`                                         | `capture`                 | `capture()`                | — 🔒       |
+| POST  | `/:provider/void`                                            | `void`                    | `voidAuthorization()`      | — 🔒       |
+| POST  | `/:provider/cards/save`                                      | `cards/save`              | `saveCard()`               | — 🔒       |
+| POST  | `/:provider/cards/list`                                      | `cards/list`              | `listCards()`              | — 🔒       |
+| POST  | `/:provider/cards/delete`                                    | `cards/delete`            | `deleteCard()`             | — 🔒       |
+| POST  | `/:provider/checkout/init`                                   | `checkout/init`           | `createCheckout()`         | —          |
+| POST  | `/:provider/checkout/retrieve`                               | `checkout/retrieve`       | `getCheckoutResult()`      | — 🔒       |
+| POST  | `/iyzico/pwi/init`                                           | `pwi/init`                | `initPWIPayment()`         | —          |
+| POST  | `/iyzico/pwi/retrieve`                                       | `pwi/retrieve`            | `retrievePWIPayment()`     | —          |
+| POST  | `/iyzico/subscription/initialize`                            | `subscription/initialize` | `initializeSubscription()` | —          |
+| POST  | `/iyzico/subscription/{cancel,upgrade,retrieve,card-update}` | …                         | …                          | — 🔒       |
+| POST  | `/iyzico/subscription/{product,pricing-plan}`                | …                         | …                          | — 🔒       |
+| GET   | `/health`                                                    | —                         | —                          | ✅         |
 
 🔒 = `authorize` gerektirir.
 
 ## Yanıtlar [#responses]
 
-| Durum | HTTP durum kodu | Gövde |
-|-----------|-------------|------|
-| `success` / `pending` sonucu | 200 | sağlayıcı sonucu |
-| `failure` sonucu | 422 | sağlayıcı sonucu (`errorCode`, `errorMessage`) |
-| PayTR bildirimi (`/paytr/callback`) | 200 `text/plain` | `OK` (hash geçersizse 400) |
-| `callbackRedirect` bir URL döndürdü | 303 | `Location` başlığı |
-| Geçersiz girdi / yanlış metot / etkin değil | 400 / 405 / 404 | `{ error, message }` |
-| `authorize` reddetti | 403 | `{ error, message }` |
-| Beklenmeyen hata | 500 | `{ error, message: 'Internal server error' }` |
+| Durum                                       | HTTP durum kodu  | Gövde                                          |
+| ------------------------------------------- | ---------------- | ---------------------------------------------- |
+| `success` / `pending` sonucu                | 200              | sağlayıcı sonucu                               |
+| `failure` sonucu                            | 422              | sağlayıcı sonucu (`errorCode`, `errorMessage`) |
+| PayTR bildirimi (`/paytr/callback`)         | 200 `text/plain` | `OK` (hash geçersizse 400)                     |
+| `callbackRedirect` bir URL döndürdü         | 303              | `Location` başlığı                             |
+| Geçersiz girdi / yanlış metot / etkin değil | 400 / 405 / 404  | `{ error, message }`                           |
+| `authorize` reddetti                        | 403              | `{ error, message }`                           |
+| Beklenmeyen hata                            | 500              | `{ error, message: 'Internal server error' }`  |
 
 <Callout type="warn">
-  PayTR, tam olarak `OK` alana kadar bildirimi yeniden gönderir. `res.headers['Content-Type']` `text/plain` olduğunda `res.body`'yi düz metin olarak döndürün; JSON'a çevirmeyin. `onCallback` hata fırlatırsa handler 500 döner ve PayTR bildirimi tekrar gönderir.
+  PayTR, tam olarak `OK` alana kadar bildirimi yeniden gönderir.
+  `res.headers['Content-Type']` `text/plain` olduğunda `res.body`'yi düz metin
+  olarak döndürün; JSON'a çevirmeyin. `onCallback` hata fırlatırsa handler 500
+  döner ve PayTR bildirimi tekrar gönderir.
 </Callout>
 
 ### Ham sağlayıcı yanıtları [#raw-provider-responses]
@@ -121,7 +133,11 @@ Yollar `basePath`'e göredir (varsayılan `/api/pay`).
 Yanıtlar sağlayıcının `rawResponse` alanını içermez. Bu alan müşterinin tarayıcısının görmemesi gereken mağaza verilerini (iyzico komisyon oranları ve fraud durumu) ve kayıtlı kart anahtarlarını (`cardUserKey`, `cardToken`) taşıyabilir. `onCallback`, `callbackRedirect` ve event'ler sonucun tamamını almaya devam eder. Alanı yanıta eklemek için `exposeRawResponse: true` verin; örneğin yalnızca yöneticilere açık bir handler'da:
 
 ```typescript
-const admin = payment.createHandler({ basePath: '/admin/pay', authorize: isAdmin, exposeRawResponse: true });
+const admin = payment.createHandler({
+  basePath: "/admin/pay",
+  authorize: isAdmin,
+  exposeRawResponse: true,
+});
 ```
 
 ## Tekrar eden callback'ler ve Idempotency-Key [#duplicate-callbacks-and-idempotency-key]
@@ -136,7 +152,7 @@ Sağlayıcılar callback'leri birden fazla kez iletir: PayTR `OK` alana kadar bi
 
 Tekrarlar, callback gövdesinin SHA-256 hash'iyle tanınır. Sahte bir gövde, saklanan bir yanıtla asla eşleşemez.
 
-Veri değiştiren route'lar (`payment`, `payment/init-3ds`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, iyzico checkout/PWI/abonelik yönetimi) ayrıca bir **`Idempotency-Key`** başlığını da dikkate alır. Her işlem için benzersiz bir anahtar gönderin; örneğin bir UUID ya da `refund-<orderId>`:
+Veri değiştiren route'lar (`payment`, `payment/init-3ds`, `refund`, `cancel`, `authorize`, `capture`, `void`, `cards/save`, `cards/delete`, `checkout/init`, iyzico PWI/abonelik yönetimi) ayrıca bir **`Idempotency-Key`** başlığını da dikkate alır. Her işlem için benzersiz bir anahtar gönderin; örneğin bir UUID ya da `refund-<orderId>`:
 
 - Aynı anahtar ve aynı gövde, sağlayıcıyı yeniden çağırmadan ilk yanıtı `Idempotent-Replayed: true` işaretiyle döner.
 - Aynı anahtar farklı bir gövdeyle gelirse `422` döner.
@@ -166,7 +182,9 @@ betterPayment({
 ```
 
 <Callout type="info">
-  `setIfAbsent` atomik olmalıdır: Redis'te `SET ... NX`, SQL'de ise benzersiz anahtarlı bir tabloya ekleme (`INSERT ... ON CONFLICT DO NOTHING` ve etkilenen satır sayısını kontrol edin).
+  `setIfAbsent` atomik olmalıdır: Redis'te `SET ... NX`, SQL'de ise benzersiz
+  anahtarlı bir tabloya ekleme (`INSERT ... ON CONFLICT DO NOTHING` ve etkilenen
+  satır sayısını kontrol edin).
 </Callout>
 
 ### Anahtarları çağırana bağlama [#scoping-keys-to-the-caller]
@@ -194,12 +212,12 @@ interface BetterPaymentRequest {
 interface BetterPaymentResponse {
   status: number;
   headers: Record<string, string>;
-  body: unknown;  // JSON object, or a string for text/plain responses
+  body: unknown; // JSON object, or a string for text/plain responses
 }
 
 interface HandlerContext {
   provider: string | undefined; // the provider id; undefined for plugin endpoints
-  action: HandlerAction;        // 'payment/init-3ds', ... or 'plugin:<plugin id>/<endpoint name>'
+  action: HandlerAction; // 'payment/init-3ds', ... or 'plugin:<plugin id>/<endpoint name>'
   params: Record<string, string>; // { paymentId } for payment/get
   request: BetterPaymentRequest;
   body: Record<string, unknown> | undefined; // undefined when there is no object body
@@ -215,19 +233,20 @@ Plugin'ler handler'a yeni adresler ekleyebilir ([plugin endpoint'leri](/docs/gui
 ## Framework'ler [#frameworks]
 
 Adapter'lar handler'ı framework'ünüze bağlar ve yanlış yapılması kolay ayrıntıları halleder:
+
 - form-urlencoded banka callback'leri için ham gövdeler
 - PayTR'nin düz metin `OK` yanıtı
 - gövdesiz yönlendirmeler
 
-| Framework | Import | Kullanım |
-| --------- | ------ | ----- |
-| Next.js (App Router) | `better-payment/next` | `export const { GET, POST } = toNextJsHandler(getBetterPayment)` |
-| Express | `better-payment/express` | `app.all('/api/pay/*path', toExpressHandler(payment))` |
-| Fastify | `better-payment/fastify` | `app.register(toFastifyPlugin(payment), { prefix: '/api/pay' })` |
-| Hono | `better-payment/hono` | `app.all('/api/pay/*', toHonoHandler(payment))` |
-| Elysia | `better-payment/elysia` | `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })` |
+| Framework                 | Import                        | Kullanım                                                                   |
+| ------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| Next.js (App Router)      | `better-payment/next`         | `export const { GET, POST } = toNextJsHandler(getBetterPayment)`           |
+| Express                   | `better-payment/express`      | `app.all('/api/pay/*path', toExpressHandler(payment))`                     |
+| Fastify                   | `better-payment/fastify`      | `app.register(toFastifyPlugin(payment), { prefix: '/api/pay' })`           |
+| Hono                      | `better-payment/hono`         | `app.all('/api/pay/*', toHonoHandler(payment))`                            |
+| Elysia                    | `better-payment/elysia`       | `app.all('/api/pay/*', toElysiaHandler(payment), { parse: 'none' })`       |
 | React Router v7, Remix v2 | `better-payment/react-router` | `export const { loader, action } = toReactRouterHandler(getBetterPayment)` |
-| `node:http` | `better-payment/express` | `createServer(toNodeHandler(payment))` |
-| Workers, Deno, Bun | `better-payment` | `toFetchHandler(payment)` |
+| `node:http`               | `better-payment/express`      | `createServer(toNodeHandler(payment))`                                     |
+| Workers, Deno, Bun        | `better-payment`              | `toFetchHandler(payment)`                                                  |
 
 [Next.js](/docs/integrations/nextjs), [diğer framework'ler](/docs/integrations/frameworks) ve [edge ortamları](/docs/integrations/edge) sayfalarına bakın. Başka bir framework için isteğini bir `BetterPaymentRequest`'e çevirin (gövdeyi ham metin olarak geçirin), `payment.handler.handle()`'ı çağırın ve `BetterPaymentResponse`'u geri yazın.

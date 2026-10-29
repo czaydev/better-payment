@@ -10,7 +10,11 @@ import {
   verifyEstCallback,
 } from '../../../../src/providers/est/utils';
 import { PaymentStatus } from '../../../../src/types';
-import { mockPaymentRequest, mockThreeDSPaymentRequest } from '../../../fixtures/payment-data';
+import {
+  mockPaymentRequest,
+  mockThreeDSPaymentRequest,
+  mockCheckoutRequest,
+} from '../../../fixtures/payment-data';
 import {
   EST_TEST,
   EST_3D_CALLBACK,
@@ -738,17 +742,74 @@ describe('EST provider', () => {
     expect(isEstCapturedSale(status({ CAPTURE_AMT: '0' }))).toBe(false);
   });
 
-  describe('est()', () => {
-    it.each(['isbank', 'ziraat', 'halkbank', 'teb', 'sekerbank', 'akbankest', 'halkbankmkd'] as const)(
-      'uses the shared test environment for %s in sandbox mode',
-      (bank) => {
-        const bp = betterPayment({
-          mode: 'sandbox',
-          providers: { pos: est({ ...EST_TEST, bank }) },
+  describe('createCheckout / getCheckoutResult', () => {
+    const checkout = { ...mockCheckoutRequest, conversationId: 'ORDERH' };
+
+    it('returns the bank hosted form for 3d_host without card fields', async () => {
+      const hosted = create({ storeType: '3d_host' });
+
+      const result = await hosted.createCheckout(checkout);
+
+      expect(post).not.toHaveBeenCalled();
+      const fields = formFields(result.html!);
+      expect(fields).toMatchObject({
+        storetype: '3d_host',
+        amount: '1.20',
+        oid: 'ORDERH',
+        okUrl: 'https://shop.example/return',
+        failUrl: 'https://shop.example/fail',
+        taksit: '6',
+      });
+      expect(fields.pan).toBeUndefined();
+      expect(fields.cv2).toBeUndefined();
+      expect(fields.hash).toBeTruthy();
+      expect(result).toMatchObject({
+        status: PaymentStatus.PENDING,
+        token: 'ORDERH',
+        paymentId: 'ORDERH',
+      });
+      expect(result.redirectUrl).toBeUndefined();
+    });
+
+    it('is NOT_SUPPORTED for the store types that take the card in the request', async () => {
+      for (const storeType of ['3d', '3d_pay'] as const) {
+        await expect(create({ storeType }).createCheckout(checkout)).rejects.toMatchObject({
+          code: 'NOT_SUPPORTED',
         });
-        expect((bp.pos as any).config.baseUrl).toBe(EST_SANDBOX_URL);
       }
-    );
+    });
+
+    it('getCheckoutResult is pending while the bank has no order, then confirms the sale', async () => {
+      post.mockResolvedValueOnce({
+        data: estXml({ Response: 'Declined', ProcReturnCode: '99', ErrMsg: 'No record found' }),
+      });
+      const pending = await create({ storeType: '3d_pay_hosting' }).getCheckoutResult('ORDERH');
+      expect(pending.status).toBe(PaymentStatus.PENDING);
+      expect(pending.paymentId).toBe('ORDERH');
+
+      post.mockResolvedValueOnce({ data: estOrderStatusXml() });
+      const confirmed = await provider.getCheckoutResult('ORDERH');
+      expect(confirmed.status).toBe(PaymentStatus.SUCCESS);
+      expect(sentFields().extra).toMatchObject({ ORDERSTATUS: 'SOR' });
+    });
+  });
+
+  describe('est()', () => {
+    it.each([
+      'isbank',
+      'ziraat',
+      'halkbank',
+      'teb',
+      'sekerbank',
+      'akbankest',
+      'halkbankmkd',
+    ] as const)('uses the shared test environment for %s in sandbox mode', (bank) => {
+      const bp = betterPayment({
+        mode: 'sandbox',
+        providers: { pos: est({ ...EST_TEST, bank }) },
+      });
+      expect((bp.pos as any).config.baseUrl).toBe(EST_SANDBOX_URL);
+    });
 
     it('registers each bank as a provider type with default URLs', () => {
       expect(ProviderType.ISBANK).toBe('isbank');
