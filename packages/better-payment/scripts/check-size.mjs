@@ -41,6 +41,11 @@ const budgets = [
   // measured against beta; 6 kB leaves room for a few more conditions.
   { file: 'dist/routing/index.mjs', maxGzipKb: 6 },
   { file: 'dist/routing/index.js', maxGzipKb: 6 },
+  // Daily transaction lists and order matching (issue #41), a separate subpath so
+  // the provider sources never weigh on better-payment or better-payment/plugins.
+  // 9.65 kB gzip measured against beta, which the main entry pays 0.15 kB of.
+  { file: 'dist/reconciliation/index.mjs', maxGzipKb: 10 },
+  { file: 'dist/reconciliation/index.js', maxGzipKb: 10 },
   { file: 'dist/next/index.mjs', maxGzipKb: 1 },
   { file: 'dist/next/index.js', maxGzipKb: 1 },
   { file: 'dist/express/index.mjs', maxGzipKb: 1 },

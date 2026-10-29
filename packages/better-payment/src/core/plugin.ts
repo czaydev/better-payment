@@ -17,6 +17,10 @@ import type {
   BinCheckResponse,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  ReconciledTransaction,
+  ReconciliationListRequest,
+  ReconciliationReport,
+  ReconciliationRunRequest,
 } from '../types';
 import type { PaymentProvider } from './PaymentProvider';
 import type { BetterPaymentLogger } from './logger';
@@ -53,6 +57,13 @@ export interface PaymentOperations {
   /** The request is the BIN (first 6-8 digits of the card) */
   binCheck: { request: string; result: BinCheckResponse };
   installmentInfo: { request: InstallmentInfoRequest; result: InstallmentInfoResponse };
+  /**
+   * Daily provider transaction list (read-only). Requires a reconciliation
+   * source, e.g. the `reconciliationPlugin()` of `better-payment/reconciliation`.
+   */
+  listTransactions: { request: ReconciliationListRequest; result: ReconciledTransaction[] };
+  /** Matches local orders against a provider transaction list (read-only). */
+  reconcile: { request: ReconciliationRunRequest; result: ReconciliationReport };
 }
 
 export type PaymentOperation = keyof PaymentOperations;
@@ -73,6 +84,8 @@ export const PAYMENT_OPERATIONS: readonly PaymentOperation[] = [
   'deleteCard',
   'binCheck',
   'installmentInfo',
+  'listTransactions',
+  'reconcile',
 ];
 
 /**

@@ -49,6 +49,10 @@ import type {
   ListCardsResponse,
   DeleteCardRequest,
   DeleteCardResponse,
+  ReconciledTransaction,
+  ReconciliationListRequest,
+  ReconciliationReport,
+  ReconciliationRunRequest,
 } from '../types';
 
 type AnyListener = (event: PaymentEvent) => unknown;
@@ -519,6 +523,26 @@ export class PaymentCore<P extends Record<string, ProviderEntry> = Record<string
   /** Queries a payment with the default provider */
   getPayment(paymentId: string): Promise<PaymentResponse> {
     return this.call('getPayment', paymentId);
+  }
+
+  /**
+   * Lists a day range of provider transactions, normalized. Read-only.
+   *
+   * Without `provider`, every source configured in `reconciliationPlugin()` is
+   * asked; with it, only that source. Call it on a provider
+   * (`payment.paytr.listTransactions()`) to ask only that provider.
+   */
+  listTransactions(request: ReconciliationListRequest): Promise<ReconciledTransaction[]> {
+    return this.call('listTransactions', request);
+  }
+
+  /**
+   * Matches the merchant's orders against the provider transaction list and
+   * reports missing, mismatched, unknown and ambiguous entries. Read-only:
+   * it never changes an order or a payment.
+   */
+  reconcile(request: ReconciliationRunRequest): Promise<ReconciliationReport> {
+    return this.call('reconcile', request);
   }
 }
 

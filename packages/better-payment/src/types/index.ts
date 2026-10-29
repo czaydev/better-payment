@@ -547,3 +547,25 @@ export interface InstallmentInfoResponse {
 
 // Export subscription types
 export * from './subscription';
+
+// Reconciliation (better-payment/reconciliation); the request/result types are
+// shared with the core operations `listTransactions` and `reconcile`.
+export type {
+  ReconcilableOrder,
+  ReconcileOptions,
+  ReconciledTransaction,
+  ReconciliationAmbiguous,
+  ReconciliationFieldCandidates,
+  ReconciliationListRequest,
+  ReconciliationMatch,
+  ReconciliationMismatch,
+  ReconciliationOrderStatus,
+  ReconciliationQuery,
+  ReconciliationReport,
+  ReconciliationRunRequest,
+  ReconciliationSource,
+  ReconciliationSourceOptions,
+  ReconciliationTotals,
+  ReconciliationTransactionStatus,
+  ReconciliationTransactionType,
+} from './reconciliation';
