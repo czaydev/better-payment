@@ -6,7 +6,7 @@ import type { EndpointContext, EndpointHandlerInfo } from './plugin';
 import { VERSION } from '../version';
 import { PaymentStatus } from '../types';
 import type { PaymentResponse } from '../types';
-import type { PaymentProvider } from './PaymentProvider';
+import type { PaymentProvider, WebhookVerifiableProvider } from './PaymentProvider';
 import { errorMessage } from './utils';
 import { NETWORK_ERROR_CODE } from './failure';
 import { fingerprint, MemoryIdempotencyStore, type IdempotencyStore } from './idempotency';
@@ -62,6 +62,7 @@ export type BuiltInHandlerAction =
   | 'payment/complete-3ds'
   | 'payment/get'
   | 'callback'
+  | 'webhook'
   | 'refund'
   | 'cancel'
   | 'authorize'
@@ -92,6 +93,7 @@ export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
   'payment/complete-3ds',
   'payment/get',
   'callback',
+  'webhook',
   'refund',
   'cancel',
   'authorize',
@@ -123,6 +125,7 @@ export const ALL_HANDLER_ACTIONS: BuiltInHandlerAction[] = [
 export const DEFAULT_HANDLER_ACTIONS: HandlerAction[] = [
   'payment/complete-3ds',
   'callback',
+  'webhook',
   'installment',
   'bin-check',
 ];
@@ -149,10 +152,14 @@ export const PRIVILEGED_HANDLER_ACTIONS: HandlerAction[] = [
 ];
 
 /**
- * Provider callbacks. They are signed by the provider and are called by the
- * bank or the customer's browser, not by your frontend.
+ * Provider callbacks and webhooks. They are signed by the provider and are called by the
+ * bank or the provider servers, not by your frontend.
  */
-export const CALLBACK_HANDLER_ACTIONS: HandlerAction[] = ['payment/complete-3ds', 'callback'];
+export const CALLBACK_HANDLER_ACTIONS: HandlerAction[] = [
+  'payment/complete-3ds',
+  'callback',
+  'webhook',
+];
 
 export interface HandlerContext {
   /** The provider id of the route; undefined for plugin endpoints */
@@ -709,6 +716,10 @@ export class BetterPaymentHandler {
         this.requireMethod(ctx, 'POST');
         return this.handleCallback({ ...ctx, provider: this.providerOf(ctx) });
 
+      case 'webhook':
+        this.requireMethod(ctx, 'POST');
+        return this.handleWebhook({ ...ctx, provider: this.providerOf(ctx) });
+
       case 'payment/get':
         this.requireMethod(ctx, 'GET');
         return this.resultResponse(await provider.getPayment(ctx.params.paymentId));
@@ -954,6 +965,58 @@ export class BetterPaymentHandler {
     }
 
     return this.resultResponse(result);
+  }
+
+  /**
+   * Handles incoming merchant webhooks (server-to-server notifications).
+   * Verifies signatures with the provider and emits typed payment events.
+   */
+  private async handleWebhook(ctx: CallbackContext): Promise<BetterPaymentResponse> {
+    const provider = this.core.rawProvider(
+      ctx.provider
+    ) as unknown as Partial<WebhookVerifiableProvider>;
+    if (typeof provider.verifyWebhook !== 'function') {
+      return this.errorResponse(400, `Webhooks are not supported by provider '${ctx.provider}'`);
+    }
+
+    const verification = await provider.verifyWebhook(ctx.request.headers, ctx.body);
+    if (!verification?.valid || !verification.result) {
+      return this.errorResponse(401, 'Invalid or missing webhook signature');
+    }
+
+    const result: PaymentResponse = verification.result;
+    const body = ctx.body ?? {};
+    const idem = this.idempotency;
+
+    if (!idem) {
+      await this.core.emit('createPayment', ctx.provider, body, result);
+      if (this.options.onCallback) await this.options.onCallback(result, ctx);
+      return this.jsonResponse(200, { status: 'success', received: true });
+    }
+
+    const key = `bp:webhook:${ctx.provider}:${await fingerprint(body)}`;
+    const { store, ttlSeconds, lockSeconds } = idem;
+
+    if (!(await store.setIfAbsent(key, JSON.stringify({ state: 'processing' }), lockSeconds))) {
+      const record = parseRecord<CallbackRecord>(await store.get(key));
+      if (record?.state === 'done') return record.response;
+      if (record?.state !== 'verified') {
+        return this.errorResponse(409, 'Webhook notification is already being processed');
+      }
+      await store.set(key, JSON.stringify({ state: 'processing', result }), lockSeconds);
+    }
+
+    try {
+      await this.core.emit('createPayment', ctx.provider, body, result);
+      if (this.options.onCallback) await this.options.onCallback(result, ctx);
+
+      const response = this.jsonResponse(200, { status: 'success', received: true });
+      await store.set(key, JSON.stringify({ state: 'done', response }), ttlSeconds);
+      return response;
+    } catch (error) {
+      await store.delete(key);
+      throw error;
+    }
   }
 
   /**

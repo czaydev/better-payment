@@ -244,3 +244,22 @@ export abstract class PaymentProvider<
     );
   }
 }
+
+/** Outcome of verifying a server-to-server notification with the provider. */
+export interface WebhookVerification {
+  valid: boolean;
+  /** The payment the notification refers to, mapped to the library's response shape. */
+  result?: PaymentResponse;
+}
+
+/**
+ * Capability a provider opts into by implementing `verifyWebhook`. It is kept out of
+ * `PaymentProvider` because the handler probes for it at runtime and answers 400 when a
+ * provider cannot verify notifications.
+ */
+export interface WebhookVerifiableProvider {
+  verifyWebhook(
+    headers: Headers | Record<string, string | string[] | undefined>,
+    body: unknown
+  ): Promise<WebhookVerification>;
+}

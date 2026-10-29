@@ -1,3 +1,5 @@
+import type { PaymentResponse } from '../../types';
+
 /**
  * iyzico API response types
  */
@@ -334,4 +336,28 @@ export interface IyzicoInstallmentInfoRequest {
  */
 export interface IyzicoInstallmentInfoResponse extends IyzicoResponse {
   installmentDetails?: IyzicoInstallmentPrice[];
+}
+
+/**
+ * iyzico Webhook (Merchant Notification) Payload
+ */
+export interface IyzicoWebhookPayload {
+  iyziEventType?: string;
+  paymentId?: string;
+  paymentConversationId?: string;
+  status?: string;
+  iyziReferenceCode?: string;
+  price?: number | string;
+  paidPrice?: number | string;
+  currency?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  errorGroup?: string;
+  [key: string]: unknown;
+}
+
+export interface IyzicoVerifyWebhookResult {
+  valid: boolean;
+  event?: IyzicoWebhookPayload;
+  result?: PaymentResponse;
 }
