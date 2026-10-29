@@ -75,6 +75,11 @@
       "types": "./dist/react-router/index.d.ts",
       "import": "./dist/react-router/index.mjs",
       "require": "./dist/react-router/index.js"
+    },
+    "./bin": {
+      "types": "./dist/bin/index.d.ts",
+      "import": "./dist/bin/index.mjs",
+      "require": "./dist/bin/index.js"
     }
   },
   "sideEffects": false,

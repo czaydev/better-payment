@@ -55,6 +55,11 @@ const budgets = [
   { file: 'dist/elysia/index.js', maxGzipKb: 1 },
   { file: 'dist/react-router/index.mjs', maxGzipKb: 1 },
   { file: 'dist/react-router/index.js', maxGzipKb: 1 },
+  // dist/bin is the offline BIN table: every row added to src/bin/data.ts moves this
+  // number, so the budget is a growth allowance, not slack. 1.54 / 1.54 kB gzip
+  // measured against beta.
+  { file: 'dist/bin/index.mjs', maxGzipKb: 4 },
+  { file: 'dist/bin/index.js', maxGzipKb: 4 },
 ];
 
 // better-payment/client must stay browser-safe

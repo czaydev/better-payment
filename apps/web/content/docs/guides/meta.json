@@ -5,6 +5,7 @@
     "writing-plugins",
     "custom-providers",
     "test-cards",
-    "migration-0-5"
+    "migration-0-5",
+    "bin-lookup"
   ]
 }

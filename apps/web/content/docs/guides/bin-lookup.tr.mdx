@@ -1,0 +1,46 @@
+---
+title: Çevrimdışı BIN Sorgulama
+description: Türk banka kartları, kart aileleri ve programları için anlık çevrimdışı BIN sorgusu.
+---
+
+<Since version="0.12.0" />
+
+iyzico, PayTR ve Parampos gibi ödeme kuruluşları ağ üzerinden `binCheck()` sunarken, komisyon yönlendiricisi (#51) ve ödeme ekranında anında taksit tablosunu göstermek için harici ağ çağrısı gerektirmeyen çevrimdışı BIN bilgisi gereklidir.
+
+`better-payment/bin`, açık BKM veri setlerine dayalı, ağ gecikmesi olmayan ve kullanmayan uygulamaların paket boyutunu etkilemeyen (tree-shakable) çevrimdışı bir arama tablosu sağlar.
+
+## Kullanım [#usage]
+
+```typescript
+import { lookupBin } from 'better-payment/bin';
+
+const info = lookupBin('552879');
+
+if (info) {
+  console.log(info.bankName);        // "Garanti BBVA"
+  console.log(info.bankCode);        // 62
+  console.log(info.cardFamily);      // "Bonus"
+  console.log(info.cardType);        // "CREDIT_CARD"
+  console.log(info.cardAssociation); // "MASTER_CARD"
+  console.log(info.commercial);      // false
+}
+```
+
+## Özellikler [#features]
+
+- **Sıfır Ağ Çağrısı**: Bellekte mikrosaniye altında çalışır; ödeme sayfasında kart numarası yazılırken anlık tespit için idealdir.
+- **Tree-Shakable**: Ayrı bir alt yol (`better-payment/bin`) olarak sunulur. Yalnızca ana paketi kullanan uygulamalar için 0 kB ek yük oluşturur.
+- **Esnek Girdi Formatı**: 6 haneli, 8 haneli ön ekleri, boşluklu veya tam 16 haneli kart numaralarını (`"5528 7912 3456 7890"`) kabul eder.
+- **Türk Kart Programları**: Başlıca Türk kart ailelerini (Bonus, World, Maximum, Axess, CardFinans, Paraf, Bankkart Combo, Sağlam Kart) ve Papara, ininal gibi ön ödemeli kartları tanır.
+
+## Yanıt Alanları [#return-fields]
+
+| Alan | Tip | Açıklama |
+| ---- | --- | -------- |
+| `binNumber` | `string` | Eşleşen 6 veya 8 haneli BIN ön eki |
+| `bankName` | `string` | Banka adı (ör. `"Garanti BBVA"`, `"Yapı Kredi"`, `"Türkiye İş Bankası"`) |
+| `bankCode` | `number` | Sayısal banka kodu (ör. `62`, `67`, `64`) |
+| `cardFamily` | `string` | Kart sadakat programı (ör. `"Bonus"`, `"World"`, `"Maximum"`, `"Axess"`) |
+| `cardType` | `string` | `'CREDIT_CARD'`, `'DEBIT_CARD'` veya `'PREPAID_CARD'` |
+| `cardAssociation` | `string` | `'VISA'`, `'MASTER_CARD'`, `'TROY'` veya `'AMERICAN_EXPRESS'` |
+| `commercial` | `boolean` | Ticari / şirket kartları için `true`, bireysel kartlar için `false` |

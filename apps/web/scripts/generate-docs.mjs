@@ -31,9 +31,14 @@ const sourceOf = (name) => {
   // the fraud rules engine lives with the plugins but ships as its own entry point
   if (name === "fraud") return "plugins/fraud-rules.ts";
   if (
-    ["client", "testing", "plugins", "commission-router", "routing"].includes(
-      name,
-    )
+    [
+      "client",
+      "testing",
+      "plugins",
+      "commission-router",
+      "routing",
+      "bin",
+    ].includes(name)
   )
     return `${name}/index.ts`;
   return `adapters/${name}.ts`;
