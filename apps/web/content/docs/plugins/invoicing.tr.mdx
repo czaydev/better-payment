@@ -1,0 +1,194 @@
+---
+title: Fatura (e-Fatura / e-Arşiv)
+description: Başarılı ödemelerin ardından takılabilir entegratör adaptörleri (Paraşüt) ile e-Fatura ve e-Arşiv faturalarını otomatik olarak düzenleyin.
+---
+
+<Since version="0.12.0" />
+
+Türkiye'de her ticari satış için müşteriye e-Fatura veya e-Arşiv faturası düzenlenmesi zorunludur. `invoicing` eklentisi bu işlemi iki adımda otomatikleştirir: başarılı bir ödemenin ardından seçtiğiniz entegratör (ör. Paraşüt) üzerinden önce temel satış faturasını oluşturur, ardından bu satış faturasını gerçek elektronik belgeye dönüştüren ayrı bir düzenleme (issuance) adımı çalıştırır. İade durumunda ise iade faturası keser veya orijinal faturayı iptal eder.
+
+Fatura üretimi müşteri ödeme akışını asla bekletmez veya yavaşlatmaz. Eklenti bir faturayı yalnızca sağlayıcının onayı sonrası `issued` olarak bildirir: onaylanmamış belge `pending` durumunda kalır ve yeniden denenebilir durumda olur; asla tamamlanmış gibi gösterilmez.
+
+## Kurulum [#setup]
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { invoicing, parasut } from 'better-payment/invoicing';
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    invoicing({
+      adapter: parasut({
+        // The Paraşüt OAuth password grant requires all five values
+        clientId: process.env.PARASUT_CLIENT_ID!,
+        clientSecret: process.env.PARASUT_CLIENT_SECRET!,
+        username: process.env.PARASUT_USERNAME!,
+        password: process.env.PARASUT_PASSWORD!,
+        companyId: process.env.PARASUT_COMPANY_ID!,
+        eArchiveInternetSaleUrl: 'https://shop.example.com',
+      }),
+      // Production must supply a persistent store; the memory default is
+      // dev-only and forgets issued documents on restart
+      store: myInvoicingStore,
+      // Map the payment onto Paraşüt records: the customer's contact id and
+      // each line item's product id
+      map: (payment) => ({
+        buyer: {
+          name: `${payment.buyer?.name} ${payment.buyer?.surname}`,
+          taxNumber: payment.buyer?.identityNumber,
+          contactId: myContacts.parasutIdFor(payment.buyer?.email),
+        },
+        items: payment.basketItems?.map((item) => ({
+          name: item.name,
+          quantity: 1,
+          unitPrice: item.price,
+          productId: myProducts.parasutIdFor(item.id),
+        })),
+        vatRate: 20, // 20% KDV
+      }),
+      onRefund: 'return-invoice', // 'return-invoice' | 'cancel' | 'none'
+      retry: { attempts: 3, delay: 1000 },
+      issuance: { mode: 'auto' }, // 'auto' | 'manual' | 'none'
+      onInvoiceCreated: (invoice, event) => {
+        console.log(`Sales invoice created: ${invoice.id} for payment ${event.paymentId}`);
+      },
+      onInvoiceIssued: (record) => {
+        console.log(`E-document confirmed: ${record.invoiceNumber} (${record.documentType})`);
+      },
+      onInvoiceFailed: (error, event) => {
+        console.error(`Invoice failed for payment ${event.paymentId}:`, error);
+      },
+      onInvoiceIssuanceFailed: (error, record) => {
+        console.error(`Issuance failed for payment ${record.paymentId}:`, error);
+      },
+    }),
+  ],
+});
+```
+
+## Düzenleme Adımı: e-Fatura / e-Arşiv [#issuance-e-fatura--e-arşiv]
+
+Entegratörde bir `sales_invoice` oluşturmak akışın sonu değildir: elektronik belge, satış faturasından ikinci ve açıkça ayrıştırılmış bir adımla düzenlenir.
+
+- Eklenti, satış faturası oluşturulduktan sonra düzenleme isteğini arka planda bir iş (job) olarak gönderir. Bu adım ödeme yanıtını bekletmez ve hiçbir senkron garanti verilmez: Paraşüt düzenleme isteğine *takip edilebilir bir job (trackable job)* ile yanıt verir ve eklenti bu job'u yoklar.
+- Kayıt ancak sağlayıcının job'ı `done` döndüğünde `issued` olur. Yoklama süresi bitince job hâlâ çalışıyorsa kayıt `pending` kalır. Sağlayıcı reddederse kayıt `failed` olur, `onInvoiceIssuanceFailed` kancası tetiklenir ve kayıt `payment.invoicing.getFailed()` içinde görünür; böylece yeniden deneme başlatılabilir.
+- Belge türü dokümante bir kurala göre seçilir: alıcının VKN/TCKN'si entegratörde kayıtlı bir e-Fatura gelen kutusuna sahipse fatura **e-Fatura** olarak düzenlenir; kayıtlı gelen kutusu olmayan alıcılara **e-Arşiv** düzenlenir (kart ödemeleri için internet satış bloğu doldurularak). Türü fatura başına `map` içinden `documentType: 'efatura' | 'earsiv'` döndürerek zorlayabilir, ya da düzenleme adımını kendiniz çağırabilirsiniz.
+- Düzenleme isteği bilinçli olarak fatura başına bir kez gönderilir: başarısız bir düzenlemeyi sessizce yeniden göndermek, tam da yasal açıdan önemli bir belgeyi iki kez düzenleyebilecek istektir. `failed` kaydı yalnızca `payment.invoicing.retry()` veya `payment.invoicing.issue()` ile açıkça yeniden denenir.
+
+Yanıt sonrası arka plan işinin öldüğü serverless çalışma ortamlarında `issuance: { mode: 'manual' }` kullanın ve kendi kuyruk tüketicinizden `payment.invoicing.issue(paymentId)` çağırın.
+
+## Özellikler [#features]
+
+- **İki Aşamalı Faturalama:** Satış faturasının oluşturulması ve elektronik belgenin düzenlenmesi ayrı adımlardır ve ayrı kancaları vardır; eklenti sağlayıcı onaylamadan bir faturayı asla düzenlenmiş gibi göstermez.
+- **Asenkron Çalışma:** `payment.succeeded` ve `refund.succeeded` olaylarını dinler. Müşteri ödeme onayını anında alırken, faturalar arka planda üretilir.
+- **Otomatik Yeniden Denemeler (yalnızca oluşturma):** Satış faturası oluşturulurken ağ kesintisi ya da hız limiti yaşanırsa eklenti yapılandırılabilir aralıklarla otomatik tekrar dener. Düzenleme istekleri tek denemedir; yukarıya bakın.
+- **Yenileme Koruması:** Ağ geçidi aynı `payment.succeeded` ya da `refund.succeeded` olayını iki kez iletebilir ve ikinci istek tek satış için ikinci fatura demek olur. Yanında `invoiceId` — iade tarafında `returnInvoiceId` — taşıyan bir kayıt varsa yenileme düşer; aynı süreçte hâlâ sürmekte olan ikinci bir iletim de aynı korumaya takılır.
+- **İade Yönetimi (`onRefund`):**
+  - `'return-invoice'` (varsayılan): İade edilen tutarı karşılayan bir iade faturası (`item_type: 'refund'`) düzenler.
+  - `'cancel'`: Orijinal satış faturasını entegratörde iptal eder.
+  - `'none'`: İadeleri yok sayar.
+- **Manuel Kurtarma API'si:** Kayıtlar, durumları ve yeniden oluşturmak için gereken tam fatura verisi store içinde saklanır; her an incelenebilir, yeniden denenabilir veya düzenlenebilir.
+- **Takılabilir Adaptör Mimarisi:** **Paraşüt** için resmi destek ve özel entegratörler (Logo, Uyumsoft, Foriba/Sovos, BirFatura) eklenebilmesini sağlayan genişletilebilir `InvoicingAdapter` arayüzü ile gelir.
+
+## Kayıt Store'u [#record-store]
+
+Düzenlenen faturalar yasal açıdan önemli belgelerdir: neyin düzenlendiğine dair kaydın kaybedilmesi idempotency'yi bozar ve aynı ödeme için ikinci bir e-Fatura düzenlenmesine yol açabilir. Bu nedenle eklenti kayıtları, bu kütüphanedeki diğer store'larla aynı şekilde asenkron `get`/`set`/`list` sunan `InvoicingStore` arayüzünün arkasında tutar.
+
+> **Uyarı:** Varsayılan `MemoryInvoicingStore` süreç içidir ve yeniden başlatmada her şeyi kaybeder. Yalnızca geliştirme ve test içindir — üretimde `store` seçeneğine kalıcı bir store (SQL, Redis, KV) vermeniz gerekir.
+
+```typescript
+import type { InvoicingRecord, InvoicingStore } from 'better-payment/invoicing';
+
+// Persist records as JSON so issued invoices survive restarts and deploys.
+export function invoicingStoreFromKeyValue(kv: {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+  keys(): Promise<string[]>;
+}): InvoicingStore {
+  return {
+    async get(paymentId) {
+      const raw = await kv.get(`invoicing:${paymentId}`);
+      return raw ? (JSON.parse(raw) as InvoicingRecord) : undefined;
+    },
+    async set(paymentId, record) {
+      await kv.put(`invoicing:${paymentId}`, JSON.stringify(record));
+    },
+    async list() {
+      const ids = await kv.keys();
+      const records = await Promise.all(
+        ids.map((id) => kv.get(id).then((raw) => (raw ? (JSON.parse(raw) as InvoicingRecord) : undefined)))
+      );
+      return records.filter((record): record is InvoicingRecord => record !== undefined);
+    },
+  };
+}
+```
+
+Kayıt durumları: `created` (satış faturası oluştu, belge henüz düzenlenmedi) → `pending` (düzenleme gönderildi, sağlayıcı onayı bekleniyor) → `issued` (onaylanmış elektronik belge). `failed`, oluşturma veya düzenlemenin izin verilen denemeler sonrası başarısız olduğunu; `cancelled` faturanın iptal edildiğini belirtir.
+
+## Fatura Yönetim API'si [#invoicing-management-api]
+
+Eklenti `payment.invoicing` isim alanını ekler. Kayıtlar takılabilir store'da yaşadığı için API'nin tamamı asenkron çağrılır:
+
+```typescript
+// Look up an invoice record by payment ID
+const record = await payment.invoicing.get('pay-12345');
+console.log(record?.invoiceNumber, record?.status, record?.documentType);
+
+// List every recorded invoice
+const allInvoices = await payment.invoicing.list();
+
+// List invoices that failed (creation or issuance)
+const failed = await payment.invoicing.getFailed();
+
+// Re-run a failed creation from the saved snapshot, then the issuance step
+const recovered = await payment.invoicing.retry('pay-12345');
+
+// Run the issuance step explicitly (the manual queue-consumer path)
+const issued = await payment.invoicing.issue('pay-12345');
+
+// Manually cancel an invoice
+await payment.invoicing.cancel('pay-12345', 'Customer requested return');
+```
+
+## Seçenekler [#options]
+
+| Seçenek | Tip | Varsayılan | Açıklama |
+| ------- | --- | ---------- | -------- |
+| `adapter` | `InvoicingAdapter` | *(Zorunlu)* | Fatura servisi adaptörü (ör. `parasut`). |
+| `store` | `InvoicingStore` | `MemoryInvoicingStore` | Kayıt kalıcılığı. Varsayılan yalnızca geliştirmeye yöneliktir; üretimde yeniden başlatmalarda dayanıklı bir store verilmelidir. |
+| `map` | `Function` | — | Alıcıyı (`contactId` dahil), satır kalemlerini (`productId` dahil), KDV oranını ve `documentType`'ı özelleştiren fonksiyon. |
+| `onRefund` | `'return-invoice' \| 'cancel' \| 'none'` | `'return-invoice'` | İade başarılı olduğunda yapılan işlem. |
+| `retry` | `{ attempts?: number, delay?: number }` | `{ attempts: 3, delay: 1000 }` | Satış faturası oluşturulurken geçici hatalar için yeniden deneme yapılandırması. |
+| `defaultVatRate` | `number` | `20` | Kalemlere uygulanan varsayılan KDV oranı yüzdesi. |
+| `issuance.mode` | `'auto' \| 'manual' \| 'none'` | `'auto'` | `auto`: fatura oluşturulduktan sonra e-belge adımı kuyruğa alınır; `manual`: `payment.invoicing.issue()` bekler; `none`: devre dışı bırakır. |
+| `issuance.pollIntervalMs` | `number` | `2000` | Düzenleme sırasında sağlayıcı job durumunun yoklama aralığı. |
+| `issuance.pollAttempts` | `number` | `5` | Kaydı `pending` bırakmadan önceki maksimum yoklama sayısı. |
+| `onInvoiceCreated` | `Function` | — | Sağlayıcı satış faturasını onayladığında tetiklenir (e-belge henüz değil). |
+| `onInvoiceFailed` | `Function` | — | Fatura oluşturma yeniden denemeler sonrası başarısız olduğunda tetiklenir. |
+| `onInvoiceIssued` | `Function` | — | Sağlayıcı e-belgenin düzenlendiğini onayladığında tetiklenir. |
+| `onInvoiceIssuanceFailed` | `Function` | — | Düzenleme adımı başarısız olduğunda tetiklenir; kayıt yeniden denenebilir kalır. |
+
+## Paraşüt adaptör seçenekleri [#paraşüt-adapter-options]
+
+Adaptör, Paraşüt'in dokümante API v4 (`https://apidocs.parasut.com`) referansına göre kurulmuştur. OAuth **password grant** (`grant_type=password`) ile kimlik doğrular; API bunu `client_id`, `client_secret`, `username`, `password` ve `urn:ietf:wg:oauth:2.0:oob` yönlendirmesiyle birlikte zorunlu tutar. Jetonlar dönen `refresh_token` ile yenilenir; istek/yanıt gövdeleri ve jetonlar asla loglanmaz.
+
+| Seçenek | Tip | Varsayılan | Açıklama |
+| ------- | --- | ---------- | -------- |
+| `clientId` | `string` | *(Zorunlu)* | OAuth client id. |
+| `clientSecret` | `string` | *(Zorunlu)* | OAuth client secret. |
+| `username` | `string` | *(Zorunlu)* | Paraşüt hesap e-postası (password grant). |
+| `password` | `string` | *(Zorunlu)* | Paraşüt hesap şifresi (password grant). |
+| `companyId` | `string` | *(Zorunlu)* | `/v4/{company_id}` yolunda kullanılan şirket id. |
+| `redirectUri` | `string` | `urn:ietf:wg:oauth:2.0:oob` | Client için kayıtlı OAuth yönlendirme adresi. |
+| `baseUrl` | `string` | `https://api.parasut.com` | API temel adresi. |
+| `tokenUrl` | `string` | `{baseUrl}/oauth/token` | OAuth token uç noktası. |
+| `efaturaScenario` | `'basic' \| 'commercial'` | `'basic'` | Düzenlenen e-Faturaların `scenario` özelliği. |
+| `eArchiveInternetSaleUrl` | `string` | — | e-Arşiv `internet_sale` bloğunda gönderilen mağaza adresi; Paraşüt internetten satışlarda zorunlu tutar. |
+| `eArchivePaymentType` | `'KREDIKARTI/BANKAKARTI' \| 'EFT/HAVALE' \| 'KAPIDAODEME' \| 'ODEMEARACISI'` | `'KREDIKARTI/BANKAKARTI'` | e-Arşiv internet satış bloğunun ödeme tipi. |
+| `fetch` | `typeof fetch` | `globalThis.fetch` | Test için fetch implementasyonu. |
+
+Paraşüt müşterileri `contacts`, ürünleri `products` olarak modeller. Satış faturası mevcut bir contact'e, satır kalemleri gerçek ürünlere referans vermek zorundadır; bu yüzden `map`, `buyer.contactId` ve `items[].productId` (Paraşüt id'leri) sağlamalıdır — `parasut-<timestamp>` tarzı uydurma yer tutucular hata olarak reddedilir. İptal, dokümante `DELETE /sales_invoices/{id}/cancel` ile yapılır; Paraşüt'te iptal sebebi alanı olmadığından `reason` argümanı genel arayüzde kabul edilir ancak gönderilmez. İade faturaları, satış faturalarıyla aynı tipli payload builder üzerinden `item_type: 'refund'` ile oluşturulur.

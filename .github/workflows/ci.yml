@@ -137,6 +137,11 @@ jobs:
           # better-payment/routing is its own subpath, not part of the plugins barrel
           node -e "const plugins = require('better-payment/plugins'); if ('routing' in plugins) process.exit(1); const { routing } = require('better-payment/routing'); const bp = require('better-payment'); try { routing({ rules: [{ use: 'x', when: { cardType: 'prepaid' } }] }); process.exit(1) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
           node --input-type=module -e "import { routing } from 'better-payment/routing'; import { betterPayment } from 'better-payment'; import { MockProvider } from 'better-payment/testing'; const p = betterPayment({ providers: { mock: new MockProvider() }, defaultProvider: 'mock', plugins: [routing({ default: 'mock' })] }); const d = await p.routing.explain({ price: '10.00', currency: 'TRY' }); if (d.provider !== 'mock' || d.reason !== 'default') process.exit(1)"
+          # better-payment/invoicing: the invoicing plugin and Paraşüt adapter ship as their own subpath
+          node -e "const { invoicing, parasut, MemoryInvoicingStore } = require('better-payment/invoicing'); const bp = require('better-payment'); if (typeof invoicing !== 'function' || typeof parasut !== 'function' || typeof MemoryInvoicingStore !== 'function') process.exit(1); try { invoicing({}) } catch (e) { if (!(e instanceof bp.ConfigurationError)) process.exit(1) }"
+          node --input-type=module -e "import { invoicing, parasut } from 'better-payment/invoicing'; if (typeof invoicing !== 'function' || typeof parasut !== 'function') process.exit(1)"
+          # importing better-payment/plugins must not pull invoicing code (shared barrel stays lean)
+          node -e "const p = require('better-payment/plugins'); if ('invoicing' in p || 'parasut' in p || 'MemoryInvoicingStore' in p) process.exit(1)"
 
       - name: Smoke test framework adapter subpaths (CJS and ESM)
         run: |
@@ -163,6 +168,7 @@ jobs:
           test -f dist/fraud/index.js && test -f dist/fraud/index.mjs && test -f dist/fraud/index.d.ts
           test -f dist/commission-router/index.js && test -f dist/commission-router/index.mjs && test -f dist/commission-router/index.d.ts
           test -f dist/routing/index.js && test -f dist/routing/index.mjs && test -f dist/routing/index.d.ts
+          test -f dist/invoicing/index.js && test -f dist/invoicing/index.mjs && test -f dist/invoicing/index.d.ts
           for adapter in next express hono fastify elysia react-router; do
             for extension in js mjs d.ts; do
               test -f "dist/$adapter/index.$extension"

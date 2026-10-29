@@ -55,6 +55,11 @@ const budgets = [
   { file: 'dist/elysia/index.js', maxGzipKb: 1 },
   { file: 'dist/react-router/index.mjs', maxGzipKb: 1 },
   { file: 'dist/react-router/index.js', maxGzipKb: 1 },
+  // Invoicing plugin + Paraşüt adapter, shipped as the better-payment/invoicing
+  // subpath so importing better-payment/plugins stays free of it. Budget is the
+  // measured build (5.5 kB gzip); only this optional entrypoint pays for it.
+  { file: 'dist/invoicing/index.mjs', maxGzipKb: 6 },
+  { file: 'dist/invoicing/index.js', maxGzipKb: 6 },
 ];
 
 // better-payment/client must stay browser-safe

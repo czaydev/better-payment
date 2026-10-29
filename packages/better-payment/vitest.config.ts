@@ -45,6 +45,7 @@ export default defineConfig({
         './src/commission-router/index.ts'
       ),
       'better-payment/routing': path.resolve(__dirname, './src/routing/index.ts'),
+      'better-payment/invoicing': path.resolve(__dirname, './src/invoicing/index.ts'),
       'better-payment/next': path.resolve(__dirname, './src/adapters/next.ts'),
       'better-payment/express': path.resolve(__dirname, './src/adapters/express.ts'),
       'better-payment/hono': path.resolve(__dirname, './src/adapters/hono.ts'),

@@ -1,0 +1,194 @@
+---
+title: Invoicing (e-Fatura / e-Arşiv)
+description: Automatically issue e-Fatura and e-Arşiv invoices upon successful payments with pluggable integrator adapters (Paraşüt).
+---
+
+<Since version="0.12.0" />
+
+In Turkey, merchants must issue an e-Fatura or e-Arşiv invoice for every commercial sale. The `invoicing` plugin automates this in two steps: on a successful payment it creates the underlying sales invoice with your invoicing integrator (e.g. Paraşüt), then it runs a separate issuance step that turns that sales invoice into the actual e-document. On a refund it issues a return invoice or cancels the original one.
+
+Invoice generation never blocks or slows down the customer's checkout flow. The plugin only reports an invoice as `issued` after the provider confirms it: an unconfirmed document stays `pending` and remains retryable, it is never reported as done.
+
+## Setup
+
+```typescript
+import { betterPayment, iyzico } from 'better-payment';
+import { invoicing, parasut } from 'better-payment/invoicing';
+
+export const payment = betterPayment({
+  providers: {
+    iyzico: iyzico({ /* ... */ }),
+  },
+  plugins: [
+    invoicing({
+      adapter: parasut({
+        // The Paraşüt OAuth password grant requires all five values
+        clientId: process.env.PARASUT_CLIENT_ID!,
+        clientSecret: process.env.PARASUT_CLIENT_SECRET!,
+        username: process.env.PARASUT_USERNAME!,
+        password: process.env.PARASUT_PASSWORD!,
+        companyId: process.env.PARASUT_COMPANY_ID!,
+        eArchiveInternetSaleUrl: 'https://shop.example.com',
+      }),
+      // Production must supply a persistent store; the memory default is
+      // dev-only and forgets issued documents on restart
+      store: myInvoicingStore,
+      // Map the payment onto Paraşüt records: the customer's contact id and
+      // each line item's product id
+      map: (payment) => ({
+        buyer: {
+          name: `${payment.buyer?.name} ${payment.buyer?.surname}`,
+          taxNumber: payment.buyer?.identityNumber,
+          contactId: myContacts.parasutIdFor(payment.buyer?.email),
+        },
+        items: payment.basketItems?.map((item) => ({
+          name: item.name,
+          quantity: 1,
+          unitPrice: item.price,
+          productId: myProducts.parasutIdFor(item.id),
+        })),
+        vatRate: 20, // 20% KDV
+      }),
+      onRefund: 'return-invoice', // 'return-invoice' | 'cancel' | 'none'
+      retry: { attempts: 3, delay: 1000 },
+      issuance: { mode: 'auto' }, // 'auto' | 'manual' | 'none'
+      onInvoiceCreated: (invoice, event) => {
+        console.log(`Sales invoice created: ${invoice.id} for payment ${event.paymentId}`);
+      },
+      onInvoiceIssued: (record) => {
+        console.log(`E-document confirmed: ${record.invoiceNumber} (${record.documentType})`);
+      },
+      onInvoiceFailed: (error, event) => {
+        console.error(`Invoice failed for payment ${event.paymentId}:`, error);
+      },
+      onInvoiceIssuanceFailed: (error, record) => {
+        console.error(`Issuance failed for payment ${record.paymentId}:`, error);
+      },
+    }),
+  ],
+});
+```
+
+## Issuance: e-Fatura / e-Arşiv
+
+Creating a `sales_invoice` at the integrator is not the end of the flow: the electronic document is issued from the sales invoice in a second, explicitly separated step.
+
+- The plugin submits the invoice for issuance as a background job after the sales invoice is created. Nothing about this step blocks the checkout response, and no synchronous guarantee is made: Paraşüt answers the issuance request with a *trackable job*, and the plugin polls that job.
+- A record becomes `issued` only when the provider's job reports `done`. While the job is still running after the polling window, the record stays `pending`. When the provider rejects it, the record becomes `failed`, the `onInvoiceIssuanceFailed` hook fires and the record shows up in `payment.invoicing.getFailed()` so a retry can be triggered.
+- The document type is chosen by a documented rule: if the buyer's VKN/TCKN has a registered e-Fatura inbox at the integrator, the invoice is issued as an **e-Fatura**; everyone else receives an **e-Arşiv** (with the internet-sale block filled in for card payments). You can force the type per invoice by returning `documentType: 'efatura' | 'earsiv'` from `map`, or per plugin run by calling the issuance step yourself.
+- The issuance submission is sent once per invoice on purpose: silently re-sending a failed issuance is exactly the request that could double-issue a legally relevant document. A `failed` record must be retried explicitly via `payment.invoicing.retry()` or `payment.invoicing.issue()`.
+
+On serverless runtimes where background work is killed after the response, use `issuance: { mode: 'manual' }` and call `payment.invoicing.issue(paymentId)` from your own queue consumer.
+
+## Features
+
+- **Two-Phase Invoicing:** The sales invoice creation and the e-document issuance are separate steps with separate hooks; the plugin never claims an invoice is issued before the provider confirms it.
+- **Asynchronous Execution:** Listens to `payment.succeeded` and `refund.succeeded` events. The customer receives their payment confirmation immediately, while invoices are issued in the background.
+- **Automatic Retries (creation only):** If the invoicing provider experiences temporary network glitches or rate limits while the sales invoice is created, the plugin retries automatically with configurable backoff. Issuance submissions are single-attempt; see above.
+- **Redelivery Guard:** A gateway can deliver the same `payment.succeeded` or `refund.succeeded` twice, and the second POST would be a second invoice for one sale. A record that already carries an `invoiceId` — or a `returnInvoiceId` on the refund side — stops the redelivery, and so does an identical delivery that is still in flight in the same process.
+- **Refund Handling (`onRefund`):**
+  - `'return-invoice'` (default): Issues a return invoice (`item_type: 'refund'`) matching the refunded amount.
+  - `'cancel'`: Cancels the original sales invoice with the integrator.
+  - `'none'`: Ignores refunds.
+- **Manual Recovery API:** Records, their statuses and the exact invoice data needed to recreate them are kept in the store and can be inspected, retried or issued at any time.
+- **Pluggable Adapter Architecture:** Comes with official support for **Paraşüt**, and an extensible `InvoicingAdapter` interface for adding custom integrators (Logo, Uyumsoft, Foriba/Sovos, BirFatura).
+
+## Record store
+
+Issued invoices are legally relevant documents: losing the record of what was issued breaks idempotency and can result in a second e-Fatura for the same payment. The plugin therefore keeps its records behind an `InvoicingStore` interface with async `get`/`set`/`list`, the same shape other stores in this library use.
+
+> **Warning:** The default `MemoryInvoicingStore` is per-process and loses everything on restart. It is for development and tests only — in production you must pass a persistent store (SQL, Redis, KV) to the `store` option.
+
+```typescript
+import type { InvoicingRecord, InvoicingStore } from 'better-payment/invoicing';
+
+// Persist records as JSON so issued invoices survive restarts and deploys.
+export function invoicingStoreFromKeyValue(kv: {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+  keys(): Promise<string[]>;
+}): InvoicingStore {
+  return {
+    async get(paymentId) {
+      const raw = await kv.get(`invoicing:${paymentId}`);
+      return raw ? (JSON.parse(raw) as InvoicingRecord) : undefined;
+    },
+    async set(paymentId, record) {
+      await kv.put(`invoicing:${paymentId}`, JSON.stringify(record));
+    },
+    async list() {
+      const ids = await kv.keys();
+      const records = await Promise.all(
+        ids.map((id) => kv.get(id).then((raw) => (raw ? (JSON.parse(raw) as InvoicingRecord) : undefined)))
+      );
+      return records.filter((record): record is InvoicingRecord => record !== undefined);
+    },
+  };
+}
+```
+
+Record statuses: `created` (sales invoice exists, not issued yet) → `pending` (issuance submitted, waiting for provider confirmation) → `issued` (confirmed e-document). `failed` means creation or issuance failed after the allowed attempts; `cancelled` means the invoice was cancelled.
+
+## Invoicing Management API
+
+The plugin adds a `payment.invoicing` namespace. All of it is async because the records live in the pluggable store:
+
+```typescript
+// Look up an invoice record by payment ID
+const record = await payment.invoicing.get('pay-12345');
+console.log(record?.invoiceNumber, record?.status, record?.documentType);
+
+// List every recorded invoice
+const allInvoices = await payment.invoicing.list();
+
+// List invoices that failed (creation or issuance)
+const failed = await payment.invoicing.getFailed();
+
+// Re-run a failed creation from the saved snapshot, then the issuance step
+const recovered = await payment.invoicing.retry('pay-12345');
+
+// Run the issuance step explicitly (the manual queue-consumer path)
+const issued = await payment.invoicing.issue('pay-12345');
+
+// Manually cancel an invoice
+await payment.invoicing.cancel('pay-12345', 'Customer requested return');
+```
+
+## Options
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `adapter` | `InvoicingAdapter` | *(Required)* | The invoicing service adapter (e.g. `parasut`). |
+| `store` | `InvoicingStore` | `MemoryInvoicingStore` | Record persistence. The default is dev-only; production must supply a store that survives restarts. |
+| `map` | `Function` | — | Function to customize the invoice buyer (including `contactId`), line items (including `productId`), VAT rate and `documentType`. |
+| `onRefund` | `'return-invoice' \| 'cancel' \| 'none'` | `'return-invoice'` | Action taken when a refund succeeds. |
+| `retry` | `{ attempts?: number, delay?: number }` | `{ attempts: 3, delay: 1000 }` | Retry configuration for transient failures while creating the sales invoice. |
+| `defaultVatRate` | `number` | `20` | Default VAT (KDV) rate percentage applied to items. |
+| `issuance.mode` | `'auto' \| 'manual' \| 'none'` | `'auto'` | `auto` queues the e-document step after invoice creation; `manual` waits for `payment.invoicing.issue()`; `none` disables it. |
+| `issuance.pollIntervalMs` | `number` | `2000` | Delay between provider job status checks during issuance. |
+| `issuance.pollAttempts` | `number` | `5` | Maximum checks before leaving the record `pending`. |
+| `onInvoiceCreated` | `Function` | — | Callback fired when the provider confirms the sales invoice (not yet the e-document). |
+| `onInvoiceFailed` | `Function` | — | Callback fired when invoice creation fails after retries. |
+| `onInvoiceIssued` | `Function` | — | Callback fired when the provider confirms the e-document was issued. |
+| `onInvoiceIssuanceFailed` | `Function` | — | Callback fired when the issuance step fails; the record stays retryable. |
+
+## Paraşüt adapter options
+
+The adapter is built against Paraşüt's documented API v4 (`https://apidocs.parasut.com`). It authenticates with the OAuth **password grant** (`grant_type=password`), which the API requires together with `client_id`, `client_secret`, `username`, `password` and the `urn:ietf:wg:oauth:2.0:oob` redirect. Tokens are refreshed with the rotating `refresh_token`; no request or response bodies and no tokens are ever logged.
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `clientId` | `string` | *(Required)* | OAuth client id. |
+| `clientSecret` | `string` | *(Required)* | OAuth client secret. |
+| `username` | `string` | *(Required)* | Paraşüt account e-mail (password grant). |
+| `password` | `string` | *(Required)* | Paraşüt account password (password grant). |
+| `companyId` | `string` | *(Required)* | Paraşüt company id used in the `/v4/{company_id}` path. |
+| `redirectUri` | `string` | `urn:ietf:wg:oauth:2.0:oob` | OAuth redirect registered for your client. |
+| `baseUrl` | `string` | `https://api.parasut.com` | API base url. |
+| `tokenUrl` | `string` | `{baseUrl}/oauth/token` | OAuth token endpoint. |
+| `efaturaScenario` | `'basic' \| 'commercial'` | `'basic'` | `scenario` attribute of issued e-Faturas. |
+| `eArchiveInternetSaleUrl` | `string` | — | Shop URL sent in the e-Arşiv `internet_sale` block; Paraşüt requires it for sales made over the internet. |
+| `eArchivePaymentType` | `'KREDIKARTI/BANKAKARTI' \| 'EFT/HAVALE' \| 'KAPIDAODEME' \| 'ODEMEARACISI'` | `'KREDIKARTI/BANKAKARTI'` | Payment type of the e-Arşiv internet-sale block. |
+| `fetch` | `typeof fetch` | `globalThis.fetch` | Fetch implementation, for testing. |
+
+Paraşüt models customers as `contacts` and goods as `products`. A sales invoice must reference an existing contact and its line items the real products, so `map` has to provide `buyer.contactId` and `items[].productId` (the Paraşüt ids — `parasut-<timestamp>` style placeholders are rejected with an error instead of being invented). Cancelling uses the documented `DELETE /sales_invoices/{id}/cancel`; Paraşüt has no cancel-reason field, so the `reason` argument is accepted by the generic interface but not sent. Return invoices are created through the same typed payload builder as sales invoices with `item_type: 'refund'`.
