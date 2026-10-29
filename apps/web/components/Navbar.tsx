@@ -8,9 +8,7 @@ import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  AlertTriangle, ArrowUpRight, Bell, BookOpen, Box, Building2, Bug, Check, ChevronDown, ChevronRight, Clock, Code2,
-  CreditCard, Download, FlaskConical, Globe, Layers, Lock, Menu, Package, PenLine, Plug, Puzzle, Rocket, Route, Settings,
-  Shield, ShoppingBasket, Sparkles, Wallet, X, type LucideIcon,
+  ArrowUpRight, Check, ChevronDown, ChevronRight, Globe, Menu, X,
 } from "lucide-react";
 import { GitHubIcon } from "@/components/icons";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -19,17 +17,27 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 import { LOCALES, localeName, localePath, type Locale } from "@/lib/i18n/config";
 import { switchLocale, switchLocalePath } from "@/lib/i18n/switch";
 import { withBasePath } from "@/lib/base-path";
-import { GITHUB_URL, MENU_KEYS, menus, type MenuIcon, type MenuKey } from "@/lib/nav-menu";
+import { GITHUB_URL, MENU_ICON_ASSETS, MENU_KEYS, menus, type MenuIcon, type MenuKey } from "@/lib/nav-menu";
 
 // Homepage sections are reached by scrolling, without a #hash in the address bar
 export const SCROLL_TARGET_KEY = "bp-scroll-to";
 
-const icons: Record<MenuIcon, LucideIcon | typeof GitHubIcon> = {
-  layers: Layers, shield: Shield, wallet: Wallet, puzzle: Puzzle, rocket: Rocket, download: Download, globe: Globe,
-  book: BookOpen, card: CreditCard, clock: Clock, sparkles: Sparkles, route: Route, alert: AlertTriangle, plug: Plug,
-  github: GitHubIcon, basket: ShoppingBasket, lock: Lock, bell: Bell, flask: FlaskConical, code: Code2,
-  package: Package, settings: Settings, building: Building2, bug: Bug, box: Box, pen: PenLine,
-};
+function MenuIconVisual({ icon, className }: { icon: MenuIcon; className?: string }) {
+  if (icon === "github") {
+    return <GitHubIcon aria-hidden className={className} />;
+  }
+
+  return (
+    <Image
+      src={withBasePath(MENU_ICON_ASSETS[icon])}
+      width={64}
+      height={64}
+      alt=""
+      aria-hidden
+      className={cn("object-contain", className)}
+    />
+  );
+}
 
 /** Menu of every supported language; switches to the same page in the chosen one */
 function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
@@ -168,14 +176,15 @@ export default function Navbar({
   function renderPanel(key: MenuKey) {
     const def = menus[key];
     const copy = menu[key];
-    const Icon = icons[def.icon];
     const groupCopy = copy.groups as Record<string, string>;
     const itemCopy = copy.items as Record<string, string>;
     return (
       <div className="grid grid-cols-[minmax(280px,340px)_1fr]">
         {/* Intro */}
         <div className="border-r border-border py-9 pr-10">
-          <Icon className="mb-4 size-8 text-foreground" strokeWidth={1.5} />
+          <span className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-primary/10 bg-tint/70">
+            <MenuIconVisual icon={def.icon} className="size-10" />
+          </span>
           <p className="text-title-sm text-foreground">{copy.label}</p>
           <p className="mt-3 text-body leading-relaxed text-muted-foreground">{copy.desc}</p>
           <Link
@@ -202,7 +211,6 @@ export default function Navbar({
               </p>
               <ul className="grid gap-1">
                 {group.items.map((item) => {
-                  const ItemIcon = icons[item.icon];
                   const external = "external" in item && item.external;
                   return (
                     <li key={item.id}>
@@ -212,8 +220,14 @@ export default function Navbar({
                         onClick={close}
                         className="group/item -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 text-body font-medium text-foreground transition-colors hover:text-primary focus-visible:text-primary focus-visible:outline-none"
                       >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-tint text-accent-text transition-colors duration-200 group-hover/item:bg-primary group-hover/item:text-primary-foreground">
-                          <ItemIcon className="size-4" />
+                        <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-primary/10 bg-tint/70 transition-[background-color,border-color] duration-200 group-hover/item:border-primary/25 group-hover/item:bg-tint">
+                          <MenuIconVisual
+                            icon={item.icon}
+                            className={cn(
+                              "size-7 transition-transform duration-200 group-hover/item:scale-110",
+                              item.icon === "github" && "size-4.5 text-foreground",
+                            )}
+                          />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{itemCopy[item.id]}</span>
                         {external && <ArrowUpRight className="size-3.5 text-muted-foreground transition-colors group-hover/item:text-primary" />}
@@ -374,7 +388,6 @@ export default function Navbar({
                           {groupCopy[group.id]}
                         </p>
                         {group.items.map((item) => {
-                          const ItemIcon = icons[item.icon];
                           return (
                             <Link
                               key={item.id}
@@ -382,8 +395,11 @@ export default function Navbar({
                               onClick={close}
                               className="flex items-center gap-3 rounded-lg px-1 py-2 text-sm font-medium text-foreground hover:text-primary"
                             >
-                              <span className="flex size-7 items-center justify-center rounded-lg bg-tint text-accent-text">
-                                <ItemIcon className="size-3.5" />
+                              <span className="flex size-7 items-center justify-center overflow-hidden rounded-lg border border-primary/10 bg-tint/70">
+                                <MenuIconVisual
+                                  icon={item.icon}
+                                  className={cn("size-6", item.icon === "github" && "size-3.5 text-foreground")}
+                                />
                               </span>
                               {itemCopy[item.id]}
                             </Link>
