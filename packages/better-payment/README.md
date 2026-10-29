@@ -108,7 +108,7 @@ list and suggested customer messages.
 if (result.code === PaymentErrorCode.INSUFFICIENT_FUNDS) askForAnotherCard();
 ```
 
-For PayTR, Parampos, Sipay, Akbank, Kuveyt Türk, Garanti BBVA, EST, QNB, VakıfBank and Denizbank, `paymentId` is your **order id**: the
+For PayTR, Parampos, Sipay, Lidio, Akbank, Kuveyt Türk, Garanti BBVA, EST, QNB, VakıfBank and Denizbank, `paymentId` is your **order id**: the
 `conversationId` you pass in, or an alphanumeric id generated for you. Pass
 this id to `refund`, `cancel` and `getPayment`.
 
@@ -121,6 +121,7 @@ this id to `refund`, `cancel` and `getPayment`.
 | Parampos     | ✓ (TRY)                   | ✓ `TP_WMD_UCD`/`TP_WMD_Pay` |   ✓    | ✓               |   ✓    |  ✓  | ✓ (account rates) |
 | Sipay        | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
 | QNBpay ³     | ✓ (needs non-3D approval) | ✓ paySmart3D                |   ✓    | ✓ (refund)      |   ✓    |  ✓  | ✓ (account rates) |
+| Lidio        | ✓                         | ✓ ProcessPayment            |   ✓    | ✓ (same day)    |   ✓    |  ✓  | ✓ (account rates) |
 | Akbank       | ✓                         | ✓ 3D_PAY                    |   ✓    | ✓               |   ✓    |  —  | —                 |
 | Kuveyt Türk  | —                         | ✓ KT Pay Gate               |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
 | Garanti BBVA | ✓                         | ✓ 3D / 3D_PAY / GarantiPay  |   ✓    | ✓ (same day)    |   ✓    |  —  | —                 |
@@ -149,6 +150,10 @@ Halkbank Macedonia, with `est({ bank })`.
 - **Sipay:** Sipay POSTs to your `callbackUrl` (or `failUrl`). The callback's
   `hash_key` is decrypted with your app secret; its signed status, invoice id and
   order id decide the result, and the other fields are not trusted.
+- **Lidio:** Lidio sends the browser back to your `callbackUrl` with the result in the
+  query string. Complete it in that route with the order from your records,
+  `completeThreeDSPayment(query, { orderId, amount, currency, customer })`: the `Hash`
+  is verified, the order and amount must be yours, then `FinishPaymentProcess` charges.
 - **EST:** the bank POSTs to your `callbackUrl`. The hash (ver3) is verified, then the
   result is confirmed with the bank: `3d` and `3d_host` only authenticate the card and
   charge it with the XML API, `3d_pay` / `3d_pay_hosting` are checked with an order
@@ -180,7 +185,7 @@ Halkbank Macedonia, with `est({ bank })`.
   `/api/pay/paytr/callback`; the handler verifies the notification and replies
   `OK`.
 
-Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Akbank and Albaraka Türk:
+Pre-authorization (block now, charge later) works on iyzico, Parampos, Sipay, Lidio, Akbank and Albaraka Türk:
 `authorize()` / `initThreeDSAuthorize()`, then `capture({ paymentId, amount, ip })` or
 `voidAuthorization({ paymentId, ip })`. See the
 [pre-authorization guide](https://better-payment.czaylabs.com/docs/payments/pre-authorization).

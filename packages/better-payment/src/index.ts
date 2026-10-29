@@ -165,6 +165,12 @@ export type { ParamposConfig } from './providers/parampos';
 export type { Parampos3DSCallbackData } from './providers/parampos/types';
 export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
 export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
+export { Lidio, lidio, lidioPaymentStatus } from './providers/lidio';
+export type {
+  LidioConfig,
+  Lidio3DCallbackData,
+  LidioCompleteContext,
+} from './providers/lidio/types';
 export { Albaraka, albaraka } from './providers/albaraka';
 export type {
   AlbarakaConfig,
