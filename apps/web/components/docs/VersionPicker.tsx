@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { Badge } from "@czayelements/zay-ui";
 import type { Locale } from "@/lib/i18n/config";
 import { DEFAULT_LOCALE, localeText } from "@/lib/i18n/config";
 import { PACKAGE_VERSION } from "@/lib/release";
-import { cn } from "@/lib/utils";
 
 type Labels = { version: string; stable: string; beta: string; stableHint: string; betaHint: string };
 const LABELS: { en: Labels } & Partial<Record<Locale, Labels>> = {
@@ -73,14 +73,9 @@ export function VersionPicker({ lang, beta }: { lang: Locale; beta: boolean }) {
         onClick={() => setOpen(!open)}
         className="flex h-10 w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 text-start text-sm font-medium transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <span
-          className={cn(
-            "rounded-md px-1.5 py-0.5 font-mono text-[11px]",
-            beta ? "bg-tint text-accent-text" : "bg-secondary text-foreground",
-          )}
-        >
+        <Badge variant={beta ? "brand" : "secondary"} className="px-1.5 py-0.5 font-mono text-[11px]">
           v{PACKAGE_VERSION}
-        </span>
+        </Badge>
         <span className="flex-1 text-foreground">{current.label}</span>
         <ChevronsUpDown className="size-3.5 text-muted-foreground" />
       </button>

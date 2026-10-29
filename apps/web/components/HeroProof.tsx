@@ -11,7 +11,7 @@ export default function HeroProof({ t }: { t: Dictionary["hero"]["proof"] }) {
   return (
     <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-md">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 sm:px-6">
-        <p className="w-full font-mono text-label sm:w-auto font-medium tracking-eyebrow text-muted-foreground uppercase">{t.label}</p>
+        <p className="w-full font-mono text-label sm:w-auto font-medium text-muted-foreground">{t.label}</p>
         <ul className="flex flex-1 flex-wrap items-center gap-2.5">
           {logos.map((tile) => (
             <li

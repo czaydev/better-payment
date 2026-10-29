@@ -8,14 +8,10 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import { withBasePath } from "@/lib/base-path";
 
-// Sheen colours for buttons that sit on the indigo band
-const onIndigo = { "--bp-sheen": "color-mix(in srgb, var(--color-brand-500) 16%, transparent)", "--bp-sheen-soft": "color-mix(in srgb, var(--color-brand-500) 5%, transparent)" } as React.CSSProperties;
-const onIndigoOutline = { "--bp-sheen": "rgb(255 255 255 / 0.22)", "--bp-sheen-soft": "rgb(255 255 255 / 0.06)" } as React.CSSProperties;
-
 export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] }) {
   return (
-    <section className="px-5 py-24 sm:px-8">
-      <div className="bp-reveal relative mx-auto max-w-7xl overflow-hidden rounded-[20px] bg-primary px-6 py-11 text-primary-foreground sm:px-12 sm:py-14">
+    <section className="px-4 py-24 sm:px-6 md:px-4">
+      <div className="bp-reveal relative mx-auto max-w-[97rem] overflow-hidden rounded-card panel-dark px-6 py-11 sm:px-14 sm:py-16">
         <Image
           src={withBasePath("/brand/cta-lanes.webp")}
           alt=""
@@ -30,7 +26,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
             <br />
             {t.titleLine2}
           </h2>
-          <p className="mt-4 max-w-md leading-relaxed text-brand-100">
+          <p className="mt-4 max-w-md leading-relaxed text-muted-foreground">
             {t.lead}{" "}
             <Link href={localePath(lang, "/docs/whats-new")} className="text-white underline underline-offset-4">
               {t.whatsNew}
@@ -38,16 +34,15 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
             .
           </p>
 
-          <div className="mt-6 inline-flex items-center gap-2.5 rounded-[10px] border border-white/20 bg-white/10 px-3.5 py-2.5 font-mono text-sm">
-            <span className="text-brand-200 select-none">$</span>
+          <div className="mt-6 inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 font-mono text-sm">
+            <span className="text-accent-text select-none">$</span>
             npm install better-payment
           </div>
 
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={localePath(lang, "/docs")}
-              style={onIndigo}
-              className={cn(buttonVariants({ variant: "outline" }), "btn-fx-idle border-transparent bg-white text-primary hover:bg-white")}
+              className={buttonVariants()}
             >
               {t.readDocs}
               <ChevronRight data-icon="chevron" />
@@ -56,8 +51,7 @@ export default function CTA({ lang, t }: { lang: Locale; t: Dictionary["cta"] })
               href="https://github.com/czaydev/better-payment"
               target="_blank"
               rel="noopener noreferrer"
-              style={onIndigoOutline}
-              className={cn(buttonVariants({ variant: "outline" }), "border-white/30 bg-transparent text-white hover:border-white/60")}
+              className={cn(buttonVariants({ variant: "outline" }), "bg-transparent")}
             >
               <GitHubIcon data-icon="brand" />
               {t.github}

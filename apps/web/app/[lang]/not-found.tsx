@@ -38,7 +38,7 @@ export default function NotFound() {
         />
         <div className="absolute inset-0 bg-linear-to-b from-background via-transparent to-background" />
       </div>
-      <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-6 sm:px-8">
+      <div className="mx-auto flex min-h-svh w-full max-w-[97rem] flex-col px-4 sm:px-6 md:px-4">
         <header className="flex items-center justify-between gap-6 py-7">
           <Link
             href={localePath(lang, "/")}

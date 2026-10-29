@@ -13,8 +13,8 @@ export default function Contributors({ lang, t }: { lang: Locale; t: Dictionary[
   // Only languages with their own CONTRIBUTING.<code>.md in the registry link to it
   const guide = `${repository}/blob/main/CONTRIBUTING${hasContribGuide(lang) ? `.${lang}` : ""}.md`;
   return (
-    <section id="contribute" className="scroll-mt-24 border-y border-border bg-card px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20">
+    <section id="contribute" className="scroll-mt-24 border-y border-border bg-card px-4 py-24 sm:px-6 md:px-4 md:py-28">
+      <div className="mx-auto grid max-w-[97rem] gap-14 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20">
         <div>
           <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} className="mb-8" />
           <div className="bp-reveal flex flex-wrap gap-3">
@@ -37,7 +37,7 @@ export default function Contributors({ lang, t }: { lang: Locale; t: Dictionary[
                   href={`https://github.com/${login}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`group flex h-full flex-col items-center gap-3 rounded-2xl border px-2 py-6 transition-[border-color,background-color] duration-(--bp-d-md) hover:bg-tint focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${owner ? "border-lilac/60 bg-linear-to-b from-tint/70 to-background hover:border-lilac" : "border-border bg-background hover:border-line-strong"}`}
+                  className={`group flex h-full flex-col items-center gap-3 rounded-2xl border px-2 py-6 transition-[border-color,background-color] duration-(--bp-d-md) hover:bg-tint focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${owner ? "border-lilac/60 bg-tint/50 hover:border-lilac" : "border-border bg-background hover:border-line-strong"}`}
                 >
                   <span className="relative">
                     <Image src={`https://avatars.githubusercontent.com/u/${avatarId}?v=4&s=128`} alt="" width={64} height={64} unoptimized className={`size-16 rounded-full object-cover shadow-sm ${owner ? "border-4 border-card ring-2 ring-primary/70" : "border-4 border-card"}`} />

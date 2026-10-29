@@ -1,4 +1,6 @@
 import { mkdir, readFile, writeFile, access, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Application, ReflectionKind } from "typedoc";
@@ -9,6 +11,16 @@ const registry = readLocaleRegistry();
 
 const web = fileURLToPath(new URL("../", import.meta.url));
 const pkg = resolve(web, "../../packages/better-payment");
+
+// Ensure better-payment is built so Next.js can resolve 'better-payment' in local dev
+if (!existsSync(join(pkg, "dist/index.mjs"))) {
+  console.log("dist/index.mjs not found, building better-payment package...");
+  execSync("pnpm --filter better-payment build", {
+    cwd: resolve(web, "../.."),
+    stdio: "inherit",
+  });
+}
+
 const output = join(web, "public");
 const origin = siteUrl(process.env.NEXT_PUBLIC_BASE_PATH);
 const manifest = JSON.parse(await readFile(join(pkg, "package.json"), "utf8"));

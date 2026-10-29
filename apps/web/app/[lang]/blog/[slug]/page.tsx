@@ -83,13 +83,13 @@ export default async function BlogPostPage({ params }: PageProps<"/[lang]/blog/[
   };
 
   return (
-    <article className="px-5 pt-14 pb-24 sm:px-8 md:pt-20 md:pb-28">
+    <article className="px-4 pt-14 pb-24 sm:px-6 md:px-4 md:pt-20 md:pb-28">
       <script
         type="application/ld+json"
         // JSON-LD is static data built from the post's frontmatter
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-[97rem]">
         <Link
           href={localePath(lang, "/blog")}
           className="mb-8 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -193,7 +193,7 @@ export default async function BlogPostPage({ params }: PageProps<"/[lang]/blog/[
       </div>
 
       {related.length > 0 && (
-        <div className="mx-auto mt-24 max-w-7xl">
+        <div className="mx-auto mt-24 max-w-[97rem]">
           <h2 className="mb-6 text-2xl font-bold tracking-title text-foreground">{t.moreTitle}</h2>
           <div className="grid gap-4 md:grid-cols-2">
             {related.map((other) => (

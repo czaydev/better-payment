@@ -1,41 +1,39 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import { localePath, type Locale } from "@/lib/i18n/config";
 import { withBasePath } from "@/lib/base-path";
+import { PROVIDER_META } from "@/lib/provider-meta";
+import { PROVIDERS_DATA, type ProviderSlug } from "@/lib/providers-data";
 
 type Strings = Dictionary["hero"]["network"];
 
-// Geometry of the 470×400 canvas; node positions are percentages of it
-const W = 470;
-const H = 400;
-const HUB = { x: W / 2, y: H / 2 };
+// The canvas is a 100×100 square; every position is a percentage of it
+const INNER: ProviderSlug[] = ["iyzico", "paytr", "sipay", "parampos"];
+const OUTER: ProviderSlug[] = ["akbank", "kuveytturk", "isbank", "ziraat", "halkbank", "teb", "sekerbank"];
+const R_INNER = 23;
+const R_OUTER = 42;
+
+const polar = (r: number, deg: number) => ({
+  x: 50 + r * Math.cos((deg * Math.PI) / 180),
+  y: 50 + r * Math.sin((deg * Math.PI) / 180),
+});
 
 const NODES = [
-  { key: "iyzico", name: "iyzico", logo: "/iyzico.svg", x: 16, y: 18 },
-  { key: "paytr", name: "PayTR", logo: "/paytr.svg", x: 84, y: 18 },
-  { key: "parampos", name: "Parampos", logo: "/param.svg", x: 16, y: 82 },
-  { key: "akbank", name: "Akbank", logo: "/akbank.svg", x: 84, y: 82 },
-] as const;
+  ...INNER.map((slug, i) => ({ slug, ring: "inner" as const, ...polar(R_INNER, -135 + i * 90) })),
+  ...OUTER.map((slug, i) => ({ slug, ring: "outer" as const, ...polar(R_OUTER, -90 + (i * 360) / OUTER.length) })),
+];
 
-function wirePath(xPct: number, yPct: number) {
-  const x = (xPct / 100) * W;
-  const y = (yPct / 100) * H;
-  const mx = (x + HUB.x) / 2;
-  return `M${HUB.x},${HUB.y} C${mx},${HUB.y} ${mx},${y} ${x},${y}`;
-}
+// Highlight order alternates between the rings so the flow keeps moving around the hub
+const ORDER = [0, 4, 1, 5, 2, 6, 3, 7, 8, 9, 10];
 
-// Timings follow the approved motion spec (vault: Branding/06)
-const TRAVEL_MS = 1300;
-const HOLD_MS = 600;
-const GAP_MS = 2200;
-const START_MS = 1900;
-
-type Phase = "idle" | "request" | "at" | "return" | "verified";
-
-const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+const REQUEST_MS = 800;
+const STEP_MS = 2300;
 
 const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
 function subscribeReduced(onChange: () => void) {
@@ -44,91 +42,39 @@ function subscribeReduced(onChange: () => void) {
   return () => media.removeEventListener("change", onChange);
 }
 
-export default function ProviderNetwork({ t, className }: { t: Strings; className?: string }) {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [tip, setTip] = useState<number | null>(null);
+export default function ProviderNetwork({ t, lang, className }: { t: Strings; lang: Locale; className?: string }) {
+  const [step, setStep] = useState(0);
+  const [verified, setVerified] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const visible = useRef(true);
+  const root = useRef<HTMLDivElement>(null);
   const reduced = useSyncExternalStore(
     subscribeReduced,
     () => window.matchMedia(REDUCED_QUERY).matches,
     () => false,
   );
 
-  const root = useRef<HTMLDivElement>(null);
-  const wires = useRef<(SVGPathElement | null)[]>([]);
-  const dots = useRef<(SVGGElement | null)[]>([]);
-  const generation = useRef(0);
-  const visible = useRef(true);
-
-  const wait = (ms: number, gen: number) =>
-    new Promise<boolean>((resolve) => setTimeout(() => resolve(gen === generation.current), ms));
-
-  // All four requests (and all four verified returns) travel at the same time.
-  // The timer drives the flow; animation frames only draw the dots, so the
-  // loop keeps its order even when the browser skips frames.
-  const travel = useCallback((reverse: boolean, gen: number) => {
-    return new Promise<boolean>((resolve) => {
-      const lanes = NODES.map((_, i) => ({ path: wires.current[i], g: dots.current[i] }));
-      if (lanes.some((l) => !l.path || !l.g)) return resolve(false);
-      const lengths = lanes.map((l) => l.path!.getTotalLength());
-      const start = performance.now();
-      let done = false;
-      lanes.forEach((l) => (l.g!.style.opacity = "1"));
-      const step = (now: number) => {
-        if (done) return;
-        const k = Math.min(1, (now - start) / TRAVEL_MS);
-        lanes.forEach((l, i) => {
-          const at = easeInOut(k) * lengths[i];
-          const p = l.path!.getPointAtLength(reverse ? lengths[i] - at : at);
-          l.g!.setAttribute("transform", `translate(${p.x},${p.y})`);
-        });
-        if (k < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-      setTimeout(() => {
-        done = true;
-        lanes.forEach((l) => (l.g!.style.opacity = "0"));
-        resolve(gen === generation.current);
-      }, TRAVEL_MS);
-    });
-  }, []);
-
-  const run = useCallback(
-    async (delay: number) => {
-      const gen = ++generation.current;
-      if (!(await wait(delay, gen))) return;
-      while (gen === generation.current) {
-        if (!visible.current) {
-          if (!(await wait(400, gen))) return;
-          continue;
-        }
-        setPhase("request");
-        if (!(await travel(false, gen))) return;
-        setPhase("at");
-        if (!(await wait(HOLD_MS, gen))) return;
-        setPhase("return");
-        if (!(await travel(true, gen))) return;
-        setPhase("verified");
-        if (!(await wait(GAP_MS, gen))) return;
-      }
-    },
-    [travel],
-  );
-
-  // Bumping the generation makes every pending step of the loop stop
-  const stop = useCallback(() => {
-    generation.current++;
-  }, []);
+  const hold = reduced || paused;
+  const activeIndex = ORDER[step % ORDER.length];
+  const active = NODES[activeIndex];
+  const provider = PROVIDERS_DATA[active.slug];
+  const caps = (t.caps as Record<string, string>)[active.slug] ?? PROVIDER_META[active.slug].tagline[lang === "tr" ? "tr" : "en"];
 
   useEffect(() => {
-    if (reduced) {
-      stop();
-      return;
-    }
-    run(START_MS);
-    return stop;
-  }, [reduced, run, stop]);
+    if (hold) return;
+    const ok = setTimeout(() => setVerified(true), REQUEST_MS);
+    const next = setTimeout(() => {
+      if (!visible.current) return;
+      setVerified(false);
+      setStep((s) => s + 1);
+    }, STEP_MS);
+    return () => {
+      clearTimeout(ok);
+      clearTimeout(next);
+    };
+  }, [step, hold]);
 
-  // Pause the loop while the network is off screen
+  // Pause while off screen
   useEffect(() => {
     const el = root.current;
     if (!el) return;
@@ -139,97 +85,104 @@ export default function ProviderNetwork({ t, className }: { t: Strings; classNam
     return () => io.disconnect();
   }, []);
 
-  const chip =
-    reduced || phase === "idle"
-      ? { tone: "ok", text: t.idle }
-      : phase === "verified"
-        ? { tone: "ok", text: `✓ ${t.verified} · success · 4/4` }
-        : { tone: "req", text: `${t.request} → ${t.all}` };
+  const show = (i: number) => {
+    setPaused(true);
+    setVerified(true);
+    setStep(ORDER.indexOf(i));
+  };
 
   return (
-    <div
-      ref={root}
-      role="group"
-      aria-label={t.label}
-      className={cn("relative w-full max-w-[470px] aspect-[47/40] max-md:aspect-[47/50]", className)}
-    >
-      <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 size-full overflow-visible" aria-hidden="true">
-        {NODES.map((n, i) => (
-          <path
-            key={n.key}
-            ref={(el) => {
-              wires.current[i] = el;
-            }}
-            d={wirePath(n.x, n.y)}
-            className="bp-wire"
-            data-active={!reduced && phase !== "idle" && phase !== "verified" ? "" : undefined}
-          />
-        ))}
-        {NODES.map((n, i) => (
-          <g
-            key={n.key}
-            ref={(el) => {
-              dots.current[i] = el;
-            }}
-            style={{ opacity: 0 }}
-          >
-            <circle r={11} className={phase === "return" ? "fill-success/20" : "fill-primary/20"} />
-            <circle r={5} className={phase === "return" ? "fill-success" : "fill-primary"} />
-          </g>
-        ))}
-      </svg>
+    <div ref={root} role="group" aria-label={t.label} className={cn("w-full max-w-[540px]", className)}>
+      <div className="relative aspect-square w-full">
+        <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" aria-hidden="true">
+          {/* orbits: hairlines only */}
+          <circle cx="50" cy="50" r={R_OUTER} fill="none" stroke="var(--border)" strokeWidth="0.25" />
+          <circle cx="50" cy="50" r={R_INNER} fill="none" stroke="var(--border)" strokeWidth="0.25" />
+          <circle cx="50" cy="50" r="11" fill="none" stroke="var(--border)" strokeWidth="0.25" strokeDasharray="0.8 1.2" />
+          {/* faint spokes to every provider */}
+          {NODES.map((n) => (
+            <line key={n.slug} x1="50" y1="50" x2={n.x} y2={n.y} stroke="var(--border)" strokeWidth="0.2" />
+          ))}
+          {/* the live request: draws out to the provider, then settles green */}
+          {!reduced && (
+            <line
+              key={`${step}-${active.slug}`}
+              x1="50"
+              y1="50"
+              x2={active.x}
+              y2={active.y}
+              pathLength={1}
+              className="bp-flow-line"
+              data-verified={verified ? "" : undefined}
+            />
+          )}
+        </svg>
 
-      <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-2xl bg-primary px-4 py-3 font-mono text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-12px_var(--bp-glow)] max-md:gap-2 max-md:px-3 max-md:py-2.5 max-md:text-meta">
-        <Image src={withBasePath("/brand/better-payment-symbol-white.svg")} width={22} height={22} alt="" className="size-5.5 max-md:size-4.5" />
-        betterPayment()
-      </div>
-
-      <div
-        aria-live="polite"
-        className={cn(
-          "absolute left-1/2 top-[calc(50%+38px)] z-20 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors duration-(--bp-d-md)",
-          chip.tone === "ok" ? "bg-success-soft text-success" : "border border-border bg-card text-muted-foreground",
-        )}
-      >
-        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-        {chip.text}
-      </div>
-
-      {NODES.map((n, i) => {
-        const on = !reduced;
-        return (
-          <button
-            key={n.key}
-            type="button"
-            style={{ left: `${n.x}%`, top: `${n.y}%` }}
-            aria-label={`${n.name}: ${t.caps[n.key]}`}
-            onMouseEnter={() => setTip(i)}
-            onMouseLeave={() => setTip(null)}
-            onFocus={() => setTip(i)}
-            onBlur={() => setTip(null)}
-            className={cn(
-              "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-[14px] border border-border bg-card py-2 pr-3 pl-2 transition-[border-color,box-shadow,scale] duration-(--bp-d-md) ease-spring focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary max-md:gap-2 max-md:py-1.5 max-md:pr-2.5 max-md:pl-1.5",
-              on && phase === "at" && "scale-[1.04] border-primary shadow-[0_0_0_5px_var(--bp-tint)]",
-              on && (phase === "return" || phase === "verified") && "border-success shadow-[0_0_0_5px_var(--bp-success-soft)]",
-            )}
-          >
-            <span className="grid size-9.5 place-items-center rounded-[9px] border border-border bg-background dark:bg-logo max-md:size-7.5">
-              <Image src={withBasePath(n.logo)} width={32} height={18} alt="" className="h-4.5 w-8 object-contain max-md:h-3.5 max-md:w-6.5" />
-            </span>
-            <b className="font-display text-body-sm max-md:text-meta">{n.name}</b>
-          </button>
-        );
-      })}
-
-      {tip !== null && (
-        <div
-          role="tooltip"
-          style={{ left: `${NODES[tip].x}%`, top: `calc(${NODES[tip].y}% + 34px)` }}
-          className="pointer-events-none absolute z-20 max-w-[220px] -translate-x-1/2 rounded-[9px] bg-foreground px-2.5 py-2 text-meta leading-snug text-background"
-        >
-          {t.caps[NODES[tip].key]}
+        {/* hub */}
+        <div className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+          <div className="grid size-[88px] place-items-center rounded-[28px] bg-primary text-primary-foreground shadow-[var(--bp-button-edge),var(--bp-button-ring),0_6px_14px_-6px_var(--bp-shadow)] max-sm:size-16 max-sm:rounded-[22px]">
+            <Image src={withBasePath("/brand/better-payment-symbol-white.svg")} width={40} height={40} alt="" className="size-9 max-sm:size-7" />
+          </div>
         </div>
-      )}
+
+        {/* providers */}
+        {NODES.map((n, i) => {
+          const meta = PROVIDER_META[n.slug];
+          const isActive = i === activeIndex && !reduced;
+          return (
+            <Link
+              key={n.slug}
+              href={localePath(lang, `/providers/${n.slug}`)}
+              aria-label={`${PROVIDERS_DATA[n.slug].name}`}
+              onMouseEnter={() => show(i)}
+              onFocus={() => show(i)}
+              onMouseLeave={() => setPaused(false)}
+              onBlur={() => setPaused(false)}
+              style={{ left: `${n.x}%`, top: `${n.y}%` }}
+              className={cn(
+                "absolute z-10 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl border bg-logo transition-[border-color,scale] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                n.ring === "inner" ? "h-[11%] w-[21%]" : "h-[9%] w-[17%]",
+                isActive ? (verified ? "scale-[1.06] border-success" : "scale-[1.06] border-primary") : "border-border hover:border-line-strong",
+              )}
+            >
+              <Image
+                src={withBasePath(meta.logo)}
+                width={meta.w}
+                height={meta.h}
+                alt=""
+                className={cn("w-auto object-contain", n.ring === "inner" ? "max-h-[52%] max-w-[66%]" : "max-h-[50%] max-w-[68%]")}
+              />
+              {isActive && verified && (
+                <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-success text-background max-sm:size-4">
+                  <Check className="size-3 max-sm:size-2.5" strokeWidth={3} />
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* status card: what the active provider handles, and the verified result */}
+      <div aria-live="polite" className="mt-2 flex items-center justify-between gap-4 rounded-3xl border border-border bg-card px-5 py-4">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-body font-semibold text-foreground">
+            {provider.name}
+            <span className="rounded-badge bg-muted px-2 py-0.5 font-mono text-micro font-normal text-muted-foreground">
+              {provider.category === "gateway" ? "gateway" : "virtual POS"}
+            </span>
+          </p>
+          <p className="mt-1 truncate text-caption text-muted-foreground">{caps}</p>
+        </div>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-caption font-medium transition-colors duration-300",
+            verified || reduced ? "bg-success-soft text-success" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+          {verified || reduced ? `${t.verified} · success` : `${t.request}…`}
+        </span>
+      </div>
     </div>
   );
 }

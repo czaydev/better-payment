@@ -2,7 +2,7 @@
   "name": "better-payment-monorepo",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter web dev",
+    "dev": "pnpm --filter better-payment build && pnpm --filter web dev",
     "build": "pnpm --filter better-payment build",
     "build:web": "pnpm --filter web build",
     "test": "pnpm --filter better-payment test",
