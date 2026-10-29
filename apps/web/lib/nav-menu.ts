@@ -15,76 +15,77 @@ type Group = { id: string; items: readonly Item[] };
 export const menus: Record<MenuKey, { icon: MenuIcon; href: string; groups: readonly Group[] }> = {
   product: {
     icon: "layers",
-    href: "/docs/concepts/configuration",
+    href: "/product",
     groups: [
       {
         id: "payment",
         items: [
-          { id: "unified", href: "/docs/concepts/configuration", icon: "layers" },
-          { id: "basket", href: "/docs/payments/basket", icon: "basket" },
-          { id: "preAuth", href: "/docs/payments/pre-authorization", icon: "lock" },
-          { id: "storedCards", href: "/docs/payments/stored-cards", icon: "card" },
+          { id: "unified", href: "/features/unified", icon: "layers" },
+          { id: "basket", href: "/features/basket", icon: "basket" },
+          { id: "preAuth", href: "/features/pre-auth", icon: "lock" },
+          { id: "storedCards", href: "/features/stored-cards", icon: "card" },
         ],
       },
       {
         id: "security",
         items: [
-          { id: "handler", href: "/docs/concepts/handler", icon: "shield" },
-          { id: "events", href: "/docs/concepts/events", icon: "bell" },
-          { id: "errorCodes", href: "/docs/reference/error-codes", icon: "alert" },
+          { id: "handler", href: "/features/handler", icon: "shield" },
+          { id: "events", href: "/features/events", icon: "bell" },
+          { id: "errorCodes", href: "/features/error-codes", icon: "alert" },
         ],
       },
       {
         id: "extend",
         items: [
-          { id: "plugins", href: "/docs/concepts/plugins", icon: "puzzle" },
-          { id: "customProviders", href: "/docs/guides/custom-providers", icon: "plug" },
-          { id: "testing", href: "/docs/concepts/testing", icon: "flask" },
+          { id: "plugins", href: "/features/plugins", icon: "puzzle" },
+          { id: "customProviders", href: "/features/custom-providers", icon: "plug" },
+          { id: "testing", href: "/features/testing", icon: "flask" },
         ],
       },
     ],
   },
   providers: {
     icon: "building",
-    href: "/docs/providers/iyzico",
+    href: "/providers",
     groups: [
       {
         id: "gateways",
         items: [
-          { id: "iyzico", href: "/docs/providers/iyzico", icon: "wallet" },
-          { id: "paytr", href: "/docs/providers/paytr", icon: "wallet" },
-          { id: "sipay", href: "/docs/providers/sipay", icon: "wallet" },
-          { id: "parampos", href: "/docs/providers/parampos", icon: "wallet" },
+          { id: "iyzico", href: "/providers/iyzico", icon: "wallet" },
+          { id: "paytr", href: "/providers/paytr", icon: "wallet" },
+          { id: "sipay", href: "/providers/sipay", icon: "wallet" },
+          { id: "parampos", href: "/providers/parampos", icon: "wallet" },
         ],
       },
       {
         id: "banks",
         items: [
-          { id: "akbank", href: "/docs/banks/akbank", icon: "building" },
-          { id: "halkbank", href: "/docs/banks/halkbank", icon: "building" },
-          { id: "isbank", href: "/docs/banks/isbank", icon: "building" },
-          { id: "kuveytturk", href: "/docs/banks/kuveytturk", icon: "building" },
-          { id: "sekerbank", href: "/docs/banks/sekerbank", icon: "building" },
-          { id: "teb", href: "/docs/banks/teb", icon: "building" },
-          { id: "ziraat", href: "/docs/banks/ziraat", icon: "building" },
+          { id: "akbank", href: "/providers/akbank", icon: "building" },
+          { id: "halkbank", href: "/providers/halkbank", icon: "building" },
+          { id: "isbank", href: "/providers/isbank", icon: "building" },
+          { id: "kuveytturk", href: "/providers/kuveytturk", icon: "building" },
+          { id: "sekerbank", href: "/providers/sekerbank", icon: "building" },
+          { id: "teb", href: "/providers/teb", icon: "building" },
+          { id: "ziraat", href: "/providers/ziraat", icon: "building" },
         ],
       },
       {
         id: "more",
         items: [
-          { id: "customProviders", href: "/docs/guides/custom-providers", icon: "plug" },
-          { id: "testCards", href: "/docs/guides/test-cards", icon: "card" },
+          { id: "customProviders", href: "/features/custom-providers", icon: "plug" },
+          { id: "testCards", href: "/features/testing", icon: "card" },
         ],
       },
     ],
   },
   developers: {
     icon: "code",
-    href: "/docs",
+    href: "/developers",
     groups: [
       {
         id: "start",
         items: [
+          { id: "docs", href: "/docs", icon: "book" },
           { id: "quickStart", href: "/docs/quick-start", icon: "rocket" },
           { id: "installation", href: "/docs/installation", icon: "download" },
           { id: "configuration", href: "/docs/concepts/configuration", icon: "settings" },
@@ -111,7 +112,7 @@ export const menus: Record<MenuKey, { icon: MenuIcon; href: string; groups: read
   },
   resources: {
     icon: "book",
-    href: "/docs/reference/changelog",
+    href: "/resources",
     groups: [
       {
         id: "releases",

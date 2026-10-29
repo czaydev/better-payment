@@ -52,8 +52,8 @@ const result = await payment.iyzico.initThreeDSPayment({
 
 export default function QuickStart({ lang, t, code }: { lang: Locale; t: Dictionary["quickStart"]; code: Dictionary["code"] }) {
   return (
-    <section id="quickstart" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-20">
+    <section id="quickstart" className="scroll-mt-20 px-4 py-24 sm:px-6 md:px-4 md:py-28">
+      <div className="mx-auto grid max-w-[97rem] gap-12 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-20">
         <div className="lg:sticky lg:top-28 lg:self-start">
           <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} className="mb-8" />
           <Link

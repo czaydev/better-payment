@@ -82,7 +82,7 @@ export default function CompareSlider({
             if (e.key === "ArrowLeft") setPos((p) => Math.max(4, p - 5));
             if (e.key === "ArrowRight") setPos((p) => Math.min(96, p + 5));
           }}
-          className="absolute top-1/2 z-[3] grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_16px_-6px_var(--bp-glow)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary"
+          className="absolute top-1/2 z-[3] grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary"
           style={{ left: `${pos}%` }}
         >
           <ChevronsLeftRight className="size-4" />

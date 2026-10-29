@@ -1,6 +1,7 @@
 "use client";
 
 import { Banner } from "fumadocs-ui/components/banner";
+import { Badge } from "@czayelements/zay-ui";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n/config";
 import { localeText } from "@/lib/i18n/config";
@@ -19,6 +20,7 @@ export function BetaBanner({ lang }: { lang: Locale }) {
   return (
     // Scrolls away with the page: the site navbar is the sticky bar above the docs
     <Banner changeLayout={false} className="relative gap-2 bg-tint text-accent-text">
+      <Badge variant="brand" className="font-mono text-[11px]">Beta</Badge>
       <span className="font-semibold">{t.title}</span>
       <a href={pathname} className="underline underline-offset-4">
         {t.link}

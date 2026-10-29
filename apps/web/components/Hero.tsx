@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { buttonVariants } from "@/lib/button-variants";
@@ -9,7 +8,6 @@ import HeroProof from "@/components/HeroProof";
 import { GitHubIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { localePath, type Locale } from "@/lib/i18n/config";
-import { withBasePath } from "@/lib/base-path";
 
 // Entrance order from the approved motion spec (vault: Branding/06)
 const at = (ms: number) => ({ "--at": `${ms}ms` }) as React.CSSProperties;
@@ -27,32 +25,11 @@ export default function Hero({
 }) {
   return (
     <section className="relative isolate overflow-hidden md:min-h-[min(880px,100svh)]">
-      <div aria-hidden className="bp-parallax absolute inset-0 -z-10 origin-bottom">
-        <Image
-          src={withBasePath("/brand/hero/hero-a3.webp")}
-          alt=""
-          fill
-          priority
-          quality={90}
-          sizes="100vw"
-          className="bp-art object-cover object-bottom max-md:object-[42%_100%] dark:hidden"
-        />
-        {/* Same render with its lightness inverted onto the dark background */}
-        <Image
-          src={withBasePath("/brand/hero/hero-a3-dark.webp")}
-          alt=""
-          fill
-          quality={90}
-          sizes="100vw"
-          className="bp-art hidden object-cover object-bottom max-md:object-[42%_100%] dark:block"
-        />
-      </div>
-
-      <div className="mx-auto grid max-w-[84rem] items-center gap-10 px-5 pt-32 pb-10 sm:px-8 md:grid-cols-[1.05fr_0.95fr] md:pt-40">
+      <div className="mx-auto grid max-w-[97rem] items-center gap-10 px-4 pt-32 pb-10 sm:px-6 md:px-4 md:grid-cols-[1.05fr_0.95fr] md:pt-40">
         <div className="min-w-0">
           <Link
             href={localePath(lang, "/docs/reference/changelog")}
-            className="bp-enter group/badge mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card/80 py-1 pr-3 pl-1 text-caption font-medium text-foreground backdrop-blur-sm transition-colors hover:border-line-strong"
+            className="bp-enter group/badge mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card py-1 pr-3 pl-1 text-caption font-medium text-foreground transition-colors hover:border-line-strong"
             style={at(160)}
           >
             <span className="rounded-full bg-tint px-2 py-0.5 font-mono text-label text-accent-text">v{version}</span>
@@ -81,7 +58,7 @@ export default function Hero({
               href="https://github.com/czaydev/better-payment"
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: "outline" }), "bg-card/85 backdrop-blur-sm")}
+              className={cn(buttonVariants({ variant: "outline" }), "bg-card")}
             >
               <GitHubIcon data-icon="brand" />
               {t.star}
@@ -94,11 +71,11 @@ export default function Hero({
         </div>
 
         <div className="bp-enter flex justify-center md:justify-end" style={at(1000)}>
-          <ProviderNetwork t={t.network} />
+          <ProviderNetwork t={t.network} lang={lang} />
         </div>
       </div>
 
-      <div className="bp-enter mx-auto max-w-[84rem] px-5 pb-16 sm:px-8 md:pb-24" style={at(1150)}>
+      <div className="bp-enter mx-auto max-w-[97rem] px-4 pb-16 sm:px-6 md:px-4 md:pb-24" style={at(1150)}>
         <HeroProof t={t.proof} />
       </div>
     </section>

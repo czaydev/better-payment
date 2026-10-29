@@ -62,7 +62,7 @@ function RouteNode({ item, t }: { item: RouteItem; t: Dictionary["banks"] }) {
   const beta = isBeta(item);
   const body = (
     <>
-      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 shadow-[0_1px_2px_var(--bp-shadow-xs)] dark:bg-logo transition-[border-color,box-shadow] duration-(--bp-d-md) group-hover:border-line-strong group-hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]">
+      <span className="grid h-16 w-[150px] place-items-center rounded-2xl border border-border bg-card px-4 dark:bg-logo transition-colors duration-(--bp-d-md) group-hover:border-line-strong">
         {item.logo ? (
           <Image
             src={withBasePath(item.logo)}
@@ -144,7 +144,7 @@ function RouteTrack({ groups, t }: { groups: { title: string; items: RouteItem[]
               style={{ left: x[i], top: MID - 32 }}
             >
               {"label" in stop ? (
-                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-meta font-semibold tracking-wide text-accent-text uppercase" style={{ width: LABEL_W }}>
+                <h4 className="flex h-16 items-center justify-center rounded-full border border-dashed border-lilac bg-tint/60 px-4 text-center text-caption font-medium text-accent-text" style={{ width: LABEL_W }}>
                   {stop.label}
                 </h4>
               ) : (
@@ -161,8 +161,8 @@ function RouteTrack({ groups, t }: { groups: { title: string; items: RouteItem[]
 export default function Banks({ lang, t }: { lang: Locale; t: Dictionary["banks"] }) {
   const highlights = t.highlights.map((h, i) => ({ ...h, icon: highlightIcons[i] }));
   return (
-    <section id="banks" className="scroll-mt-20 overflow-x-clip px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto max-w-7xl">
+    <section id="banks" className="scroll-mt-20 overflow-x-clip px-4 py-24 sm:px-6 md:px-4 md:py-28">
+      <div className="mx-auto max-w-[97rem]">
         <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} />
 
         <div className="bp-reveal grid gap-3">

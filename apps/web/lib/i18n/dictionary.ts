@@ -57,7 +57,7 @@ const en = {
         cta: "Open the docs",
         groups: { start: "Get started", integrations: "Integrations", reference: "Reference" },
         items: {
-          quickStart: "Quick start", installation: "Installation", configuration: "Configuration",
+          docs: "Documentation", quickStart: "Quick start", installation: "Installation", configuration: "Configuration",
           nextjs: "Next.js", edge: "Edge runtimes", frameworks: "Express, Hono & more",
           api: "API reference", types: "Types", errorCodes: "Error codes", testCards: "Test cards",
         },
@@ -420,7 +420,7 @@ const tr: Dictionary = {
         cta: "Dokümantasyonu açın",
         groups: { start: "Başlangıç", integrations: "Entegrasyonlar", reference: "Referans" },
         items: {
-          quickStart: "Hızlı başlangıç", installation: "Kurulum", configuration: "Yapılandırma",
+          docs: "Dokümantasyon", quickStart: "Hızlı başlangıç", installation: "Kurulum", configuration: "Yapılandırma",
           nextjs: "Next.js", edge: "Edge ortamları", frameworks: "Express, Hono ve diğerleri",
           api: "API referansı", types: "Tipler", errorCodes: "Hata kodları", testCards: "Test kartları",
         },

@@ -28,8 +28,8 @@ export default async function BlogIndex({ params }: PageProps<"/[lang]/blog">) {
   const [featured, ...rest] = getPosts(lang);
 
   return (
-    <section className="px-5 pt-14 pb-24 sm:px-8 md:pt-20 md:pb-28">
-      <div className="mx-auto max-w-7xl">
+    <section className="px-4 pt-14 pb-24 sm:px-6 md:px-4 md:pt-20 md:pb-28">
+      <div className="mx-auto max-w-[97rem]">
         <SectionHeading line1={t.titleLine1} line2={t.titleLine2} lead={t.lead} />
 
         {!featured ? (

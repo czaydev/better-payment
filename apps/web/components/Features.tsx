@@ -16,8 +16,8 @@ const layout = [
 export default function Features({ lang, t }: { lang: Locale; t: Dictionary["features"] }) {
   const features = layout.map((item) => ({ ...item, ...t.items[item.key] }));
   return (
-    <section id="features" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto max-w-7xl">
+    <section id="features" className="scroll-mt-20 px-4 py-24 sm:px-6 md:px-4 md:py-28">
+      <div className="mx-auto max-w-[97rem]">
         <h2 className="bp-reveal mb-12 max-w-2xl text-title-lg text-foreground sm:text-title-xl">
           {t.titleLine1}
           <br />
@@ -30,7 +30,7 @@ export default function Features({ lang, t }: { lang: Locale; t: Dictionary["fea
               key={f.key}
               style={{ "--at": `${(i % 3) * 110}ms` } as React.CSSProperties}
               className={[
-                "bp-reveal group relative flex flex-col rounded-2xl border border-border bg-card p-6 transition-[translate,box-shadow,border-color] duration-(--bp-d-md) ease-spring hover:-translate-y-[3px] hover:border-line-strong hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]",
+                "bp-reveal group relative flex flex-col rounded-card border border-border bg-card p-7 transition-colors duration-(--bp-d-md) hover:border-line-strong",
                 "span" in f ? f.span : "",
               ].join(" ")}
             >

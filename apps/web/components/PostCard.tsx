@@ -24,7 +24,7 @@ export default function PostCard({
   return (
     <article
       className={cn(
-        "bp-reveal group relative flex flex-col rounded-2xl border border-border bg-card p-6 transition-[translate,box-shadow,border-color] duration-(--bp-d-md) ease-spring hover:-translate-y-[3px] hover:border-line-strong hover:shadow-[0_10px_30px_-14px_var(--bp-shadow)]",
+        "bp-reveal group relative flex flex-col rounded-card border border-border bg-card p-7 transition-colors duration-(--bp-d-md) hover:border-line-strong",
         featured && "p-8 md:p-10",
       )}
     >

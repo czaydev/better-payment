@@ -5,6 +5,7 @@ import { Card, Cards } from "fumadocs-ui/components/card";
 import DocsCallout from "@/components/docs/DocsCallout";
 import DocsCodeBlock from "@/components/docs/DocsCodeBlock";
 import { Since, type SinceProps } from "@/components/docs/Since";
+import { Badge } from "@czayelements/zay-ui";
 import { DEFAULT_LOCALE, localePath, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { withBasePath } from "@/lib/base-path";
@@ -23,6 +24,7 @@ export function getMDXComponents(components: MDXComponents, lang: Locale = DEFAU
     // Fumadocs code blocks with the brand copy button ("Copy" / "Copied")
     pre: (props: ComponentProps<"pre">) => <DocsCodeBlock {...props} copy={copy} />,
     Callout: DocsCallout,
+    Badge,
     Tab,
     Tabs,
     Card,
