@@ -188,3 +188,56 @@ jobs:
       # Playwright's webServer runs the example's own `dev` script, which also
       # proves `prisma generate` and `prisma db push` work on a clean checkout.
       - run: pnpm --filter next-shop test:e2e
+
+  cli:
+    name: better-payment-cli
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: packages/cli
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Build the library (the CLI links it as a workspace dependency)
+        run: pnpm --filter better-payment build
+        working-directory: .
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Smoke test the built CLI
+        run: |
+          node dist/bin.js --version
+          node dist/bin.js --help
+          node dist/bin.js init --help
+          node dist/bin.js doctor --help
+          node dist/bin.js listen --help
+          node dist/bin.js nope 2>&1 | grep -q "unknown command"

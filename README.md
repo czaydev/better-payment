@@ -330,6 +330,18 @@ await payment.mock.createPayment({ ...order, paymentCard: { ...card, cardNumber:
 
 See the [testing guide](https://better-payment.czaylabs.com/docs/concepts/testing).
 
+## CLI
+
+The `better-payment-cli` package scaffolds an integration, checks sandbox credentials and watches callbacks during development:
+
+```bash
+npx better-payment-cli init     # write lib/payment.ts, the route and .env.example
+npx better-payment-cli doctor   # read-only sandbox probe: credentials, mode, handler checks
+npx better-payment-cli listen   # public tunnel + one-line callback logs (no bodies, no card data)
+```
+
+The `doctor` probes never create a payment and never print a secret; `listen` logs provider, route, status and duration only. See the [CLI guide](https://better-payment.czaylabs.com/docs/guides/cli).
+
 ## Logging & Retry
 
 ```typescript

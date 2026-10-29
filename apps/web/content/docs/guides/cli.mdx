@@ -1,0 +1,97 @@
+---
+title: Command Line Interface (CLI)
+description: The better-payment CLI scaffolds your integration, checks sandbox credentials and safely logs provider callbacks.
+---
+
+The `better-payment-cli` package ships a small dependency-free CLI for the three chores around an integration: generating the files, verifying the sandbox setup, and watching callbacks during development.
+
+Run it with `npx` (Node.js 20+):
+
+```bash
+npx better-payment-cli --help
+npx better-payment-cli init --help
+npx better-payment-cli doctor --help
+npx better-payment-cli listen --help
+```
+
+---
+
+## init: generate the integration files
+
+`init` detects your framework, package manager and TypeScript setup, then writes three files:
+
+| File | Purpose |
+| --- | --- |
+| `lib/payment.ts` | Lazy `betterPayment()` singleton plus the exported `handlerOptions` |
+| route handler | Framework-specific route mounting the handler (`app/api/pay/[...payment]/route.ts` for Next.js App Router) |
+| `.env.example` | Variable names only — never a credential value |
+
+Existing files are never overwritten without `--force`, and no install command runs unless you pass `--install`.
+
+```bash
+# Detect everything, ask for the providers
+npx better-payment-cli init
+
+# Scripted: Next.js App Router with iyzico and PayTR
+npx better-payment-cli init --framework next-app --provider iyzico,paytr --yes --no-install
+```
+
+Supported frameworks: `next-app`, `next-pages`, `express`, `fastify`, `hono`, `elysia`, `react-router`, `node`. Supported providers: `iyzico`, `paytr`, `parampos`, `akbank`.
+
+The generated config follows the [Next.js integration guide](/docs/integrations/nextjs): a lazy singleton so `next build` works without credentials, callbacks kept reachable in `allowedActions`, and `handlerOptions` exported for `doctor`.
+
+---
+
+## doctor: verify the sandbox setup
+
+`doctor` answers the three questions that burn hours on every first integration: are the credentials right, is the mode right, and is the handler safe?
+
+```bash
+# Read credentials from the environment
+npx better-payment-cli doctor
+
+# With the generated config module
+npx better-payment-cli doctor --config lib/payment.ts
+```
+
+Per provider it runs one **read-only probe** — a BIN lookup (iyzico, PayTR, Parampos) or an order query for an id that cannot exist (Akbank). No payment is created, no card data is sent, and credential values are never printed.
+
+The verdict distinguishes the two most common mistakes:
+
+- **401/403 or an authentication message** → the credentials were rejected (wrong key).
+- **404/405, an HTML page or no response** → the mode/base URL is wrong (the key was never checked).
+
+It also inspects the handler: exposed `allowedActions`, whether privileged actions sit behind an `authorize` hook, callback deduplication, and a `GET <basePath>/health` round-trip when the config exports the payment object.
+
+Use `--json` for machine-readable output, e.g. in CI.
+
+---
+
+## listen: a public URL and safe callback logs
+
+Callbacks need a public HTTPS URL, and local development has none. `listen` opens a Cloudflare quick tunnel through a local logging proxy and prints the URLs to paste into your provider panels:
+
+```bash
+npx better-payment-cli listen --port 3000
+```
+
+```text
+local    http://localhost:3000 (proxy 127.0.0.1:54123)
+health   https://random-words.trycloudflare.com/api/pay/health
+
+callbackUrl (3D Secure): https://random-words.trycloudflare.com/api/pay/<provider>/payment/complete-3ds
+PayTR notification URL:  https://random-words.trycloudflare.com/api/pay/paytr/callback
+```
+
+Every callback is logged as provider, route, method, status and duration only. Bodies, headers, cookies, query strings, signatures and card data are never read or printed.
+
+- Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) first, or point `--url https://your-tunnel.example.com` at an existing tunnel to skip it.
+- The proxy forwards request bodies untouched; it only reads the URL path to label the log line.
+
+---
+
+## What the CLI never does
+
+- It never sends a payment, a refund or card data (the `doctor` probes are read-only queries).
+- It never prints or writes a credential value (`.env.example` holds names, `doctor` masks secrets).
+- It never runs a package manager unless you pass `--install`.
