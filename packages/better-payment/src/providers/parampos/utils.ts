@@ -11,6 +11,23 @@ import { ValidationError } from '../../core/errors';
 export const PARAMPOS_NAMESPACE = 'https://turkpos.com.tr/';
 
 /**
+ * The card storage (KS) service is a separate ASMX endpoint with its own
+ * namespace. Its methods take no hash: only the G credentials and the GUID.
+ */
+export const PARAMPOS_KS_NAMESPACE = 'https://turkpara.com.tr/';
+
+/** Card storage (Kart Saklama) service endpoints, as published by Param's SDK */
+export const PARAMPOS_KS_URLS = {
+  sandbox: 'https://testposws.param.com.tr/out.ws/service_ks.asmx',
+  production: 'https://posws.param.com.tr/out.ws/service_ks.asmx',
+} as const;
+
+/** KS endpoint for a payment base URL; the test service has "test" in its host */
+export function defaultParamposKsUrl(baseUrl: string | undefined): string {
+  return baseUrl && /test/i.test(baseUrl) ? PARAMPOS_KS_URLS.sandbox : PARAMPOS_KS_URLS.production;
+}
+
+/**
  * Encodes a string as ISO-8859-9 (Turkish), the encoding Param uses for hash input.
  * Characters outside the charset are replaced with '?'.
  */
@@ -222,7 +239,8 @@ export function buildXmlFields(fields: Record<string, XmlValue>): string {
  */
 export function buildParamposSoapEnvelope(
   soapAction: string,
-  fields: Record<string, XmlValue>
+  fields: Record<string, XmlValue>,
+  namespace = PARAMPOS_NAMESPACE
 ): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?>' +
@@ -230,10 +248,28 @@ export function buildParamposSoapEnvelope(
     'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ' +
     'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">' +
     '<soap:Body>' +
-    `<${soapAction} xmlns="${PARAMPOS_NAMESPACE}">${buildXmlFields(fields)}</${soapAction}>` +
+    `<${soapAction} xmlns="${namespace}">${buildXmlFields(fields)}</${soapAction}>` +
     '</soap:Body>' +
     '</soap:Envelope>'
   );
+}
+
+/**
+ * The 3D form of KS_Tahsilat comes HTML-encoded in `UCD_URL`
+ * (Param's sample decodes it before rendering).
+ */
+export function decodeParamposHtml(html: string): string {
+  return unescapeXml(html.replace(/&nbsp;/gi, ' '));
+}
+
+/**
+ * Content of DT_Bilgi, XML-unescaped when the service returns the DataSet as an
+ * escaped string instead of inline XML. Row parsing works on either form.
+ */
+export function extractParamposDataSetXml(soapXml: string): string {
+  const match = soapXml.match(/<DT_Bilgi(?:\s[^>]*)?>([\s\S]*?)<\/DT_Bilgi>/i);
+  if (!match) return soapXml;
+  return match[1].includes('&lt;') ? unescapeXml(match[1]) : match[1];
 }
 
 /**

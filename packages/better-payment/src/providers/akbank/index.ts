@@ -24,6 +24,11 @@ import {
   VoidAuthorizationRequest,
   InstallmentInfoRequest,
   InstallmentInfoResponse,
+  SaveCardRequest,
+  SaveCardResponse,
+  ListCardsResponse,
+  DeleteCardRequest,
+  DeleteCardResponse,
   PaymentStatus,
 } from '../../types';
 import {
@@ -491,6 +496,32 @@ export class Akbank extends PaymentProvider<AkbankConfig> {
   /** Releases a pre-authorization: Akbank voids it like any other transaction (txnCode 1003) */
   async voidAuthorization(request: VoidAuthorizationRequest): Promise<CancelResponse> {
     return this.cancel(request);
+  }
+
+  /**
+   * Akbank's Sanal POS JSON API reference shows a `savedCard` request/response
+   * object and a `/transaction/manageSavedCard` route, but publishes neither the
+   * txnCode that performs card storage nor the add/list/delete semantics. This
+   * provider does not invent transaction codes, so card storage is reported as
+   * unsupported instead of guessing.
+   */
+  private cardStorageUnsupported(): BetterPaymentError {
+    return this.notSupported(
+      'Card storage',
+      "Akbank's Sanal POS JSON API documents a savedCard field and /transaction/manageSavedCard, but no transaction code or add/list/delete semantics. Use iyzico, PayTR or Parampos for stored cards"
+    );
+  }
+
+  async saveCard(_request: SaveCardRequest): Promise<SaveCardResponse> {
+    throw this.cardStorageUnsupported();
+  }
+
+  async listCards(_request: { customerToken: string }): Promise<ListCardsResponse> {
+    throw this.cardStorageUnsupported();
+  }
+
+  async deleteCard(_request: DeleteCardRequest): Promise<DeleteCardResponse> {
+    throw this.cardStorageUnsupported();
   }
 
   /**

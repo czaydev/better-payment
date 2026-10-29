@@ -11,7 +11,10 @@ Stored cards let a returning customer pay without typing the card number again. 
 - `cardToken`: identifies one saved card (iyzico `cardToken`, PayTR `ctoken`).
 
 <Callout type="warn">
-  Never store card numbers or CVCs yourself; that puts your whole system in PCI DSS scope. Store only the tokens, next to your own user id. Save a card only when the customer **explicitly agrees** (for example, a "Remember this card" checkbox), and let them delete it.
+  Never store card numbers or CVCs yourself; that puts your whole system in PCI
+  DSS scope. Store only the tokens, next to your own user id. Save a card only
+  when the customer **explicitly agrees** (for example, a "Remember this card"
+  checkbox), and let them delete it.
 </Callout>
 
 ## Save a card during a payment
@@ -19,14 +22,16 @@ Stored cards let a returning customer pay without typing the card number again. 
 Pass `saveCard` with a normal card payment. When the payment succeeds, the result carries the tokens:
 
 ```typescript
-const result = await payment.use('iyzico').createPayment({
+const result = await payment.use("iyzico").createPayment({
   ...order,
   paymentCard: { cardHolderName, cardNumber, expireMonth, expireYear, cvc },
   saveCard: true, // or { customerToken: user.cardUserKey, alias: 'My card' } to add it to an existing customer
 });
 
-if (result.status === 'success' && result.storedCard) {
-  await db.users.update(user.id, { customerToken: result.storedCard.customerToken });
+if (result.status === "success" && result.storedCard) {
+  await db.users.update(user.id, {
+    customerToken: result.storedCard.customerToken,
+  });
   // result.storedCard.cardToken is set when the provider returns it (iyzico)
 }
 ```
@@ -38,9 +43,12 @@ if (result.status === 'success' && result.storedCard) {
 Send `storedCard` instead of `paymentCard`:
 
 ```typescript
-await payment.use('iyzico').createPayment({
+await payment.use("iyzico").createPayment({
   ...order,
-  storedCard: { customerToken: user.customerToken, cardToken: selectedCard.cardToken },
+  storedCard: {
+    customerToken: user.customerToken,
+    cardToken: selectedCard.cardToken,
+  },
 });
 ```
 
@@ -49,10 +57,14 @@ For PayTR, add `cvc` when the listed card has `requiresCvc: true`.
 ## List and delete
 
 ```typescript
-const { cards } = await payment.use('iyzico').listCards({ customerToken: user.customerToken });
+const { cards } = await payment
+  .use("iyzico")
+  .listCards({ customerToken: user.customerToken });
 // cards: [{ cardToken, alias, binNumber, lastFourDigits, cardAssociation, bankName, ... }]
 
-await payment.use('iyzico').deleteCard({ customerToken: user.customerToken, cardToken });
+await payment
+  .use("iyzico")
+  .deleteCard({ customerToken: user.customerToken, cardToken });
 ```
 
 Show customers `lastFourDigits`, `bankName` and `alias` to pick a card; never the token itself.
@@ -60,10 +72,10 @@ Show customers `lastFourDigits`, `bankName` and `alias` to pick a card; never th
 iyzico can also save a card without a payment:
 
 ```typescript
-const saved = await payment.use('iyzico').saveCard({
+const saved = await payment.use("iyzico").saveCard({
   customerToken: user.customerToken, // omit for a new customer; use email/externalId instead
   email: user.email,
-  alias: 'Work card',
+  alias: "Work card",
   card: { cardHolderName, cardNumber, expireMonth, expireYear },
 });
 // saved.customerToken, saved.card?.cardToken
@@ -71,23 +83,25 @@ const saved = await payment.use('iyzico').saveCard({
 
 ## Providers
 
-| Provider | Save during payment | `saveCard()` | `listCards()` | `deleteCard()` | Pay by token |
-| -------- | ------------------- | ------------ | ------------- | -------------- | ------------ |
-| iyzico | `registerCard` | `/cardstorage/card` | `/cardstorage/cards` | `/cardstorage/card` | `cardUserKey` + `cardToken` |
-| PayTR | Direct API `store_card=1` | not supported | `/odeme/capi/list` | `/odeme/capi/delete` | `utoken` + `ctoken` |
-| Parampos | not yet ([#65](https://github.com/czaydev/better-payment/issues/65)) | — | — | — | — |
-| Akbank | not yet ([#65](https://github.com/czaydev/better-payment/issues/65)) | — | — | — | — |
+| Provider | Save during payment                                               | `saveCard()`          | `listCards()`          | `deleteCard()`       | Pay by token                |
+| -------- | ----------------------------------------------------------------- | --------------------- | ---------------------- | -------------------- | --------------------------- |
+| iyzico   | `registerCard`                                                    | `/cardstorage/card`   | `/cardstorage/cards`   | `/cardstorage/card`  | `cardUserKey` + `cardToken` |
+| PayTR    | Direct API `store_card=1`                                         | not supported         | `/odeme/capi/list`     | `/odeme/capi/delete` | `utoken` + `ctoken`         |
+| Parampos | `saveCard` on the request                                         | `KS_Kart_Ekle` (SOAP) | `KS_Kart_Liste` (SOAP) | `KS_Kart_Sil` (SOAP) | `KS_GUID` via `KS_Tahsilat` |
+| Akbank   | no (`savedCard` exists in the API, no storage txnCode documented) | —                     | —                      | —                    | —                           |
 
 - **PayTR** saves cards only during a Direct API payment, and the feature (Kart Saklama) must be enabled on your PayTR account. The `utoken` comes back in the payment result or in the notification (`onCallback`); get the `ctoken` from `listCards()`. The iFrame API cannot save cards.
+- **Parampos** stores cards in its SOAP card-storage service (`KS_*`): `saveCard()` runs `KS_Kart_Ekle`, `listCards()` runs `KS_Kart_Liste`, `deleteCard()` runs `KS_Kart_Sil`, and a payment with `storedCard` charges the saved card by its `KS_GUID` (`KS_Tahsilat`). `saveCard` on a payment request stores the card first and returns the `KS_GUID` with the result. Field mapping follows Param's public documentation; sandbox verification is still pending ([#63](https://github.com/czaydev/better-payment/issues/63)).
+- **Akbank**'s Sanal POS JSON API shows a `savedCard` request object and a `/transaction/manageSavedCard` route, but publishes neither the transaction code that stores cards nor add/list/delete semantics. Card storage there throws `NOT_SUPPORTED` instead of guessing codes.
 - Unsupported providers throw `NOT_SUPPORTED` (for `storedCard`/`saveCard` in a payment request: `INVALID_REQUEST`); the HTTP handler answers `400`.
 
 ## HTTP handler
 
-| Route | Action | Needs `authorize` |
-| ----- | ------ | ----------------- |
-| `POST /:provider/cards/save` | `cards/save` | 🔒 |
-| `POST /:provider/cards/list` | `cards/list` | 🔒 |
-| `POST /:provider/cards/delete` | `cards/delete` | 🔒 |
+| Route                          | Action         | Needs `authorize` |
+| ------------------------------ | -------------- | ----------------- |
+| `POST /:provider/cards/save`   | `cards/save`   | 🔒                |
+| `POST /:provider/cards/list`   | `cards/list`   | 🔒                |
+| `POST /:provider/cards/delete` | `cards/delete` | 🔒                |
 
 The card routes deal with one customer's cards, so they can only be enabled with an `authorize` hook. In `transformRequest`, take the `customerToken` from **your session**, not from the request body, so that one customer cannot list or delete another customer's cards:
 

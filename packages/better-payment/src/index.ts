@@ -162,7 +162,7 @@ export { Akbank, akbank } from './providers/akbank';
 export type { AkbankConfig, Akbank3DCallbackData } from './providers/akbank/types';
 export { Parampos, parampos } from './providers/parampos';
 export type { ParamposConfig } from './providers/parampos';
-export type { Parampos3DSCallbackData } from './providers/parampos/types';
+export type { Parampos3DSCallbackData, ParamposKsCallbackData } from './providers/parampos/types';
 export { KuveytTurk, kuveytturk } from './providers/kuveytturk';
 export type { KuveytTurkConfig, KuveytTurk3DCallbackData } from './providers/kuveytturk/types';
 export { Albaraka, albaraka } from './providers/albaraka';

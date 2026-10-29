@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import crypto from 'crypto';
 import { Iyzico } from '../../../src/providers/iyzico';
 import { PayTR } from '../../../src/providers/paytr';
-import { Parampos } from '../../../src/providers/parampos';
 import { Akbank } from '../../../src/providers/akbank';
 import { betterPayment, iyzico as iyzicoProvider } from '../../../src';
 import { BetterPaymentHandler } from '../../../src/core/BetterPaymentHandler';
@@ -265,29 +264,29 @@ describe('PayTR stored cards', () => {
 });
 
 describe('providers without card storage', () => {
-  it('Parampos and Akbank reject stored cards before calling the bank', async () => {
-    const parampos = new Parampos({
-      clientCode: '1',
-      clientUsername: 'u',
-      clientPassword: 'p',
-      guid: 'g',
-      baseUrl: 'https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx',
-    });
+  it('Akbank rejects stored cards before calling the bank and reports storage as unsupported', async () => {
     const akbank = new Akbank({
       ...AKBANK_TEST,
       baseUrl: 'https://apipre.akbank.com/api/v1/payment/virtualpos',
     });
-    for (const provider of [parampos, akbank]) {
-      const post = vi.fn();
-      (provider as any).client.post = post;
-      const result = await provider.createPayment({ ...order, storedCard: stored });
-      expect(post).not.toHaveBeenCalled();
-      expect(result).toMatchObject({ status: 'failure', code: PaymentErrorCode.INVALID_REQUEST });
-      expect(result.errorMessage).toContain('storedCard is not supported');
-      await expect(provider.listCards({ customerToken: 'U' })).rejects.toMatchObject({
+    const post = vi.fn();
+    (akbank as any).client.post = post;
+    const result = await akbank.createPayment({ ...order, storedCard: stored });
+    expect(post).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: 'failure', code: PaymentErrorCode.INVALID_REQUEST });
+    expect(result.errorMessage).toContain('storedCard is not supported');
+
+    for (const method of ['saveCard', 'listCards', 'deleteCard'] as const) {
+      const args =
+        method === 'saveCard'
+          ? { card: { cardHolderName: 'A', cardNumber: '4355084355084358', expireMonth: '12', expireYear: '30' } }
+          : { customerToken: 'U', cardToken: 'C' };
+      await expect((akbank as any)[method](args)).rejects.toMatchObject({
         code: 'NOT_SUPPORTED',
+        message: expect.stringContaining('manageSavedCard'),
       });
     }
+    expect(post).not.toHaveBeenCalled();
   });
 });
 
