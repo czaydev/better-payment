@@ -139,7 +139,17 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
             © {new Date().getFullYear()} Better Payment. {t.license}
           </span>
           <span className="text-xs text-muted-foreground/35 font-mono">
-            {t.builtWith}
+            {t.builtWith} ·{" "}
+            {t.designedWithPrefix}
+            <a
+              href="https://github.com/czayelements/zay-ui"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-muted-foreground transition-colors"
+            >
+              zay-ui
+            </a>
+            {t.designedWithSuffix}
           </span>
         </div>
       </div>

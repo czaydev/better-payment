@@ -345,7 +345,9 @@ const en = {
       changelog: "Changelog",
     },
     license: "Released under the MIT License.",
-    builtWith: "Built with Next.js, Tailwind CSS & shadcn/ui",
+    builtWith: "Built with Next.js & Tailwind CSS",
+    designedWithPrefix: "Designed with ",
+    designedWithSuffix: "",
   },
   docs: {
     fallbackNotice: "This page has not been translated yet, so the English version is shown.",
@@ -708,7 +710,9 @@ const tr: Dictionary = {
       changelog: "Sürüm notları",
     },
     license: "MIT lisansı ile yayınlanmıştır.",
-    builtWith: "Next.js, Tailwind CSS ve shadcn/ui ile yapıldı",
+    builtWith: "Next.js ve Tailwind CSS ile yapıldı",
+    designedWithPrefix: "",
+    designedWithSuffix: " ile tasarlandı",
   },
   docs: {
     fallbackNotice: "Bu sayfa henüz Türkçeye çevrilmedi; İngilizce hâli gösteriliyor.",
