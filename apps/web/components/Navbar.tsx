@@ -8,13 +8,13 @@ import { buttonVariants } from "@/lib/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowUpRight, Check, ChevronDown, ChevronRight, Globe, Menu, X,
+  ArrowUpRight, Check, ChevronDown, ChevronRight, Menu, X,
 } from "lucide-react";
 import { GitHubIcon } from "@/components/icons";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
-import { LOCALES, localeName, localePath, type Locale } from "@/lib/i18n/config";
+import { LOCALES, localeFlag, localeName, localePath, type Locale } from "@/lib/i18n/config";
 import { switchLocale, switchLocalePath } from "@/lib/i18n/switch";
 import { withBasePath } from "@/lib/base-path";
 import { GITHUB_URL, MENU_ICON_ASSETS, MENU_KEYS, menus, type MenuIcon, type MenuKey } from "@/lib/nav-menu";
@@ -40,7 +40,16 @@ function MenuIconVisual({ icon, className }: { icon: MenuIcon; className?: strin
 }
 
 /** Menu of every supported language; switches to the same page in the chosen one */
-function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
+function LanguageMenu({
+  lang,
+  label,
+  side = "bottom",
+}: {
+  lang: Locale;
+  label: string;
+  /** "top" opens upward from the start edge, for the mobile panel where a downward menu would be clipped */
+  side?: "top" | "bottom";
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -64,9 +73,11 @@ function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
     return (
       <Link
         key={target}
+        role="menuitem"
         href={switchLocalePath(target, pathname)}
         hrefLang={target}
         aria-current={current ? "true" : undefined}
+        tabIndex={open ? 0 : -1}
         // Not prefetched: the other language is opened with a full load (see switchLocale)
         prefetch={false}
         onClick={(event) => {
@@ -77,13 +88,26 @@ function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
           switchLocale(target, pathname);
         }}
         className={cn(
-          "flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+          "grid grid-cols-[2.25rem_1fr_1rem] items-center gap-3 rounded-xl px-2 py-2 text-xs font-medium whitespace-nowrap transition-colors",
           current ? "text-foreground bg-accent/50" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
         )}
       >
-        <span className="font-mono uppercase">{target}</span>
+        <span
+          aria-hidden
+          className="grid h-7 w-9 place-items-center rounded-lg border border-border bg-background shadow-xs"
+        >
+          <Image
+            src={withBasePath(`/brand/flags/${localeFlag(target)}`)}
+            width={24}
+            height={16}
+            alt=""
+            className="h-4 w-6 rounded-[4px] object-cover shadow-sm"
+          />
+        </span>
         <span>{localeName(target, lang)}</span>
-        {current && <Check className="size-3.5 shrink-0 text-primary" />}
+        <span className="grid size-4 place-items-center" aria-hidden>
+          {current && <Check className="size-3.5 text-primary" />}
+        </span>
       </Link>
     );
   });
@@ -101,18 +125,31 @@ function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
           "h-9 gap-1 rounded-full px-2.5 text-xs font-medium text-muted-foreground uppercase hover:text-foreground"
         )}
       >
-        <Globe className="size-3.5" />
+        <Image
+          src={withBasePath(`/brand/flags/${localeFlag(lang)}`)}
+          width={20}
+          height={14}
+          alt=""
+          aria-hidden
+          className="h-3.5 w-5 rounded-[3px] object-cover shadow-sm"
+        />
         {lang}
         <ChevronDown className={cn("size-3 transition-transform duration-200", open && "rotate-180")} />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute top-full end-0 z-50 mt-1 min-w-40 rounded-2xl border border-border bg-card p-1"
-        >
-          {menuItems}
-        </div>
-      )}
+      <div
+        role="menu"
+        aria-hidden={!open}
+        data-state={open ? "open" : "closed"}
+        className={cn(
+          "absolute z-50 min-w-48 rounded-2xl border border-border bg-card p-1.5 shadow-lg transition-[opacity,transform,visibility] duration-(--bp-d-sm) ease-brand motion-reduce:transition-none",
+          side === "top" ? "start-0 bottom-full mb-1 origin-bottom-left" : "end-0 top-full mt-1 origin-top-right",
+          open
+            ? "visible translate-y-0 scale-100 opacity-100"
+            : cn("pointer-events-none invisible scale-[0.98] opacity-0", side === "top" ? "translate-y-1" : "-translate-y-1"),
+        )}
+      >
+        {menuItems}
+      </div>
     </div>
   );
 }
@@ -418,7 +455,7 @@ export default function Navbar({
           <Separator className="my-1.5" />
           <div className="flex gap-2 pt-2 pb-1">
             <ThemeToggle label={t.theme} className="h-9 shrink-0" />
-            <LanguageMenu lang={lang} label={t.language} />
+            <LanguageMenu lang={lang} label={t.language} side="top" />
             <a
               href={GITHUB_URL}
               target="_blank"

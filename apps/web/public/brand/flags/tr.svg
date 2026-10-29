@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40" role="img" aria-label="Türkiye flag">
+  <rect width="60" height="40" fill="#e30a17"/>
+  <circle cx="24" cy="20" r="10.5" fill="#fff"/>
+  <circle cx="27.5" cy="20" r="8.4" fill="#e30a17"/>
+  <path fill="#fff" d="m38.2 20 6.7-2.18-4.14 5.7v-7.04l4.14 5.7z"/>
+</svg>

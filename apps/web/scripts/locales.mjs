@@ -43,6 +43,8 @@ export function resolveLocaleRegistry(registry) {
     for (const ui of UI_LANGUAGES)
       if (!isText(settings.names[ui])) fail(`"${code}".names.${ui} must be a non-empty string`);
     if (!isText(settings.nativeName)) fail(`"${code}" needs a non-empty nativeName`);
+    if (typeof settings.flag !== 'string' || !/^[\w.-]+\.svg$/.test(settings.flag))
+      fail(`"${code}".flag must be an SVG file name under public/brand/flags`);
     if (settings.dir !== 'ltr' && settings.dir !== 'rtl')
       fail(`"${code}" has dir "${settings.dir}", expected "ltr" or "rtl"`);
     if (typeof settings.enabled !== 'boolean') fail(`"${code}" needs a boolean enabled flag`);

@@ -18,6 +18,8 @@ export interface LocaleSettings {
   names: Record<string, string>;
   /** the language's own name, used by the docs UI and the generated llms index */
   nativeName: string;
+  /** SVG file under public/brand/flags used by the navbar language switcher */
+  flag: string;
   /** text direction; `rtl` sets dir="rtl" on <html> */
   dir: TextDirection;
   /** false declares a language without routing, listing or checking it yet */
@@ -83,6 +85,11 @@ export function localeSettings(lang: Locale): LocaleSettings {
  */
 export function localeName(lang: Locale, uiLang: Locale = DEFAULT_LOCALE): string {
   return settings[lang].names[uiLang] ?? settings[lang].nativeName;
+}
+
+/** Flag asset file configured for a language in the locale registry */
+export function localeFlag(lang: Locale): string {
+  return settings[lang].flag;
 }
 
 /** Open Graph locale tag for a language, e.g. "en_US" */
