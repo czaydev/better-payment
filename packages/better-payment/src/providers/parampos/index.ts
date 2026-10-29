@@ -40,6 +40,8 @@ import {
   generateParamposPaymentHash,
   generateParamposPreAuthHash,
   verifyParampos3DSCallback,
+  verifyParamposReturnHash,
+  PARAMPOS_FOREIGN_CURRENCY_CODES,
   formatParamposAmount,
   formatParamposRefundAmount,
   formatParamposExpiryMonth,
@@ -276,14 +278,82 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   }
 
   /**
-   * TP_WMD_UCD only supports TRY. Foreign currency payments require a different
-   * service (TP_Islem_Odeme_WD) which is not implemented yet.
+   * TP_Islem_Odeme_WD fields (foreign-currency 3D payment), as Param's request
+   * model documents them: `Doviz_Kodu` 1001/1002/1003, both return URLs, and the
+   * hash with the URLs instead of the installment count.
+   * https://github.com/PARAMPOS/Dotnet-Ornek-Kod/blob/8c1160cfb9bb6df8ac117d97871b7e5b496088cb/src/ParamApi.Sdk/Models/Requests/TP_Islem_Odeme_WD_Request.cs
    */
-  private assertTry(currency: string | undefined): void {
-    const value = (currency || 'TRY').toUpperCase();
-    if (value !== 'TRY' && value !== 'TL') {
+  private async buildForeignPaymentFields(
+    request: PaymentRequest,
+    orderId: string,
+    currencyCode: number
+  ): Promise<Record<string, XmlValue>> {
+    const card = this.cardOf(request);
+    // Built once: these exact strings are sent and hashed (100 and 100.00 both
+    // become "100,00", so the hash always matches the request byte for byte).
+    const transactionAmount = formatParamposAmount(request.price);
+    const totalAmount = formatParamposAmount(request.paidPrice ?? request.price);
+    const callbackUrl = request.callbackUrl ?? '';
+
+    return {
+      ...this.credentials,
+      Doviz_Kodu: currencyCode,
+      KK_Sahibi: card.cardHolderName,
+      KK_No: card.cardNumber,
+      KK_SK_Ay: formatParamposExpiryMonth(card.expireMonth),
+      KK_SK_Yil: formatParamposExpiryYear(card.expireYear),
+      KK_CVC: card.cvc,
+      KK_Sahibi_GSM: formatParamposGsm(request.buyer?.gsmNumber),
+      Hata_URL: callbackUrl,
+      Basarili_URL: callbackUrl,
+      Siparis_ID: orderId,
+      // Required by the WD request model; fall back to the order id, never invent one
+      Siparis_Aciklama: request.basketId || orderId,
+      Islem_Tutar: transactionAmount,
+      Toplam_Tutar: totalAmount,
+      Islem_Hash: await generateParamposPreAuthHash(
+        this.config.clientCode,
+        this.config.guid,
+        transactionAmount,
+        totalAmount,
+        orderId,
+        callbackUrl,
+        callbackUrl
+      ),
+      Islem_Guvenlik_Tip: '3D',
+      Islem_ID: orderId,
+      IPAdr: request.buyer.ip,
+    };
+  }
+
+  /**
+   * Direct payments, pre-authorizations and captures stay on the TRY services.
+   * Foreign currency is only available through initThreeDSPayment() (TP_Islem_Odeme_WD).
+   */
+  private assertTry(currency: string | undefined, operation = 'payments'): void {
+    if (!Parampos.isTry(currency)) {
       throw new ValidationError(
-        `Parampos provider currently supports only TRY payments (received ${currency})`
+        `Parampos ${operation} are TRY-only (received ${currency}); use initThreeDSPayment() for USD, EUR and GBP`
+      );
+    }
+  }
+
+  /** TRY (the old path); TL is accepted as the same currency */
+  private static isTry(currency: string | undefined): boolean {
+    const value = (currency || 'TRY').toUpperCase();
+    return value === 'TRY' || value === 'TL';
+  }
+
+  /**
+   * Param publishes no currency-aware refund/cancel message: the request model
+   * of TP_Islem_Iptal_Iade_Kismi2 has only Durum, Siparis_ID and Tutar.
+   * https://github.com/PARAMPOS/Dotnet-Ornek-Kod/blob/8c1160cfb9bb6df8ac117d97871b7e5b496088cb/src/ParamApi.Sdk/Models/Requests/TP_Islem_Iptal_Iade_Kismi2_Request.cs
+   * Fail loudly instead of sending the TRY message for a foreign-currency payment.
+   */
+  private assertRefundCurrency(currency: string | undefined): void {
+    if (!Parampos.isTry(currency)) {
+      throw new ValidationError(
+        `Parampos cannot refund or cancel ${(currency || '').toUpperCase()} payments: Param publishes no currency-aware refund message (TP_Islem_Iptal_Iade_Kismi2 has no Doviz_Kodu). Refund it in the Param panel.`
       );
     }
   }
@@ -327,18 +397,24 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   /**
    * Initialize 3D Secure payment (TP_WMD_UCD, Islem_Guvenlik_Tip = 3D)
    *
-   * Render `threeDSHtmlContent` in the browser. Param POSTs the result to
+   * TRY: render `threeDSHtmlContent` in the browser. Param POSTs the result to
    * `callbackUrl`; pass that POST body to completeThreeDSPayment().
+   *
+   * USD/EUR/GBP: TP_Islem_Odeme_WD instead, returning Param's `UCD_URL` as
+   * `redirectUrl`; the customer completes the payment on that page and Param
+   * posts `TURKPOS_RETVAL_*` fields to `callbackUrl`.
    */
   async initThreeDSPayment(request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     const orderId = request.conversationId || generateOrderId();
     try {
       this.validatePayment(request, PARAMPOS_CARD_RULES);
-      this.assertTry(request.currency);
       if (!request.callbackUrl) {
         throw new ValidationError('callbackUrl is required for 3D Secure payments');
       }
       const installment = Math.max(1, request.installment ?? 1);
+      if (!Parampos.isTry(request.currency)) {
+        return await this.initForeignThreeDSPayment(request, orderId, installment);
+      }
       const fields = await this.buildPaymentFields(
         request,
         orderId,
@@ -373,6 +449,62 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
       });
     }
   }
+
+  /**
+   * Foreign-currency 3D Secure init via TP_Islem_Odeme_WD.
+   * https://github.com/PARAMPOS/Dotnet-Ornek-Kod/blob/8c1160cfb9bb6df8ac117d97871b7e5b496088cb/src/ParamApi.Sdk/Models/Responses/TP_Islem_Odeme_WD_Response.cs
+   */
+  private async initForeignThreeDSPayment(
+    request: ThreeDSPaymentRequest,
+    orderId: string,
+    installment: number
+  ): Promise<ThreeDSInitResponse> {
+    const currencyCode = PARAMPOS_FOREIGN_CURRENCY_CODES[(request.currency || '').toUpperCase()];
+    if (!currencyCode) {
+      throw new ValidationError(
+        `Parampos foreign-currency payments support USD, EUR and GBP (received ${request.currency})`
+      );
+    }
+    // The WD request model has no Taksit field, so installments are unconfirmed
+    if (installment > 1) {
+      throw new ValidationError('Parampos foreign-currency payments do not support installments');
+    }
+    const result = await this.sendSoapRequest(
+      'TP_Islem_Odeme_WD',
+      await this.buildForeignPaymentFields(request, orderId, currencyCode)
+    );
+
+    if (!isParamposSuccess(result.Sonuc)) {
+      return this.withErrorCode({
+        status: PaymentStatus.FAILURE,
+        paymentId: orderId,
+        conversationId: orderId,
+        errorCode: result.Sonuc,
+        errorMessage: result.Sonuc_Str || 'Foreign-currency payment could not be started',
+        rawResponse: result,
+      });
+    }
+    if (!result.UCD_URL) {
+      // Sonuc > 0 but there is no page to send the customer to: do not claim success
+      return this.withErrorCode({
+        status: PaymentStatus.PENDING,
+        paymentId: orderId,
+        conversationId: orderId,
+        errorCode: 'MISSING_UCD_URL',
+        errorMessage: 'Parampos returned no UCD_URL for the foreign-currency payment',
+        rawResponse: result,
+      });
+    }
+
+    return this.withErrorCode({
+      status: PaymentStatus.PENDING,
+      redirectUrl: result.UCD_URL,
+      paymentId: orderId,
+      conversationId: orderId,
+      rawResponse: result,
+    });
+  }
+
   /**
    * Pre-authorization without 3D Secure (TP_Islem_Odeme_OnProv_WMD, NS).
    * Blocks the amount; charge it with capture() or release it with voidAuthorization().
@@ -511,12 +643,20 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   /**
    * Complete 3D Secure payment
    *
+   * Foreign currency (TP_Islem_Odeme_WD): Param returns `TURKPOS_RETVAL_*` form
+   * fields; they are accepted only after `TURKPOS_RETVAL_Hash` verifies. No
+   * second request is needed (or allowed): the signed return is the result.
+   *
+   * TRY (TP_WMD_UCD):
    * 1. Verifies islemHash with the configured GUID (callback values are untrusted).
    * 2. Requires mdStatus = 1 (full 3D authentication).
    * 3. Finalizes the payment with TP_WMD_Pay. The payment is only successful
    *    when TP_WMD_Pay returns Sonuc > 0 and a Dekont_ID.
    */
   async completeThreeDSPayment(callbackData: Parampos3DSCallbackData): Promise<PaymentResponse> {
+    if (callbackData && Parampos.isReturnCallback(callbackData)) {
+      return this.completeForeignPayment(callbackData);
+    }
     const orderId = callbackData?.orderId;
     try {
       if (!(await verifyParampos3DSCallback(callbackData ?? {}, this.config.guid))) {
@@ -568,6 +708,65 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
     }
   }
 
+  /** True for Param's TP_Islem_Odeme_WD return form (`TURKPOS_RETVAL_*`), not the TRY 3D callback */
+  private static isReturnCallback(data: Parampos3DSCallbackData | undefined): boolean {
+    return !!data && Object.keys(data).some((key) => key.startsWith('TURKPOS_RETVAL_'));
+  }
+
+  /**
+   * Completes a foreign-currency payment from the signed `TURKPOS_RETVAL_*` form.
+   * Success requires a valid hash AND Sonuc > 0, a non-zero Islem_ID and a
+   * positive Dekont_ID (Param's published success check); the amount and
+   * currency are kept exactly as reported.
+   */
+  private async completeForeignPayment(
+    callbackData: Parampos3DSCallbackData
+  ): Promise<PaymentResponse> {
+    const details = {
+      paymentId: callbackData.TURKPOS_RETVAL_Siparis_ID,
+      conversationId: callbackData.TURKPOS_RETVAL_Siparis_ID,
+      amount: callbackData.TURKPOS_RETVAL_Tahsilat_Tutari,
+      currency: callbackData.TURKPOS_RETVAL_PB,
+    };
+    try {
+      if (
+        !(await verifyParamposReturnHash(callbackData, this.config.clientCode, this.config.guid))
+      ) {
+        return this.withErrorCode({
+          status: PaymentStatus.FAILURE,
+          ...details,
+          errorCode: 'INVALID_HASH',
+          errorMessage: 'Invalid foreign-currency callback signature',
+          rawResponse: callbackData,
+        });
+      }
+
+      // Islem_ID is alphanumeric in published WD returns, so require a value
+      // (not "0"), not a number; Dekont_ID is numeric and must be positive.
+      const islemId = callbackData.TURKPOS_RETVAL_Islem_ID;
+      const dekontId = callbackData.TURKPOS_RETVAL_Dekont_ID;
+      const approved =
+        !!details.paymentId &&
+        isParamposSuccess(callbackData.TURKPOS_RETVAL_Sonuc) &&
+        !!islemId &&
+        islemId !== '0' &&
+        !!dekontId &&
+        Number(dekontId) > 0;
+
+      return this.withErrorCode({
+        status: approved ? PaymentStatus.SUCCESS : PaymentStatus.FAILURE,
+        ...details,
+        errorCode: approved ? undefined : callbackData.TURKPOS_RETVAL_Sonuc,
+        errorMessage: approved
+          ? undefined
+          : callbackData.TURKPOS_RETVAL_Sonuc_Str || 'Foreign-currency payment failed',
+        rawResponse: callbackData,
+      });
+    } catch (error) {
+      return this.failure<PaymentResponse>(error, 'Foreign-currency callback failed', details);
+    }
+  }
+
   private async cancelOrRefund(
     action: 'IADE' | 'IPTAL',
     orderId: string,
@@ -587,6 +786,7 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
   async refund(request: RefundRequest): Promise<RefundResponse> {
     try {
       this.validateRefund(request);
+      this.assertRefundCurrency(request.currency);
       const result = await this.cancelOrRefund('IADE', request.paymentId, request.price);
       const approved = isParamposSuccess(result.Sonuc);
 
@@ -612,6 +812,7 @@ export class Parampos extends PaymentProvider<ParamposConfig> {
    */
   async cancel(request: CancelRequest): Promise<CancelResponse> {
     try {
+      this.assertRefundCurrency(request.currency);
       let amount = request.price;
       if (!amount) {
         const status = await this.queryOrder(request.paymentId);

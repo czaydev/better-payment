@@ -59,10 +59,16 @@ export async function generateParamposPaymentHash(
  * Formula: base64(sha1(islemGUID + md + mdStatus + orderId + GUID))
  */
 /**
- * Islem_Hash of a pre-authorization (TP_Islem_Odeme_OnProv_WMD):
+ * Islem_Hash of a pre-authorization (TP_Islem_Odeme_OnProv_WMD) and of a
+ * foreign-currency payment (TP_Islem_Odeme_WD):
  * base64(sha1(ISO-8859-9(CLIENT_CODE + GUID + Islem_Tutar + Toplam_Tutar +
- * Siparis_ID + Hata_URL + Basarili_URL))). Unlike a sale, the installment is
- * not part of it; the URLs are empty for non-3D pre-authorizations.
+ * Siparis_ID + Hata_URL + Basarili_URL))). Unlike a TRY sale, the installment
+ * is not part of it; the URLs are empty for non-3D pre-authorizations.
+ *
+ * The foreign-currency formula is the same one Param documents for the amount
+ * hash only through its published clients:
+ * https://github.com/PARAMPOS/nodejs-client/blob/54f7ba35e78a1f4d0329cab2cedcc6d4c2a0a469/src/services/DovizOdemeService.js
+ * https://github.com/mewebstudio/pos/blob/e074733bf556bfe844e4a5a370505ceb5267bace/src/Crypt/ParamPosCrypt.php
  */
 export async function generateParamposPreAuthHash(
   clientCode: string,
@@ -114,6 +120,83 @@ export async function verifyParampos3DSCallback(
     guid
   );
   return safeEqual(expected, islemHash);
+}
+
+/**
+ * `Doviz_Kodu` of TP_Islem_Odeme_WD: 1001 USD, 1002 EUR, 1003 GBP. 1000 is TRL,
+ * which this provider keeps on TP_WMD_UCD.
+ * https://github.com/PARAMPOS/Dotnet-Ornek-Kod/blob/8c1160cfb9bb6df8ac117d97871b7e5b496088cb/src/ParamApi.Sdk/Models/Requests/TP_Islem_Odeme_WD_Request.cs
+ */
+export const PARAMPOS_FOREIGN_CURRENCY_CODES: Record<string, number> = {
+  USD: 1001,
+  EUR: 1002,
+  GBP: 1003,
+};
+
+/**
+ * `TURKPOS_RETVAL_*` form fields Param posts to Basarili_URL / Hata_URL after a
+ * TP_Islem_Odeme_WD payment.
+ */
+export interface ParamposReturnData {
+  TURKPOS_RETVAL_Sonuc?: string;
+  TURKPOS_RETVAL_Sonuc_Str?: string;
+  TURKPOS_RETVAL_GUID?: string;
+  TURKPOS_RETVAL_Dekont_ID?: string;
+  TURKPOS_RETVAL_Tahsilat_Tutari?: string;
+  TURKPOS_RETVAL_Odeme_Tutari?: string;
+  TURKPOS_RETVAL_Siparis_ID?: string;
+  TURKPOS_RETVAL_Islem_ID?: string;
+  TURKPOS_RETVAL_Banka_Sonuc_Kod?: string;
+  TURKPOS_RETVAL_PB?: string;
+  TURKPOS_RETVAL_Hash?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * TURKPOS_RETVAL_Hash:
+ * base64(sha1(ISO-8859-9(CLIENT_CODE + TURKPOS_RETVAL_GUID +
+ * TURKPOS_RETVAL_Dekont_ID + TURKPOS_RETVAL_Tahsilat_Tutari +
+ * TURKPOS_RETVAL_Siparis_ID + TURKPOS_RETVAL_Islem_ID)))
+ *
+ * https://github.com/mewebstudio/pos/blob/e074733bf556bfe844e4a5a370505ceb5267bace/src/Crypt/ParamPosCrypt.php
+ * (the reference vector is asserted in the tests)
+ */
+export async function generateParamposReturnHash(
+  clientCode: string,
+  callback: ParamposReturnData
+): Promise<string> {
+  const hashString =
+    clientCode +
+    (callback.TURKPOS_RETVAL_GUID ?? '') +
+    (callback.TURKPOS_RETVAL_Dekont_ID ?? '') +
+    (callback.TURKPOS_RETVAL_Tahsilat_Tutari ?? '') +
+    (callback.TURKPOS_RETVAL_Siparis_ID ?? '') +
+    (callback.TURKPOS_RETVAL_Islem_ID ?? '');
+  return toBase64(await digest('SHA-1', encodeIso88599(hashString)));
+}
+
+/**
+ * Verifies TURKPOS_RETVAL_Hash. `clientCode` and `guid` MUST come from the
+ * merchant configuration. The GUID is also compared to the configured one: it
+ * is part of the hashed string, so accepting an attacker-chosen GUID would make
+ * the hash forgeable. A return-URL visit without a valid hash is never confirmation.
+ */
+export async function verifyParamposReturnHash(
+  callback: ParamposReturnData,
+  clientCode: string,
+  guid: string
+): Promise<boolean> {
+  if (
+    !callback?.TURKPOS_RETVAL_Hash ||
+    !safeEqual(callback.TURKPOS_RETVAL_GUID, guid) ||
+    !callback.TURKPOS_RETVAL_Siparis_ID
+  ) {
+    return false;
+  }
+  return safeEqual(
+    await generateParamposReturnHash(clientCode, callback),
+    callback.TURKPOS_RETVAL_Hash
+  );
 }
 
 /**

@@ -29,7 +29,8 @@ const payment = betterPayment({
   including installment commission). Amounts are sent with a decimal comma.
 - For installments, `paidPrice` must include the commission from your Param
   rates. Get it with `calculatePaidPrice()` (below); the library never guesses rates.
-- Only **TRY** is supported (`TP_WMD_UCD`). Other currencies return `failure`.
+- TRY uses `TP_WMD_UCD`; USD, EUR and GBP use `TP_Islem_Odeme_WD` (see
+  [Foreign currency](#foreign-currency-3d-secure)). Other currencies return `failure`.
 
 `paymentId` is your order id (`Siparis_ID`): the `conversationId` you pass, or
 a generated alphanumeric id.
@@ -63,6 +64,51 @@ const result = await payment.parampos.completeThreeDSPayment(callbackBody);
 2. `mdStatus` must be `1`.
 3. The payment is finalized with `TP_WMD_Pay`. It counts as `success` only
    when Param returns a `Dekont_ID`.
+
+## Foreign currency (3D Secure) [#foreign-currency-3d-secure]
+
+`TP_WMD_UCD` only accepts TRY. USD, EUR and GBP payments use
+`TP_Islem_Odeme_WD` with `Doviz_Kodu` 1001, 1002 and 1003, and return a redirect
+URL instead of an HTML form:
+
+```typescript
+const init = await payment.parampos.initThreeDSPayment({
+  ...paymentRequest,
+  currency: 'USD',
+  conversationId: 'ORDER123',
+  callbackUrl: 'https://yoursite.com/api/pay/parampos/payment/complete-3ds',
+});
+
+if (init.redirectUrl) {
+  window.location.assign(init.redirectUrl);
+}
+```
+
+Param posts the result to `callbackUrl` as `TURKPOS_RETVAL_*` form fields.
+`completeThreeDSPayment()` verifies `TURKPOS_RETVAL_Hash` with your `clientCode`
+and GUID before it returns `success`:
+
+```typescript
+const result = await payment.parampos.completeThreeDSPayment(callbackBody);
+// result.amount and result.currency come from the verified callback
+```
+
+- The hash covers `CLIENT_CODE`, `TURKPOS_RETVAL_GUID`,
+  `TURKPOS_RETVAL_Dekont_ID`, `TURKPOS_RETVAL_Tahsilat_Tutari`,
+  `TURKPOS_RETVAL_Siparis_ID` and `TURKPOS_RETVAL_Islem_ID`. The GUID must be
+  the one from your configuration.
+- `success` also requires `TURKPOS_RETVAL_Sonuc` greater than zero, a non-zero
+  `TURKPOS_RETVAL_Islem_ID` and a positive `TURKPOS_RETVAL_Dekont_ID`. Visiting
+  the return URL alone is not a confirmation.
+- The amount is formatted once and the same string is sent and hashed
+  (`100` and `100.00` both become `100,00`).
+- Installments are not supported for these payments (`TP_Islem_Odeme_WD` has no
+  `Taksit` field); an installment count above 1 is rejected.
+- Refunds and cancels are not supported: Param publishes no currency-aware
+  refund message, so `refund()` and `cancel()` fail instead of sending the TRY
+  message. Refund foreign-currency payments in the Param panel.
+- Omitting `currency` from `cancel()` keeps the existing TRY behaviour; pass
+  `currency` for every non-TRY payment so it is rejected instead.
 
 ## Refund, Cancel & Status
 
