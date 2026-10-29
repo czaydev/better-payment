@@ -70,8 +70,13 @@ import type {
   PayTRInstallmentRatesResponse,
 } from './types';
 
+/**
+ * PayTR does not publish its pre-authorization ("ön provizyon" / "pre-provision")
+ * API. Kept as `NOT_SUPPORTED` rather than guessed; see the research note above
+ * the methods below and https://github.com/czaydev/better-payment/issues/60.
+ */
 const PAYTR_PREAUTH_NOTE =
-  'PayTR pre-authorization is not implemented yet (https://github.com/czaydev/better-payment/issues/60)';
+  'PayTR does not publish its pre-authorization API: the integration doc at https://dev.paytr.com/on-provizyon only links to https://www.paytr.com/iletisim (contact us), and neither the official Postman collection nor the hash-calculation tool has an authorize/capture/void endpoint or formula. The endpoints, parameters and hash strings are not documented publicly and need PayTR test credentials to build (https://github.com/czaydev/better-payment/issues/60).';
 
 /** Fields PayTR requires for card and iFrame payments */
 const PAYTR_ORDER_RULES: PaymentValidationRules = {
@@ -820,22 +825,50 @@ export class PayTR extends PaymentProvider<PayTRConfig> {
    * Payment status query (/odeme/durum-sorgu). `paymentId` is the merchant_oid.
    */
   /**
-   * Pre-authorization is not implemented for PayTR yet (see
-   * https://github.com/czaydev/better-payment/issues/60).
+   * Pre-authorization (authorize / initThreeDSAuthorize / capture / voidAuthorization)
+   * is intentionally NOT supported for PayTR.
+   *
+   * Research for #60 (October 2026), read from the sources:
+   *   - https://dev.paytr.com/on-provizyon and https://dev.paytr.com/en/on-provizyon are
+   *     conceptual pages only. Both close with "To access the Pre-Provision document click
+   *     here" -> https://www.paytr.com/iletisim (Contact Us): there is no public doc.
+   *   - https://dev.paytr.com/sitemap.xml has no pre-auth sub-page.
+   *   - The official Postman collection (https://dev.paytr.com/servis-test-araclari/postman/
+   *     postman_paytr.zip) - the same source the iFrame/Direct/refund/status tokens here
+   *     already follow - has no authorize/capture/void request. Its only endpoints are
+   *     /odeme, /odeme/api/get-token, /odeme/api/bin-detail, /odeme/api/link/*,
+   *     /odeme/capi/list, /odeme/capi/delete, /odeme/durum-sorgu, /odeme/iade,
+   *     /odeme/taksit-oranlari, /odeme/platform/transfer and /rapor/islem-dokumu.
+   *   - The hash-calculation tool (https://dev.paytr.com/servis-test-araclari/hash-hesaplama)
+   *     exposes formulas only for iFrame / Direct / Link / Status / Transaction-dökümü.
+   *   - https://www.paytr.com/en/pre-authorization gives business rules only: a temporary
+   *     card hold; capture ("closure") within 7-25 days; an upward closure of at most +15%
+   *     over the authorised amount; single payment (no installments); Virtual POS.
+   *
+   * A pre-auth result would arrive through the same notification (Bildirim) URL as a 3D
+   * payment and must go through the signature-verified completeThreeDSPayment() path above
+   * (never a redirect query flag); capture must stay idempotent (a no-response outcome stays
+   * pending/NETWORK_ERROR and must not double-charge) and must not exceed the authorised
+   * amount. None of the endpoints, parameter names or hash strings needed to implement that
+   * is published, so they are deliberately not guessed here.
    */
   async authorize(_request: PaymentRequest): Promise<PaymentResponse> {
+    // not documented publicly, needs sandbox verification (issue #60)
     throw this.notSupported('Pre-authorization', PAYTR_PREAUTH_NOTE);
   }
 
   async initThreeDSAuthorize(_request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
+    // not documented publicly, needs sandbox verification (issue #60)
     throw this.notSupported('Pre-authorization', PAYTR_PREAUTH_NOTE);
   }
 
   async capture(_request: CaptureRequest): Promise<PaymentResponse> {
+    // not documented publicly, needs sandbox verification (issue #60)
     throw this.notSupported('Capture', PAYTR_PREAUTH_NOTE);
   }
 
   async voidAuthorization(_request: VoidAuthorizationRequest): Promise<CancelResponse> {
+    // not documented publicly, needs sandbox verification (issue #60)
     throw this.notSupported('Voiding a pre-authorization', PAYTR_PREAUTH_NOTE);
   }
 
