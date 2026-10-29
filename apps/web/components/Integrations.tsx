@@ -51,8 +51,8 @@ export default function Integrations({
   };
 
   return (
-    <section id="providers" className="scroll-mt-20 px-5 py-24 sm:px-8 md:py-28">
-      <div className="mx-auto max-w-7xl">
+    <section id="providers" className="scroll-mt-20 px-4 py-24 sm:px-6 md:px-4 md:py-28">
+      <div className="mx-auto max-w-[97rem]">
         <SectionHeading line1={compare.titleLine1} line2={compare.titleLine2} lead={compare.lead} />
 
         <div className="bp-reveal mb-5 rounded-2xl border border-border bg-card p-4 sm:p-5">
@@ -68,7 +68,7 @@ export default function Integrations({
           >
             {GROUPS.map((group) => (
               <div key={group} role="presentation" className="min-w-0">
-                <p className="mb-2 px-1 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                <p className="mb-2 px-1 text-caption font-medium text-muted-foreground">
                   {t.groups[group]}
                 </p>
                 <div role="presentation" className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">

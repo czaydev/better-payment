@@ -22,7 +22,7 @@ export default function ThemeToggle({ label, className }: { label: string; class
       aria-label={label}
       onClick={() => setTheme(value === "dark" ? "light" : "dark")}
       className={cn(
-        "inline-flex h-8 items-center rounded-full border border-border p-0.5 transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+        "inline-flex h-9 items-center rounded-full border border-border p-0.5 transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         className,
       )}
     >
@@ -33,7 +33,7 @@ export default function ThemeToggle({ label, className }: { label: string; class
         <span
           key={key}
           className={cn(
-            "grid size-6.5 place-items-center rounded-full text-muted-foreground transition-colors",
+            "grid size-7.5 place-items-center rounded-full text-muted-foreground transition-colors",
             value === key && "bg-accent text-accent-foreground",
           )}
         >

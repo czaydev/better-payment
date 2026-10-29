@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Inter, JetBrains_Mono, Manrope } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
 import SiteProvider from "@/components/SiteProvider";
 import { LOCALES, SITE_URL, alternates, isLocale, isRtl, openGraphLocale, socialImageFile } from "@/lib/i18n/config";
@@ -9,14 +9,9 @@ import { i18nUI } from "@/lib/i18n/ui";
 import { Analytics } from "@vercel/analytics/next";
 import { IS_BETA_DOCS, withBasePath } from "@/lib/base-path";
 
-// Brand typography: Manrope for display and headings, Inter for text, JetBrains Mono for code
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin", "latin-ext"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
+// One family (czay.dev design system): DM Sans for text and headings, JetBrains Mono for code only
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin", "latin-ext"],
 });
 
@@ -75,7 +70,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
       lang={lang}
       // Text direction comes from the registry (locales.json `dir`); mirroring the layouts for RTL is a follow-up
       dir={isRtl(lang) ? "rtl" : "ltr"}
-      className={`${manrope.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${dmSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans antialiased">

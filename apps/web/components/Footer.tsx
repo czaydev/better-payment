@@ -10,9 +10,9 @@ function footerLinks(t: Dictionary["footer"]) {
     {
       group: t.groups.product,
       items: [
-        { label: t.links.features, href: "/#features" },
-        { label: t.links.providers, href: "/#providers" },
-        { label: t.links.quickStart, href: "/#quickstart" },
+        { label: t.links.features, href: "/product" },
+        { label: t.links.providers, href: "/providers" },
+        { label: t.links.quickStart, href: "/developers" },
         { label: t.links.docs, href: "/docs" },
         { label: t.links.blog, href: "/blog" },
       ],
@@ -24,6 +24,7 @@ function footerLinks(t: Dictionary["footer"]) {
         { label: t.links.installation, href: "/docs/installation" },
         { label: t.links.configuration, href: "/docs/concepts/configuration" },
         { label: t.links.apiReference, href: "/docs/reference/types" },
+        { label: "Examples", href: "/examples" },
       ],
     },
     {
@@ -52,7 +53,7 @@ function footerLinks(t: Dictionary["footer"]) {
 export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["footer"] }) {
   return (
     <footer className="border-t border-border bg-card/30">
-      <div className="max-w-[84rem] mx-auto px-5 sm:px-8 py-16">
+      <div className="max-w-[97rem] mx-auto px-4 sm:px-6 md:px-4 py-16">
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-10">
           {/* Brand */}
           <div className="col-span-2 sm:col-span-2">
@@ -138,7 +139,17 @@ export default function Footer({ lang, t }: { lang: Locale; t: Dictionary["foote
             © {new Date().getFullYear()} Better Payment. {t.license}
           </span>
           <span className="text-xs text-muted-foreground/35 font-mono">
-            {t.builtWith}
+            {t.builtWith} ·{" "}
+            {t.designedWithPrefix}
+            <a
+              href="https://github.com/czayelements/zay-ui"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-muted-foreground transition-colors"
+            >
+              zay-ui
+            </a>
+            {t.designedWithSuffix}
           </span>
         </div>
       </div>

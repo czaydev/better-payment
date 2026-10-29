@@ -90,7 +90,7 @@ function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
         onClick={() => setOpen((value) => !value)}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
-          "text-muted-foreground hover:text-foreground h-8 gap-1 px-2 text-xs font-medium font-mono uppercase"
+          "h-9 gap-1 rounded-full px-2.5 text-xs font-medium text-muted-foreground uppercase hover:text-foreground"
         )}
       >
         <Globe className="size-3.5" />
@@ -100,7 +100,7 @@ function LanguageMenu({ lang, label }: { lang: Locale; label: string }) {
       {open && (
         <div
           role="menu"
-          className="absolute top-full end-0 z-50 mt-1 min-w-40 rounded-lg border border-border bg-card p-1 shadow-[0_18px_40px_-18px_var(--bp-shadow)]"
+          className="absolute top-full end-0 z-50 mt-1 min-w-40 rounded-2xl border border-border bg-card p-1"
         >
           {menuItems}
         </div>
@@ -183,7 +183,7 @@ export default function Navbar({
             onClick={close}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "mt-6 border-primary/60 text-primary hover:border-primary hover:bg-tint",
+              "mt-6 rounded-full",
             )}
           >
             {copy.cta}
@@ -197,7 +197,7 @@ export default function Navbar({
         >
           {def.groups.map((group) => (
             <div key={group.id}>
-              <p className="mb-4 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+              <p className="mb-4 text-caption font-medium text-muted-foreground">
                 {groupCopy[group.id]}
               </p>
               <ul className="grid gap-1">
@@ -212,7 +212,7 @@ export default function Navbar({
                         onClick={close}
                         className="group/item -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 text-body font-medium text-foreground transition-colors hover:text-primary focus-visible:text-primary focus-visible:outline-none"
                       >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-tint to-secondary text-primary ring-1 ring-inset ring-primary/10 transition-[transform,box-shadow] duration-200 group-hover/item:-translate-y-px group-hover/item:shadow-[0_6px_14px_-6px_var(--bp-glow)]">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-tint text-accent-text transition-colors duration-200 group-hover/item:bg-primary group-hover/item:text-primary-foreground">
                           <ItemIcon className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{itemCopy[item.id]}</span>
@@ -243,7 +243,7 @@ export default function Navbar({
           : "border-transparent bg-background/60 backdrop-blur-xl",
       )}
     >
-      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[84rem] items-center px-5 sm:px-8">
+      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[97rem] items-center px-4 sm:px-6 md:px-4">
         {/* Logo */}
         <Link href={localePath(lang, "/")} className="group flex items-center gap-2.5 lg:flex-1">
           <Image
@@ -280,8 +280,8 @@ export default function Navbar({
                 onFocus={() => show(key)}
                 onClick={() => (active === key ? setActive(null) : show(key))}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-body font-medium whitespace-nowrap transition-colors duration-300 outline-none focus-visible:outline-2 focus-visible:outline-primary",
-                  active === key ? "text-primary" : "text-foreground hover:text-primary",
+                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-body font-medium whitespace-nowrap transition-colors duration-300 outline-none focus-visible:outline-2 focus-visible:outline-primary",
+                  active === key ? "bg-muted text-foreground" : "text-foreground hover:bg-muted",
                 )}
               >
                 {menu[key].label}
@@ -289,11 +289,11 @@ export default function Navbar({
               </button>
             ))}
             <Link
-              href={localePath(lang, "/docs")}
+              href={localePath(lang, "/examples")}
               onMouseEnter={hideSoon}
-              className="rounded-lg px-3.5 py-2 text-body font-medium whitespace-nowrap text-foreground transition-colors duration-300 hover:text-primary"
+              className="rounded-full px-3.5 py-2 text-body font-medium whitespace-nowrap text-foreground transition-colors duration-300 hover:bg-muted"
             >
-              {t.docs}
+              {lang === "tr" ? "Örnekler" : "Examples"}
             </Link>
           </div>
         </div>
@@ -307,12 +307,12 @@ export default function Navbar({
             href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}
           >
             <GitHubIcon data-icon="brand" />
             GitHub
           </a>
-          <Link href={localePath(lang, "/docs")} className={cn(buttonVariants({ size: "sm" }), "rounded-full px-4")}>
+          <Link href={localePath(lang, "/docs")} className={cn(buttonVariants({ size: "sm", pill: true }), "px-4")}>
             {t.getStarted}
             <ChevronRight data-icon="chevron" />
           </Link>
@@ -334,11 +334,11 @@ export default function Navbar({
         id="mega-panel"
         onMouseEnter={() => active && show(active)}
         className={cn(
-          "absolute inset-x-0 top-full hidden border-b border-border bg-card shadow-[0_32px_64px_-32px_var(--bp-shadow)] transition-[opacity,translate,visibility] duration-(--bp-d-sm) ease-brand lg:block",
+          "absolute inset-x-0 top-full hidden border-b border-border bg-card  transition-[opacity,translate,visibility] duration-(--bp-d-sm) ease-brand lg:block",
           active ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
         )}
       >
-        <div className="mx-auto max-w-[84rem] px-5 sm:px-8">{active && renderPanel(active)}</div>
+        <div className="mx-auto max-w-[97rem] px-4 sm:px-6 md:px-4">{active && renderPanel(active)}</div>
       </div>
       <div
         aria-hidden
@@ -370,7 +370,7 @@ export default function Navbar({
                   <div className="grid gap-4 pb-4">
                     {menus[key].groups.map((group) => (
                       <div key={group.id}>
-                        <p className="px-1 pb-1.5 text-label font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                        <p className="px-1 pb-1.5 text-caption font-medium text-muted-foreground">
                           {groupCopy[group.id]}
                         </p>
                         {group.items.map((item) => {
@@ -382,7 +382,7 @@ export default function Navbar({
                               onClick={close}
                               className="flex items-center gap-3 rounded-lg px-1 py-2 text-sm font-medium text-foreground hover:text-primary"
                             >
-                              <span className="flex size-7 items-center justify-center rounded-md bg-linear-to-br from-tint to-secondary text-primary">
+                              <span className="flex size-7 items-center justify-center rounded-lg bg-tint text-accent-text">
                                 <ItemIcon className="size-3.5" />
                               </span>
                               {itemCopy[item.id]}
@@ -396,8 +396,8 @@ export default function Navbar({
               </div>
             );
           })}
-          <Link href={localePath(lang, "/docs")} onClick={close} className="px-1 py-3.5 text-body font-semibold text-foreground">
-            {t.docs}
+          <Link href={localePath(lang, "/examples")} onClick={close} className="px-1 py-3.5 text-body font-semibold text-foreground">
+            {lang === "tr" ? "Örnekler" : "Examples"}
           </Link>
           <Separator className="my-1.5" />
           <div className="flex gap-2 pt-2 pb-1">

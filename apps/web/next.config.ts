@@ -57,15 +57,23 @@ const nextConfig: NextConfig = {
     };
   },
   async redirects() {
-    // The proxy does not run for the bare base path ("/beta"), and the beta deployment is for docs
     const betaRoot = basePath ? [{ source: "/", destination: "/docs", permanent: false }] : [];
-    return [...betaRoot, ...Object.entries(movedDocs).flatMap(([from, to]) =>
-      localePrefixes.map((prefix) => ({
-        source: `${prefix}/docs/${from}`,
-        destination: `${prefix}/docs/${to}`,
-        permanent: true,
-      }))
-    )];
+    const exampleRedirects = localePrefixes.map((prefix) => ({
+      source: `${prefix}/docs/integrations/next-shop`,
+      destination: `${prefix}/examples/next-shop`,
+      permanent: true,
+    }));
+    return [
+      ...betaRoot,
+      ...exampleRedirects,
+      ...Object.entries(movedDocs).flatMap(([from, to]) =>
+        localePrefixes.map((prefix) => ({
+          source: `${prefix}/docs/${from}`,
+          destination: `${prefix}/docs/${to}`,
+          permanent: true,
+        }))
+      ),
+    ];
   },
 };
 

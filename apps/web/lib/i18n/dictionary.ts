@@ -57,7 +57,7 @@ const en = {
         cta: "Open the docs",
         groups: { start: "Get started", integrations: "Integrations", reference: "Reference" },
         items: {
-          quickStart: "Quick start", installation: "Installation", configuration: "Configuration",
+          docs: "Documentation", quickStart: "Quick start", installation: "Installation", configuration: "Configuration",
           nextjs: "Next.js", edge: "Edge runtimes", frameworks: "Express, Hono & more",
           api: "API reference", types: "Types", errorCodes: "Error codes", testCards: "Test cards",
         },
@@ -345,7 +345,9 @@ const en = {
       changelog: "Changelog",
     },
     license: "Released under the MIT License.",
-    builtWith: "Built with Next.js, Tailwind CSS & shadcn/ui",
+    builtWith: "Built with Next.js & Tailwind CSS",
+    designedWithPrefix: "Designed with ",
+    designedWithSuffix: "",
   },
   docs: {
     fallbackNotice: "This page has not been translated yet, so the English version is shown.",
@@ -420,7 +422,7 @@ const tr: Dictionary = {
         cta: "Dokümantasyonu açın",
         groups: { start: "Başlangıç", integrations: "Entegrasyonlar", reference: "Referans" },
         items: {
-          quickStart: "Hızlı başlangıç", installation: "Kurulum", configuration: "Yapılandırma",
+          docs: "Dokümantasyon", quickStart: "Hızlı başlangıç", installation: "Kurulum", configuration: "Yapılandırma",
           nextjs: "Next.js", edge: "Edge ortamları", frameworks: "Express, Hono ve diğerleri",
           api: "API referansı", types: "Tipler", errorCodes: "Hata kodları", testCards: "Test kartları",
         },
@@ -708,7 +710,9 @@ const tr: Dictionary = {
       changelog: "Sürüm notları",
     },
     license: "MIT lisansı ile yayınlanmıştır.",
-    builtWith: "Next.js, Tailwind CSS ve shadcn/ui ile yapıldı",
+    builtWith: "Next.js ve Tailwind CSS ile yapıldı",
+    designedWithPrefix: "",
+    designedWithSuffix: " ile tasarlandı",
   },
   docs: {
     fallbackNotice: "Bu sayfa henüz Türkçeye çevrilmedi; İngilizce hâli gösteriliyor.",

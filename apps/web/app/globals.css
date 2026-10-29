@@ -1,10 +1,12 @@
 @import "tailwindcss";
+@import "@czayelements/zay-ui/styles.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-ui/css/shadcn.css";
 
 @source "../node_modules/fumadocs-ui/dist";
+@source "../node_modules/@czayelements/zay-ui/dist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -26,50 +28,50 @@
   --color-brand-900: #17144f;
   --color-brand-950: #13132b;
 
-  /* Blue-tinted neutrals for light surfaces, borders and secondary text */
-  --color-ink-50: #f8f8fc;
-  --color-ink-100: #f0eff8;
-  --color-ink-200: #e4e3f0;
-  --color-ink-300: #cfcde6;
-  --color-ink-500: #5a5a78;
-  --color-ink-900: #13132b;
+  /* Zinc neutrals (czay.dev DESIGN.md): canvas, wells, hairlines and secondary text. Only the brand is chromatic. */
+  --color-ink-50: #f4f4f5;
+  --color-ink-100: #efeff1;
+  --color-ink-200: #ececee;
+  --color-ink-300: #d4d4d8;
+  --color-ink-500: #52525b;
+  --color-ink-900: #09090b;
 
   /*
    * Type scale: size, then line height, tracking and weight where a step owns them.
    * Display and title steps are headings; body steps and below set only the size.
    */
-  --text-display-lg: 3.9rem;
-  --text-display-lg--line-height: 1.03;
-  --text-display-lg--letter-spacing: -0.035em;
-  --text-display-lg--font-weight: 800;
-  --text-display-md: 3rem;
-  --text-display-md--line-height: 1.05;
-  --text-display-md--letter-spacing: -0.035em;
-  --text-display-md--font-weight: 800;
-  --text-display-sm: 2.6rem;
-  --text-display-sm--line-height: 1.03;
-  --text-display-sm--letter-spacing: -0.035em;
-  --text-display-sm--font-weight: 800;
+  --text-display-lg: clamp(2.25rem, 1.2rem + 4.2vw, 4rem);
+  --text-display-lg--line-height: 1.12;
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-lg--font-weight: 600;
+  --text-display-md: clamp(2.25rem, 1.4rem + 3.2vw, 3.5rem);
+  --text-display-md--line-height: 1.12;
+  --text-display-md--letter-spacing: -0.03em;
+  --text-display-md--font-weight: 600;
+  --text-display-sm: 2.25rem;
+  --text-display-sm--line-height: 1.12;
+  --text-display-sm--letter-spacing: -0.03em;
+  --text-display-sm--font-weight: 600;
   --text-title-xl: 2.5rem;
-  --text-title-xl--line-height: 1.08;
-  --text-title-xl--letter-spacing: -0.03em;
-  --text-title-xl--font-weight: 800;
+  --text-title-xl--line-height: 1.12;
+  --text-title-xl--letter-spacing: -0.025em;
+  --text-title-xl--font-weight: 600;
   --text-title-lg: 2rem;
-  --text-title-lg--line-height: 1.08;
-  --text-title-lg--letter-spacing: -0.03em;
-  --text-title-lg--font-weight: 800;
-  --text-title-md: 1.75rem;
+  --text-title-lg--line-height: 1.12;
+  --text-title-lg--letter-spacing: -0.025em;
+  --text-title-lg--font-weight: 600;
+  --text-title-md: 1.5rem;
   --text-title-md--line-height: 1.15;
   --text-title-md--letter-spacing: -0.02em;
-  --text-title-md--font-weight: 700;
-  --text-title-sm: 1.5rem;
+  --text-title-md--font-weight: 600;
+  --text-title-sm: 1.25rem;
   --text-title-sm--line-height: 1.2;
-  --text-title-sm--letter-spacing: -0.02em;
+  --text-title-sm--letter-spacing: -0.015em;
   --text-title-sm--font-weight: 600;
   --text-stat: 1.375rem;
   --text-stat--line-height: 1;
   --text-stat--letter-spacing: -0.02em;
-  --text-stat--font-weight: 700;
+  --text-stat--font-weight: 600;
   --text-body-lg: 1.0625rem;
   --text-body: 0.9375rem;
   --text-body-sm: 0.875rem;
@@ -88,9 +90,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-jetbrains-mono);
-  --font-display: var(--font-manrope);
+  --font-display: var(--font-dm-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -143,6 +145,13 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
+  /* Shape scale: cards 36px, inner media 24px, badges 12px, pills */
+  --radius-card: 2.25rem;
+  --radius-media: 1.5rem;
+  --radius-badge: 0.75rem;
+  --radius-pill: 9999px;
+  --color-surface: var(--surface);
+  --color-inverse: var(--inverse);
   --ease-brand: var(--bp-ease);
   --ease-spring: var(--bp-spring);
 }
@@ -179,7 +188,9 @@ html.dark {
   --border: var(--color-ink-200);
   --input: var(--color-ink-200);
   --ring: var(--color-brand-500);
-  --radius: 0.75rem;
+  --radius: 0.875rem;
+  --surface: #fafafa;
+  --inverse: #09090b;
   --sidebar: var(--color-ink-50);
   --sidebar-foreground: var(--color-ink-900);
   --sidebar-primary: var(--color-brand-500);
@@ -188,6 +199,11 @@ html.dark {
   --sidebar-accent-foreground: var(--color-brand-500);
   --sidebar-border: var(--color-ink-200);
   --sidebar-ring: var(--color-brand-500);
+
+  /* zay-ui theme tokens */
+  --brand: var(--color-brand-500);
+  --brand-hover: var(--color-brand-600);
+  --brand-foreground: #ffffff;
 
   --bp-tint: var(--color-brand-50);
   --bp-lilac: var(--color-brand-300);
@@ -203,12 +219,13 @@ html.dark {
   --bp-accent-text: var(--color-brand-500);
   /* Third-party logos are drawn for light backgrounds, so they keep a light tile */
   --bp-logo-surface: #ffffff;
-  --bp-wire: #d9d6f2;
-  --bp-glow: color-mix(in srgb, var(--color-brand-500) 67%, transparent);
-  --bp-shadow: color-mix(in srgb, var(--color-brand-950) 22%, transparent);
-  --bp-shadow-xs: color-mix(in srgb, var(--color-brand-950) 4%, transparent);
+  --bp-wire: #d4d4d8;
+  --bp-shadow: rgb(0 0 0 / 0.14);
+  --bp-shadow-xs: rgb(0 0 0 / 0.04);
+  --bp-button-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.4), inset 0 9px 14px -5px rgb(255 255 255 / 0.22);
+  --bp-button-ring: 0 0 0 1.5px var(--color-brand-700);
   --bp-code-fn: #6a3fd8;
-  --bp-code-muted-bg: #fbfbfe;
+  --bp-code-muted-bg: #fafafa;
   --bp-callout-info-border: var(--color-brand-100);
   --bp-callout-info-title: var(--color-brand-700);
   --bp-callout-warn-border: #f4dfb8;
@@ -234,36 +251,43 @@ html.dark {
 
 /* Dark "Signal Indigo": deep navy surfaces, a lifted indigo, soft tints */
 .dark {
-  --background: #0d0d1c;
-  --foreground: #ecebfa;
-  --card: #15152a;
-  --card-foreground: #ecebfa;
-  --popover: #17172e;
-  --popover-foreground: #ecebfa;
+  --background: #09090b;
+  --surface: #111114;
+  --inverse: #fafafa;
+  --foreground: #fafafa;
+  --card: #131316;
+  --card-foreground: #fafafa;
+  --popover: #131316;
+  --popover-foreground: #fafafa;
   --primary: #7068ff;
   --primary-foreground: #ffffff;
   --secondary: #23214a;
   --secondary-foreground: #c4c0ff;
-  --muted: #1a1a30;
-  --muted-foreground: #a0a0bd;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
   --accent: #23214a;
   --accent-foreground: #ecebfa;
   --destructive: #f3726b;
-  --border: #29293f;
-  --input: #2f2f4c;
+  --border: #222226;
+  --input: #34343a;
   --ring: #7068ff;
-  --sidebar: #0d0d1c;
-  --sidebar-foreground: #ecebfa;
+  --sidebar: #09090b;
+  --sidebar-foreground: #fafafa;
   --sidebar-primary: #7068ff;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #23214a;
   --sidebar-accent-foreground: #c4c0ff;
-  --sidebar-border: #29293f;
+  --sidebar-border: #222226;
   --sidebar-ring: #7068ff;
+
+  /* zay-ui theme tokens */
+  --brand: #7068ff;
+  --brand-hover: #8079ff;
+  --brand-foreground: #ffffff;
 
   --bp-tint: #1f1d45;
   --bp-lilac: #5a53c9;
-  --bp-line-strong: #3a3a5c;
+  --bp-line-strong: #34343a;
   --bp-primary-hover: #8079ff;
   --bp-success: #3ccf97;
   --bp-success-soft: #0f2a22;
@@ -272,12 +296,13 @@ html.dark {
   --bp-danger: #f3726b;
   --bp-danger-soft: #331616;
   --bp-accent-text: #b9b4ff;
-  --bp-logo-surface: #ecebf5;
-  --bp-wire: #34325e;
-  --bp-glow: rgb(112 104 255 / 0.45);
-  --bp-shadow: rgb(0 0 0 / 0.5);
+  --bp-logo-surface: #f4f4f5;
+  --bp-wire: #3f3f46;
+    --bp-shadow: rgb(0 0 0 / 0.5);
+  --bp-button-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.35), inset 0 9px 14px -5px rgb(255 255 255 / 0.18);
+  --bp-button-ring: 0 0 0 1.5px #4338f2;
   --bp-code-fn: #c8a6ff;
-  --bp-code-muted-bg: #111124;
+  --bp-code-muted-bg: #111114;
   --bp-callout-info-border: #34306e;
   --bp-callout-info-title: #c4c0ff;
   --bp-callout-warn-border: #4d3a17;
@@ -287,6 +312,31 @@ html.dark {
   --bp-callout-success-border: #17473a;
   --bp-callout-success-title: #7fe0bb;
   --bp-callout-code: rgb(255 255 255 / 0.08);
+}
+
+/*
+ * Always-dark regions (the one "proof" block per page, the footer, the mega menu side panel).
+ * Cards inside lift to zinc 800 and the brand stays the filled action.
+ */
+.panel-dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #27272a;
+  --card-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --border: #3f3f46;
+  --bp-line-strong: #52525b;
+  --bp-tint: #1f1d45;
+  --bp-accent-text: #b9b4ff;
+  --primary: #7068ff;
+  --brand: #7068ff;
+  background: #131316;
+  color: #fafafa;
+  color-scheme: dark;
+}
+:root:not(.dark) .panel-dark {
+  background: #09090b;
 }
 
 @layer base {
@@ -305,37 +355,10 @@ html.dark {
 }
 
 /*
- * Buttons (K7a). `.btn-fx` sweeps a sheen once per hover or keyboard focus,
- * `.btn-fx-idle` adds the slow idle sheen used by primary buttons.
- * Icons opt into motion with data-icon="chevron" or data-icon="brand".
+ * Buttons. Filled buttons are the only elevated element (lit top edge, 1.5px ring, a small drop shadow);
+ * icons opt into motion with data-icon="chevron" or data-icon="brand".
  */
 @layer components {
-  .btn-fx {
-    position: relative;
-    overflow: hidden;
-    isolation: isolate;
-    --bp-sheen: rgb(67 56 242 / 0.14);
-    --bp-sheen-soft: rgb(67 56 242 / 0.05);
-  }
-  .btn-fx::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(
-      105deg,
-      transparent 30%,
-      var(--bp-sheen) 47%,
-      var(--bp-sheen-soft) 53%,
-      transparent 68%
-    );
-    transform: translateX(-130%);
-  }
-  .btn-fx:is(:hover, :focus-visible)::after {
-    transform: translateX(130%);
-    transition: transform var(--bp-d-xl) var(--bp-ease);
-  }
   .btn-fx [data-icon] {
     transition: transform 0.35s var(--bp-spring);
   }
@@ -344,23 +367,6 @@ html.dark {
   }
   .btn-fx:is(:hover, :focus-visible) [data-icon="brand"] {
     transform: rotate(-8deg) scale(1.08);
-  }
-  .btn-fx-idle {
-    --bp-sheen: rgb(255 255 255 / 0.55);
-    --bp-sheen-soft: rgb(255 255 255 / 0.18);
-  }
-  .btn-fx-idle:not(:hover):not(:focus-visible)::after {
-    animation: bp-idle-sheen 4.5s var(--bp-ease) infinite 1.8s;
-  }
-}
-
-@keyframes bp-idle-sheen {
-  0% {
-    transform: translateX(-130%);
-  }
-  22%,
-  100% {
-    transform: translateX(130%);
   }
 }
 
@@ -462,18 +468,24 @@ html.dark {
   .bp-route-line, .bp-roadmap-nudge { animation: none; }
 }
 
-/* Provider network in the hero */
-.bp-wire {
-  fill: none;
-  stroke: var(--bp-wire);
-  stroke-width: 1.6;
-  stroke-dasharray: 4 6;
-  transition: stroke var(--bp-d-sm);
-}
-.bp-wire[data-active] {
+/* Provider orbit in the hero: the live request draws out to the provider, then settles green */
+.bp-flow-line {
   stroke: var(--primary);
-  stroke-dasharray: none;
-  stroke-width: 2;
+  stroke-width: 0.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: bp-draw 0.8s var(--bp-ease) forwards;
+}
+.bp-flow-line[data-verified] {
+  stroke: var(--bp-success);
+  stroke-dashoffset: 0;
+  animation: none;
+}
+@keyframes bp-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 /*
@@ -606,9 +618,6 @@ html.dark {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-fx::after {
-    display: none;
-  }
   .btn-fx [data-icon] {
     transition: none;
     transform: none !important;

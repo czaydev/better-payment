@@ -1,3 +1,4 @@
+import { Badge, type BadgeVariant } from "@czayelements/zay-ui";
 import { DEFAULT_LOCALE, localeText, type Locale } from "@/lib/i18n/config";
 import { releaseStatus, type ReleaseStatus } from "@/lib/release";
 
@@ -22,22 +23,23 @@ const TITLES: Partial<Record<ReleaseStatus, LangText<string>>> = {
   },
 };
 
-const STYLES: Record<ReleaseStatus, string> = {
-  stable: "border-border bg-secondary text-secondary-foreground",
-  beta: "border-primary/30 bg-tint text-accent-text",
-  unreleased: "border-warning/30 bg-warning-soft text-warning",
+const BADGE_VARIANTS: Record<ReleaseStatus, BadgeVariant> = {
+  stable: "secondary",
+  beta: "brand",
+  unreleased: "warning",
 };
 
 export function Since({ version, lang = DEFAULT_LOCALE }: SinceProps) {
   const status = releaseStatus(version);
 
   return (
-    <span
-      className={`not-prose my-2 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs font-medium ${STYLES[status]}`}
+    <Badge
+      variant={BADGE_VARIANTS[status]}
+      className="not-prose my-2 text-xs font-medium"
       title={TITLES[status] ? localeText(TITLES[status], lang) : undefined}
       data-release-status={status}
     >
       {localeText(LABELS[status], lang)(version)}
-    </span>
+    </Badge>
   );
 }
