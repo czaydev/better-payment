@@ -1,0 +1,69 @@
+---
+title: Payment Orchestration
+description: What better-payment does, what is on the roadmap, and what a library running in your own app will not do.
+---
+
+better-payment is a payment orchestration library that runs inside your application. It gives one API to many Turkish providers, verifies their callbacks and lets plugins add routing, failover and automation. It is not a payment institution and it does not move money itself.
+
+This page answers the questions people ask when they compare it with a commercial orchestration platform: which features exist today, which are in review or planned, and what is out of scope on purpose.
+
+Statuses below are for the `beta` branch. The linked issue or pull request is the source of truth; when one ships, its row changes.
+
+## Feature map [#feature-map]
+
+| Feature | Status | Where |
+| --- | --- | --- |
+| One API for many providers (13 on `beta`) | Available | [Configuration](/docs/concepts/configuration) |
+| 3D Secure, verified callbacks, `callbackRedirect` | Available | [Handler](/docs/concepts/handler) |
+| Framework adapters: Next.js, Express, Hono, Fastify, Elysia, React Router | Available | [Integrations](/docs/integrations/nextjs) |
+| NestJS adapter | In review | [#93](https://github.com/czaydev/better-payment/issues/93) |
+| Nuxt / Nitro and SvelteKit adapters | In review (community PRs) | [#94](https://github.com/czaydev/better-payment/issues/94), [#95](https://github.com/czaydev/better-payment/issues/95) |
+| Payment events for every provider and flow | Available | [Events](/docs/concepts/events) |
+| Idempotency for callbacks | Available (in-memory); shared Redis/SQL stores on hold | [#90](https://github.com/czaydev/better-payment/issues/90), [#91](https://github.com/czaydev/better-payment/issues/91) |
+| Pre-authorization (authorize, capture, void) | Available, provider-dependent; PayTR pre-authorization planned | [#60](https://github.com/czaydev/better-payment/issues/60) |
+| Stored cards | Beta, provider-dependent; recurring payments and more providers planned | [#151](https://github.com/czaydev/better-payment/issues/151), [#65](https://github.com/czaydev/better-payment/issues/65) |
+| Installments (`installmentInfo`) | Available; installment table helper in review | [#152](https://github.com/czaydev/better-payment/issues/152) |
+| BIN lookup | Provider `binCheck` available; offline Turkish BIN table in review | [#153](https://github.com/czaydev/better-payment/issues/153) |
+| Hosted checkout | Partial: iyzico's hosted form and PayTR's iframe; one unified API planned | [#89](https://github.com/czaydev/better-payment/issues/89) |
+| Payment links | In review | [#177](https://github.com/czaydev/better-payment/issues/177) |
+| Subscriptions and recurring charges | Planned | [#151](https://github.com/czaydev/better-payment/issues/151) |
+| Card verification without a charge (`verifyCard()`) | Planned | [#280](https://github.com/czaydev/better-payment/issues/280) |
+| Alternative payment methods (wallets, Apple Pay, Google Pay, BKM Express) | Planned | [#281](https://github.com/czaydev/better-payment/issues/281) |
+| Card reward points (World, Bonus, Maximum) | Planned | [#282](https://github.com/czaydev/better-payment/issues/282) |
+| Marketplace split payments | Planned | [#88](https://github.com/czaydev/better-payment/issues/88) |
+| Reconciliation API (daily transaction lists) | Planned | [#41](https://github.com/czaydev/better-payment/issues/41) |
+| Provider failover and circuit breaker | In review | [#171](https://github.com/czaydev/better-payment/issues/171) |
+| Rule-based routing and commission routing | In review | [#279](https://github.com/czaydev/better-payment/issues/279), [#51](https://github.com/czaydev/better-payment/issues/51) |
+| Plugins: localized errors, chaos, notifications | Available | [Plugins](/docs/concepts/plugins) |
+| Plugins: invoicing, fraud rules, rate limit, captcha, redaction, webhooks, OpenAPI, MCP, multi-tenant, refund approval, currency conversion, 3D Secure timeout, payment links, telemetry | In review | [#176](https://github.com/czaydev/better-payment/issues/176), [#105](https://github.com/czaydev/better-payment/issues/105), [#172](https://github.com/czaydev/better-payment/issues/172), [#173](https://github.com/czaydev/better-payment/issues/173), [#174](https://github.com/czaydev/better-payment/issues/174), [#154](https://github.com/czaydev/better-payment/issues/154), [#182](https://github.com/czaydev/better-payment/issues/182), [#183](https://github.com/czaydev/better-payment/issues/183), [#178](https://github.com/czaydev/better-payment/issues/178), [#179](https://github.com/czaydev/better-payment/issues/179), [#181](https://github.com/czaydev/better-payment/issues/181), [#180](https://github.com/czaydev/better-payment/issues/180), [#177](https://github.com/czaydev/better-payment/issues/177), [#42](https://github.com/czaydev/better-payment/issues/42) |
+| CLI: `init`, `doctor`, `listen` | Planned | [#92](https://github.com/czaydev/better-payment/issues/92) |
+| Self-hosted payment server (Docker, REST API for any language) | Planned | [#283](https://github.com/czaydev/better-payment/issues/283) |
+| Self-hosted merchant dashboard | Planned | [#284](https://github.com/czaydev/better-payment/issues/284) |
+
+"In review" means an open pull request exists; "planned" means an issue without one. A row does not become available when a PR is opened, only when it is merged and released.
+
+## What better-payment will not do [#what-better-payment-will-not-do]
+
+These limits come from what the library is: code that runs in your process, under your PCI DSS scope, with your provider contracts.
+
+### A shared card vault across providers [#a-shared-card-vault]
+
+Storing raw card numbers so any provider can charge them later would put your own servers in full PCI DSS scope and make the library a card-data processor. That is a business most merchants should not enter. Stored cards are provider tokens: the provider holds the card, returns a token, and you charge that token through the stored-card API ([#27](https://github.com/czaydev/better-payment/issues/27)). See also [#151](https://github.com/czaydev/better-payment/issues/151) and [#65](https://github.com/czaydev/better-payment/issues/65).
+
+### Moving money between parties [#moving-money-between-parties]
+
+Paying sub-merchants, holding wallet balances and making payouts require a payment or e-money institution licence (Law No. 6493 in Turkey). The library can calculate and record each party's share for a marketplace payment ([#88](https://github.com/czaydev/better-payment/issues/88), [#116](https://github.com/czaydev/better-payment/issues/116)), but the transfer itself is executed by a licensed provider.
+
+### Fraud scoring as a service [#fraud-scoring-as-a-service]
+
+better-payment ships rules you write and control ([#105](https://github.com/czaydev/better-payment/issues/105)), not a risk model trained on other merchants' traffic. A scoring service needs a data platform, a model and a team to run it; a library that silently made risk decisions would be harder to audit, not easier.
+
+## PCI DSS: which models keep card data off your server [#pci-dss-which-models-keep-card-data-off-your-server]
+
+The integration model decides how much of PCI DSS applies to you:
+
+- **Card data never touches your server:** iyzico's hosted payment form, PayTR's iframe 3D Secure mode, and bank 3D Secure models where the shopper enters the card on the bank's page (for example Akbank 3D_PAY). Your server only sees the callback, verifies it and reads the result.
+- **Card data touches your server:** a direct API integration with your own card form, like the example shop in this repository. The card is posted to your handler and forwarded to the provider. This is the shortest integration to build and the heaviest in compliance terms: it brings your server into PCI DSS scope (SAQ D), and you must never log or store the card.
+- **Tokens instead of cards:** after a successful payment the provider can return a token. Stored cards are tokens; the card number never comes back to you.
+
+For production, prefer a hosted or iframe model unless you have a reason to handle card data yourself. The [test cards](/docs/guides/test-cards) page lists the sandbox values that work in either model.

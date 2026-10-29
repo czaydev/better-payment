@@ -1,0 +1,69 @@
+---
+title: Ödeme Orkestrasyonu
+description: better-payment ne yapıyor, yol haritasında ne var ve kendi uygulamanızda çalışan bir kütüphane neyi yapmaz.
+---
+
+better-payment, uygulamanızın içinde çalışan bir ödeme orkestrasyon kütüphanesidir. Türk sağlayıcılarına tek API sunar, callback'lerini doğrular ve plugin'lerle yönlendirme, failover ve otomasyon eklemenizi sağlar. Bir ödeme kuruluşu değildir ve parayı kendisi taşımaz.
+
+Bu sayfa, ticari bir orkestrasyon platformuyla karşılaştırırken sorulan soruları yanıtlar: bugün hangi özellikler var, hangileri incelemede veya planlı ve ne bilerek kapsam dışında.
+
+Aşağıdaki durumlar `beta` dalı içindir. Bağlantılı issue veya pull request tek doğru kaynaktır; biri yayınlandığında satırı değişir.
+
+## Özellik haritası [#feature-map]
+
+| Özellik | Durum | Nerede |
+| --- | --- | --- |
+| Çok sağlayıcılı tek API (`beta`'da 13 sağlayıcı) | Mevcut | [Yapılandırma](/docs/concepts/configuration) |
+| 3D Secure, doğrulanan callback'ler, `callbackRedirect` | Mevcut | [Handler](/docs/concepts/handler) |
+| Framework adaptörleri: Next.js, Express, Hono, Fastify, Elysia, React Router | Mevcut | [Entegrasyonlar](/docs/integrations/nextjs) |
+| NestJS adaptörü | İncelemede | [#93](https://github.com/czaydev/better-payment/issues/93) |
+| Nuxt / Nitro ve SvelteKit adaptörleri | İncelemede (topluluk PR'ları) | [#94](https://github.com/czaydev/better-payment/issues/94), [#95](https://github.com/czaydev/better-payment/issues/95) |
+| Her sağlayıcı ve akış için ödeme olayları | Mevcut | [Olaylar](/docs/concepts/events) |
+| Callback'ler için idempotency | Mevcut (bellek içi); paylaşımlı Redis/SQL store'ları beklemede | [#90](https://github.com/czaydev/better-payment/issues/90), [#91](https://github.com/czaydev/better-payment/issues/91) |
+| Ön yetkilendirme (authorize, capture, void) | Mevcut, sağlayıcıya bağlı; PayTR ön yetkilendirme planlı | [#60](https://github.com/czaydev/better-payment/issues/60) |
+| Saklı kartlar | Beta, sağlayıcıya bağlı; tekrarlayan ödemeler ve daha fazla sağlayıcı planlı | [#151](https://github.com/czaydev/better-payment/issues/151), [#65](https://github.com/czaydev/better-payment/issues/65) |
+| Taksitler (`installmentInfo`) | Mevcut; taksit tablosu yardımcısı incelemede | [#152](https://github.com/czaydev/better-payment/issues/152) |
+| BIN sorgusu | Sağlayıcı `binCheck` mevcut; çevrimdışı Türk BIN tablosu incelemede | [#153](https://github.com/czaydev/better-payment/issues/153) |
+| Hosted checkout | Kısmi: iyzico'nun hosted formu ve PayTR'nin iframe'i; tek birleşik API planlı | [#89](https://github.com/czaydev/better-payment/issues/89) |
+| Ödeme linkleri | İncelemede | [#177](https://github.com/czaydev/better-payment/issues/177) |
+| Abonelikler ve tekrarlayan çekimler | Planlandı | [#151](https://github.com/czaydev/better-payment/issues/151) |
+| Çekim yapmadan kart doğrulama (`verifyCard()`) | Planlandı | [#280](https://github.com/czaydev/better-payment/issues/280) |
+| Alternatif ödeme yöntemleri (cüzdanlar, Apple Pay, Google Pay, BKM Express) | Planlandı | [#281](https://github.com/czaydev/better-payment/issues/281) |
+| Kart puanları (World, Bonus, Maximum) | Planlandı | [#282](https://github.com/czaydev/better-payment/issues/282) |
+| Pazaryeri bölünmüş ödemeleri | Planlandı | [#88](https://github.com/czaydev/better-payment/issues/88) |
+| Mutabakat API'si (günlük işlem listeleri) | Planlandı | [#41](https://github.com/czaydev/better-payment/issues/41) |
+| Sağlayıcı failover'ı ve circuit breaker | İncelemede | [#171](https://github.com/czaydev/better-payment/issues/171) |
+| Kural tabanlı yönlendirme ve komisyon yönlendirmesi | İncelemede | [#279](https://github.com/czaydev/better-payment/issues/279), [#51](https://github.com/czaydev/better-payment/issues/51) |
+| Plugin'ler: yerelleştirilmiş hatalar, chaos, bildirimler | Mevcut | [Plugin'ler](/docs/concepts/plugins) |
+| Plugin'ler: fatura, fraud kuralları, hız sınırı, captcha, maskeleme, webhook, OpenAPI, MCP, çok kiracılılık, iade onayı, döviz çevrimi, 3D Secure zaman aşımı, ödeme linkleri, telemetri | İncelemede | [#176](https://github.com/czaydev/better-payment/issues/176), [#105](https://github.com/czaydev/better-payment/issues/105), [#172](https://github.com/czaydev/better-payment/issues/172), [#173](https://github.com/czaydev/better-payment/issues/173), [#174](https://github.com/czaydev/better-payment/issues/174), [#154](https://github.com/czaydev/better-payment/issues/154), [#182](https://github.com/czaydev/better-payment/issues/182), [#183](https://github.com/czaydev/better-payment/issues/183), [#178](https://github.com/czaydev/better-payment/issues/178), [#179](https://github.com/czaydev/better-payment/issues/179), [#181](https://github.com/czaydev/better-payment/issues/181), [#180](https://github.com/czaydev/better-payment/issues/180), [#177](https://github.com/czaydev/better-payment/issues/177), [#42](https://github.com/czaydev/better-payment/issues/42) |
+| CLI: `init`, `doctor`, `listen` | Planlandı | [#92](https://github.com/czaydev/better-payment/issues/92) |
+| Kendi sunucunuzda ödeme sunucusu (Docker, her dil için REST API) | Planlandı | [#283](https://github.com/czaydev/better-payment/issues/283) |
+| Kendi sunucunuzda satıcı paneli | Planlandı | [#284](https://github.com/czaydev/better-payment/issues/284) |
+
+"İncelemede", açık bir pull request olduğu anlamına gelir; "planlandı", henüz pull request'i olmayan bir issue demektir. Bir satır, PR açıldığında değil, yalnızca birleştirilip yayınlandığında mevcut olur.
+
+## better-payment ne yapmayacak [#what-better-payment-will-not-do]
+
+Bu sınırlar kütüphanenin ne olduğundan gelir: sizin sürecinizde, sizin PCI DSS kapsamınızda ve sizin sağlayıcı sözleşmelerinizle çalışan kod.
+
+### Sağlayıcılar arası ortak kart kasası [#a-shared-card-vault]
+
+Ham kart numaralarını saklayıp sonra herhangi bir sağlayıcıyla çekim yapmak, kendi sunucularınızı tam PCI DSS kapsamına sokar ve kütüphaneyi bir kart verisi işleyicisi yapar. Bu, çoğu satıcının girmemesi gereken bir iştir. Saklı kartlar sağlayıcı token'larıdır: kartı sağlayıcı tutar, size bir token döner ve siz o token'ı saklı kart API'siyle çekersiniz ([#27](https://github.com/czaydev/better-payment/issues/27)). Ayrıca bkz. [#151](https://github.com/czaydev/better-payment/issues/151) ve [#65](https://github.com/czaydev/better-payment/issues/65).
+
+### Taraflar arasında para transferi [#moving-money-between-parties]
+
+Alt satıcılara ödeme yapmak, cüzdan bakiyesi tutmak ve para çıkışı yapmak ödeme veya e-para kuruluşu lisansı gerektirir (Türkiye'de 6493 sayılı Kanun). Kütüphane bir pazaryeri ödemesinde her tarafın payını hesaplayabilir ve kaydedebilir ([#88](https://github.com/czaydev/better-payment/issues/88), [#116](https://github.com/czaydev/better-payment/issues/116)), ancak transferin kendisi lisanslı bir sağlayıcı tarafından yapılır.
+
+### Hizmet olarak fraud skorlama [#fraud-scoring-as-a-service]
+
+better-payment sizin yazdığınız ve kontrol ettiğiniz kuralları sunar ([#105](https://github.com/czaydev/better-payment/issues/105)), başka satıcıların trafiğiyle eğitilmiş bir risk modelini değil. Skorlama hizmeti bir veri platformu, bir model ve onu işletecek bir ekip gerektirir; sessizce risk kararı veren bir kütüphane denetlenmesi daha kolay değil, daha zor olurdu.
+
+## PCI DSS: hangi modeller kart verisini sunucunuzdan uzak tutar [#pci-dss-which-models-keep-card-data-off-your-server]
+
+Entegrasyon modeli, PCI DSS'in ne kadarının size uygulandığını belirler:
+
+- **Kart verisi sunucunuza hiç dokunmaz:** iyzico'nun hosted ödeme formu, PayTR'nin iframe 3D Secure modu ve alışveriş yapanın kartı bankanın sayfasında girdiği banka 3D Secure modelleri (örneğin Akbank 3D_PAY). Sunucunuz yalnızca callback'i görür, doğrular ve sonucu okur.
+- **Kart verisi sunucunuza dokunur:** kendi kart formunuzla doğrudan API entegrasyonu, bu depodaki örnek mağaza gibi. Kart handler'ınıza gönderilir ve sağlayıcıya iletilir. Kurulumu en kısa, uyumluluk açısından en ağır yoldur: sunucunuzu PCI DSS kapsamına sokar (SAQ D) ve kartı asla loglamamalı veya saklamamalısınız.
+- **Kart yerine token:** başarılı bir ödemeden sonra sağlayıcı bir token döndürebilir. Saklı kartlar token'dır; kart numarası size geri dönmez.
+
+Üretimde, kart verisini kendiniz işlemek için bir nedeniniz yoksa hosted veya iframe modelini tercih edin. [Test kartları](/docs/guides/test-cards) sayfası her iki modelde de çalışan sandbox değerlerini listeler.
