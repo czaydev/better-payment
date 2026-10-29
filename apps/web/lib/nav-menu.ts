@@ -2,9 +2,29 @@
 export const GITHUB_URL = "https://github.com/czaydev/better-payment";
 
 export type MenuIcon =
-  | "layers" | "shield" | "wallet" | "puzzle" | "rocket" | "download" | "globe" | "book" | "card" | "clock"
-  | "sparkles" | "route" | "alert" | "plug" | "github" | "basket" | "lock" | "bell" | "flask" | "code" | "package"
-  | "settings" | "building" | "bug" | "box" | "pen";
+  | "unified" | "payments" | "installments" | "threeds" | "handler" | "events" | "status" | "plugins" | "sandbox"
+  | "providers" | "banks" | "get-started" | "guides" | "integrations" | "reference" | "concepts" | "edge" | "github";
+
+/** Approved glass icon assets shared by desktop and mobile navigation. */
+export const MENU_ICON_ASSETS: Record<Exclude<MenuIcon, "github">, string> = {
+  unified: "/brand/icons/icon-unified-api.webp",
+  payments: "/brand/docs-icons/payments.webp",
+  installments: "/brand/icons/icon-installments.webp",
+  threeds: "/brand/icons/icon-threeds.webp",
+  handler: "/brand/icons/icon-handler.webp",
+  events: "/brand/icons/icon-events.webp",
+  status: "/brand/icons/icon-status.webp",
+  plugins: "/brand/icons/icon-plugin.webp",
+  sandbox: "/brand/icons/icon-sandbox.webp",
+  providers: "/brand/docs-icons/providers.webp",
+  banks: "/brand/docs-icons/banks.webp",
+  "get-started": "/brand/docs-icons/get-started.webp",
+  guides: "/brand/docs-icons/guides.webp",
+  integrations: "/brand/docs-icons/integrations.webp",
+  reference: "/brand/docs-icons/reference.webp",
+  concepts: "/brand/docs-icons/concepts.webp",
+  edge: "/brand/icons/icon-edge.webp",
+};
 
 export type MenuKey = "product" | "providers" | "developers" | "resources";
 export const MENU_KEYS: MenuKey[] = ["product", "providers", "developers", "resources"];
@@ -14,121 +34,121 @@ type Group = { id: string; items: readonly Item[] };
 
 export const menus: Record<MenuKey, { icon: MenuIcon; href: string; groups: readonly Group[] }> = {
   product: {
-    icon: "layers",
+    icon: "unified",
     href: "/product",
     groups: [
       {
         id: "payment",
         items: [
-          { id: "unified", href: "/features/unified", icon: "layers" },
-          { id: "basket", href: "/features/basket", icon: "basket" },
-          { id: "preAuth", href: "/features/pre-auth", icon: "lock" },
-          { id: "storedCards", href: "/features/stored-cards", icon: "card" },
+          { id: "unified", href: "/features/unified", icon: "unified" },
+          { id: "basket", href: "/features/basket", icon: "installments" },
+          { id: "preAuth", href: "/features/pre-auth", icon: "threeds" },
+          { id: "storedCards", href: "/features/stored-cards", icon: "payments" },
         ],
       },
       {
         id: "security",
         items: [
-          { id: "handler", href: "/features/handler", icon: "shield" },
-          { id: "events", href: "/features/events", icon: "bell" },
-          { id: "errorCodes", href: "/features/error-codes", icon: "alert" },
+          { id: "handler", href: "/features/handler", icon: "handler" },
+          { id: "events", href: "/features/events", icon: "events" },
+          { id: "errorCodes", href: "/features/error-codes", icon: "status" },
         ],
       },
       {
         id: "extend",
         items: [
-          { id: "plugins", href: "/features/plugins", icon: "puzzle" },
-          { id: "customProviders", href: "/features/custom-providers", icon: "plug" },
-          { id: "testing", href: "/features/testing", icon: "flask" },
+          { id: "plugins", href: "/features/plugins", icon: "plugins" },
+          { id: "customProviders", href: "/features/custom-providers", icon: "plugins" },
+          { id: "testing", href: "/features/testing", icon: "sandbox" },
         ],
       },
     ],
   },
   providers: {
-    icon: "building",
+    icon: "providers",
     href: "/providers",
     groups: [
       {
         id: "gateways",
         items: [
-          { id: "iyzico", href: "/providers/iyzico", icon: "wallet" },
-          { id: "paytr", href: "/providers/paytr", icon: "wallet" },
-          { id: "sipay", href: "/providers/sipay", icon: "wallet" },
-          { id: "parampos", href: "/providers/parampos", icon: "wallet" },
+          { id: "iyzico", href: "/providers/iyzico", icon: "providers" },
+          { id: "paytr", href: "/providers/paytr", icon: "providers" },
+          { id: "sipay", href: "/providers/sipay", icon: "providers" },
+          { id: "parampos", href: "/providers/parampos", icon: "providers" },
         ],
       },
       {
         id: "banks",
         items: [
-          { id: "akbank", href: "/providers/akbank", icon: "building" },
-          { id: "halkbank", href: "/providers/halkbank", icon: "building" },
-          { id: "isbank", href: "/providers/isbank", icon: "building" },
-          { id: "kuveytturk", href: "/providers/kuveytturk", icon: "building" },
-          { id: "sekerbank", href: "/providers/sekerbank", icon: "building" },
-          { id: "teb", href: "/providers/teb", icon: "building" },
-          { id: "ziraat", href: "/providers/ziraat", icon: "building" },
+          { id: "akbank", href: "/providers/akbank", icon: "banks" },
+          { id: "halkbank", href: "/providers/halkbank", icon: "banks" },
+          { id: "isbank", href: "/providers/isbank", icon: "banks" },
+          { id: "kuveytturk", href: "/providers/kuveytturk", icon: "banks" },
+          { id: "sekerbank", href: "/providers/sekerbank", icon: "banks" },
+          { id: "teb", href: "/providers/teb", icon: "banks" },
+          { id: "ziraat", href: "/providers/ziraat", icon: "banks" },
         ],
       },
       {
         id: "more",
         items: [
-          { id: "customProviders", href: "/features/custom-providers", icon: "plug" },
-          { id: "testCards", href: "/features/testing", icon: "card" },
+          { id: "customProviders", href: "/features/custom-providers", icon: "plugins" },
+          { id: "testCards", href: "/features/testing", icon: "sandbox" },
         ],
       },
     ],
   },
   developers: {
-    icon: "code",
+    icon: "get-started",
     href: "/developers",
     groups: [
       {
         id: "start",
         items: [
-          { id: "docs", href: "/docs", icon: "book" },
-          { id: "quickStart", href: "/docs/quick-start", icon: "rocket" },
-          { id: "installation", href: "/docs/installation", icon: "download" },
-          { id: "configuration", href: "/docs/concepts/configuration", icon: "settings" },
+          { id: "docs", href: "/docs", icon: "get-started" },
+          { id: "quickStart", href: "/docs/quick-start", icon: "get-started" },
+          { id: "installation", href: "/docs/installation", icon: "guides" },
+          { id: "configuration", href: "/docs/concepts/configuration", icon: "concepts" },
         ],
       },
       {
         id: "integrations",
         items: [
-          { id: "nextjs", href: "/docs/integrations/nextjs", icon: "route" },
-          { id: "edge", href: "/docs/integrations/edge", icon: "globe" },
-          { id: "frameworks", href: "/docs/integrations/frameworks", icon: "box" },
+          { id: "nextjs", href: "/docs/integrations/nextjs", icon: "integrations" },
+          { id: "edge", href: "/docs/integrations/edge", icon: "edge" },
+          { id: "frameworks", href: "/docs/integrations/frameworks", icon: "integrations" },
         ],
       },
       {
         id: "reference",
         items: [
-          { id: "api", href: "/docs/reference/api", icon: "book" },
-          { id: "types", href: "/docs/reference/types", icon: "code" },
-          { id: "errorCodes", href: "/docs/reference/error-codes", icon: "alert" },
-          { id: "testCards", href: "/docs/guides/test-cards", icon: "card" },
+          { id: "api", href: "/docs/reference/api", icon: "reference" },
+          { id: "types", href: "/docs/reference/types", icon: "concepts" },
+          { id: "errorCodes", href: "/docs/reference/error-codes", icon: "status" },
+          { id: "testCards", href: "/docs/guides/test-cards", icon: "sandbox" },
         ],
       },
     ],
   },
   resources: {
-    icon: "book",
+    icon: "guides",
     href: "/resources",
     groups: [
       {
         id: "releases",
         items: [
-          { id: "blog", href: "/blog", icon: "pen" },
-          { id: "changelog", href: "/docs/reference/changelog", icon: "clock" },
-          { id: "whatsNew", href: "/docs/whats-new", icon: "sparkles" },
-          { id: "migration", href: "/docs/guides/migration-0-5", icon: "route" },
+          { id: "blog", href: "/blog", icon: "guides" },
+          { id: "changelog", href: "/docs/reference/changelog", icon: "reference" },
+          { id: "whatsNew", href: "/docs/whats-new", icon: "events" },
+          { id: "migration", href: "/docs/guides/migration-0-5", icon: "integrations" },
         ],
       },
       {
         id: "community",
         items: [
           { id: "github", href: GITHUB_URL, icon: "github", external: true },
-          { id: "npm", href: "https://www.npmjs.com/package/better-payment", icon: "package", external: true },
-          { id: "issues", href: `${GITHUB_URL}/issues`, icon: "bug", external: true },
+          { id: "npm", href: "https://www.npmjs.com/package/better-payment", icon: "plugins", external: true },
+          { id: "issues", href: `${GITHUB_URL}/issues`, icon: "status", external: true },
         ],
       },
     ],
