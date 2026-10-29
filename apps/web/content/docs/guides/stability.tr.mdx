@@ -1,0 +1,81 @@
+---
+title: Kararlılık ve Sürümlendirme
+description: 1.0 neyi sabitliyor, sürüm numarası neyi garanti ediyor, kullanımdan kaldırma nasıl işliyor ve hangi sağlayıcılar ile çalışma ortamları destekleniyor.
+---
+
+better-payment 1.0 öncesi aşamada (`0.12.0-beta`). Bu sayfa 1.0 sürümünün neyi sabitlediğini, sonrasında sürüm numarasının neyi garanti ettiğini, kullanımdan kaldırmanın, sağlayıcıların ve çalışma ortamlarının nasıl desteklendiğini anlatır.
+
+## 1.0 neyi sabitliyor [#what-1-0-freezes]
+
+Genel API, paketin dışa aktardığı her şey ve kabul ettiği seçeneklerdir:
+
+- `betterPayment()` fabrikası, ödeme ve sağlayıcı tipleri ve hata kodları
+- handler seçenekleri: `allowedActions`, `authorize`, `transformRequest`, `callbackRedirect` ve idempotency store
+- ödeme olayları ve plugin hook'ları
+- framework adaptörleri: `better-payment/next`, `/express`, `/hono`, `/fastify`, `/elysia` ve `/react-router`
+- tarayıcı istemcisi (`better-payment/client`) ve test yardımcıları (`better-payment/testing`)
+
+Bir paket giriş noktasından dışa aktarılmayan her şey iç kullanımdadır ve her sürümde değişebilir. `dist/` içinden veya kaynak yollarından import etmek desteklenmez.
+
+1.0 bir yeniden tasarım değil, dondurmadır: 0.12 API'si 1.0 API'sidir ve yeniden adlandırma planlanmıyor. İnceleme sırasında bulunan pürüzlü köşeler son anda yeniden adlandırılmak yerine uyumluluk için korunur; gelecekteki bir major sürüm bunları aşağıdaki kullanımdan kaldırma süreciyle temizleyebilir.
+
+## Sürümlendirme [#versioning]
+
+1.0 sonrasında paket semantik sürümlendirmeyi izler:
+
+| Değişiklik | Sürüm |
+| --- | --- |
+| Genel API'de kırıcı değişiklik | major |
+| Yeni özellik, sağlayıcı veya plugin ya da kullanımdan kaldırma | minor |
+| Hata düzeltmesi, dokümantasyon veya iç değişiklik | patch |
+
+1.0 öncesinde her minor sürüm kırıcı değişiklik içerebilir ve bunların her biri changelog'da geçiş notuyla listelenir. Patch sürümleri çalışan kodu bozmaz.
+
+Her sürüm aynı API ile ESM ve CommonJS derlemeleri yayınlar.
+
+## Kullanımdan kaldırma politikası [#deprecation-policy]
+
+- Kullanımdan kaldırılan API çalışmaya devam eder, dokümante kalır ve TypeScript bildiriminde `@deprecated` olarak işaretlenir.
+- Kullanımdan kaldırma changelog'da ve bu sayfada duyurulur.
+- Yerine geçecek API, kullanımdan kaldırma yayınlanmadan önce dokümante edilir.
+- Kaldırma en erken bir sonraki major sürümde ve duyurudan en az bir minor sürüm ile 90 gün sonra yapılır; hangisi daha geçse o geçerlidir.
+
+## Node.js ve çalışma ortamları [#nodejs-and-runtimes]
+
+| Çalışma ortamı | Destek |
+| --- | --- |
+| Node.js 20, 22 ve 24 | her sürümde CI'da test edilir |
+| Node.js 18 ve öncesi | desteklenmez; paket Node.js 20 gerektirir |
+| Edge çalışma ortamları (Vercel Edge, Cloudflare Workers) | handler, sağlayıcılar ve plugin'ler Node'a özgü API'ler yerine Web Crypto ve `fetch` kullanır; edge derlemesi CI'da test edilir |
+| Deno ve Bun | test edilmez; paket standart ESM'dir ve çalışabilir |
+
+Kütüphanenin çalışma zamanı bağımlılığı yoktur ve eklenirse CI başarısız olur; bu yüzden kurulum sunucusuz bir pakete geçişli bağımlılık ağacı çekmez.
+
+## Sağlayıcı destek seviyeleri [#provider-support-tiers]
+
+Her sağlayıcı dokümante edilir ve birim testleri vardır. Sağlayıcının kendi test ortamına karşı doğrulama ayrıca izlenir ve bu tablodan anlaşılmaz:
+
+| Sağlayıcı | Dokümantasyon | Birim testleri | Gerçek test ortamı |
+| --- | --- | --- | --- |
+| iyzico | [/docs/providers/iyzico](/docs/providers/iyzico) | var | kayıtlı değil |
+| PayTR | [/docs/providers/paytr](/docs/providers/paytr) | var | açık, [#62](https://github.com/czaydev/better-payment/issues/62) |
+| Parampos | [/docs/providers/parampos](/docs/providers/parampos) | var | açık, [#63](https://github.com/czaydev/better-payment/issues/63) |
+| Akbank | [/docs/banks/akbank](/docs/banks/akbank) | var | açık, [#64](https://github.com/czaydev/better-payment/issues/64) |
+| Sipay | [/docs/providers/sipay](/docs/providers/sipay) | var | uçtan uca doğrulandı (changelog) |
+| Kuveyt Türk, Albaraka Türk, Denizbank, EST bankaları, QNB, VakıfBank, Yapı Kredi | [/docs/banks](/docs/banks/kuveytturk) | var | kayıtlı değil |
+
+"Kayıtlı değil", bu depoda o sağlayıcı için yakın tarihli bir sandbox çalıştırması olmadığı anlamına gelir; sağlayıcının bozuk olduğu anlamına gelmez. Bir çalıştırma yaparsanız tablonun güncellenebilmesi için ilgili issue'da belirtin.
+
+## Deneysel API'ler [#experimental-apis]
+
+Bugün hiçbir genel dışa aktarım deneysel olarak işaretli değil. 1.0'dan önce biri eklenirse bildiriminde `@experimental` olarak işaretlenir, bu sayfada listelenir ve 1.0 sonrasında bile minor sürümde değişebilir. Diğer her şey yukarıdaki sürümlendirme kurallarına uyar.
+
+## Güvenlik [#security]
+
+Güvenlik bildirimleri GitHub'ın [özel güvenlik açığı bildirimi](https://github.com/czaydev/better-payment/security/advisories/new) üzerinden yapılır, asla genel bir issue ile değil. [SECURITY.md](https://github.com/czaydev/better-payment/blob/beta/SECURITY.md) nelerin kapsamda olduğunu ve hangi sürümlerin düzeltme aldığını listeler.
+
+## Politika nasıl uygulanıyor [#how-the-policy-is-enforced]
+
+- Her pull request CI'da tip kontrolü, birim ve edge test paketleri, paket boyutu bütçeleri, çalışma zamanı bağımlılığı olmaması kontrolü ve dokümantasyon kontrollerinden geçer.
+- Sürümler changeset'lerden kesilir; bu yüzden her kullanıcıya görünen değişikliğin İngilizce ve Türkçe changelog kaydı vardır.
+- `beta` hattı ön sürümleri yayınlar; `main` yalnızca yayınlanmış sürümleri alır. Yayın akışı için [Katkı rehberine](https://github.com/czaydev/better-payment/blob/beta/CONTRIBUTING.md) bakın.

@@ -1,0 +1,48 @@
+---
+title: Migrating to 1.0
+description: 1.0 freezes the 0.12 API. If you are on the latest beta, upgrading is a version bump and a short checklist.
+---
+
+1.0 is the first stable release after the version reset. It freezes the public API described in [Stability and versioning](/docs/guides/stability). The 1.0 release does not rename or remove anything from `0.12`, so a project on the latest beta upgrades with a version bump and the checks below.
+
+## Who this guide is for [#who-this-guide-is-for]
+
+- **On a recent 0.x release (0.5 or newer):** follow the checklist. No API changes are required.
+- **On 0.4 or older:** upgrade to the latest 0.x first with [Migrating to 0.5](/docs/guides/migration-0-5), then return here.
+- **On the old 1.x–3.x releases:** those releases are deprecated; see [If you are on the old 1.x–3.x releases](#old-releases).
+
+## What changes in 1.0 [#what-changes-in-1-0]
+
+- The version number. The API, the package entry points and the provider configurations stay the same.
+- Node.js 20 is the minimum. Node.js 18 and older are no longer supported.
+- New APIs marked `@experimental` may change in a minor release; everything else follows the [versioning policy](/docs/guides/stability#versioning).
+- The package still has no runtime dependencies and still ships ESM and CommonJS from one version.
+
+## Upgrade checklist [#upgrade-checklist]
+
+1. Move to Node.js 20 or newer in development and in production.
+2. Install the new version.
+3. Run your test suite. The [test helpers](/docs/concepts/testing) from `better-payment/testing` work unchanged.
+4. Review the [changelog](/docs/reference/changelog) for deprecations between the version you ran and 1.0.
+5. Check the handler configuration against the list below.
+6. Deploy to your sandbox or staging environment and run one 3D Secure payment per provider before production.
+
+## Project configuration to re-check [#project-configuration-to-re-check]
+
+The API is unchanged, but these settings decide whether a production payment is safe. They are worth a second look during any upgrade:
+
+- `handler.allowedActions` lists only the actions your application needs; everything else is closed.
+- `handler.authorize` protects privileged actions such as `refund` and `cancel`, and does not rely on a header or cookie the browser can forge.
+- `handler.transformRequest` builds the amount, currency and basket on the server from your own data, never from the request body.
+- The idempotency store is shared when more than one server instance can receive a callback. The in-memory store is for a single development process only.
+- Payment event listeners are idempotent: the same `payment.succeeded` event may arrive from a browser return and from a provider notification.
+- Callback URLs are HTTPS and point at the handler path for that provider.
+- Logs leave out card data, signatures and request bodies.
+
+## If you are on the old 1.x–3.x releases [#old-releases]
+
+The old releases are deprecated and must not be used. They contained incorrect provider integrations and callback checks that could be bypassed. See [What's New in 0.0.1](/docs/whats-new) for the full reasoning and migration path, and replace the old package instead of patching it.
+
+## Getting help [#getting-help]
+
+If a step fails and the changelog does not explain it, open a [discussion](https://github.com/czaydev/better-payment/discussions) with the version, the provider and the error code. Never paste credentials, card numbers or personal data. For security problems, use [private vulnerability reporting](https://github.com/czaydev/better-payment/security/advisories/new) instead.
