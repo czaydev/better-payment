@@ -48,7 +48,7 @@ export type {
 } from './core/BetterPaymentConfig';
 
 export { PaymentProvider } from './core/PaymentProvider';
-export type { PaymentProviderConfig } from './core/PaymentProvider';
+export type { PaymentProviderConfig, VerifyCardOptions } from './core/PaymentProvider';
 export { HttpClient, HttpError } from './core/http';
 /** WebCrypto helpers for custom providers (signatures, constant-time comparison) */
 export { hmac, digest, safeEqual, toBase64, toHex, randomHex } from './core/crypto';
@@ -115,6 +115,9 @@ export {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  VerifyCardRequest,
+  VerifyCardInitResponse,
+  VerifyCardResult,
   RefundRequest,
   RefundResponse,
   CancelRequest,

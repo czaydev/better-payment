@@ -3,6 +3,8 @@ import type {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  VerifyCardRequest,
+  VerifyCardInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -41,6 +43,7 @@ export interface PaymentOperations {
   completeThreeDSPayment: { request: unknown; result: PaymentResponse };
   authorize: { request: PaymentRequest; result: PaymentResponse };
   initThreeDSAuthorize: { request: ThreeDSPaymentRequest; result: ThreeDSInitResponse };
+  verifyCard: { request: VerifyCardRequest; result: VerifyCardInitResponse };
   capture: { request: CaptureRequest; result: PaymentResponse };
   voidAuthorization: { request: VoidAuthorizationRequest; result: CancelResponse };
   refund: { request: RefundRequest; result: RefundResponse };
@@ -63,6 +66,7 @@ export const PAYMENT_OPERATIONS: readonly PaymentOperation[] = [
   'completeThreeDSPayment',
   'authorize',
   'initThreeDSAuthorize',
+  'verifyCard',
   'capture',
   'voidAuthorization',
   'refund',

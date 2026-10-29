@@ -4,6 +4,7 @@
   "pages": [
     "pre-authorization",
     "stored-cards",
+    "verify-card",
     "basket"
   ]
 }

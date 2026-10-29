@@ -8,16 +8,16 @@ description: React to payment outcomes with one typed listener, whichever provid
 Every operation that changes a payment emits an event: a 3D Secure callback, a PayTR notification, a refund made from your admin panel. Listen to the events instead of checking each result, and update your orders in one place.
 
 ```typescript
-payment.on('payment.succeeded', async (event) => {
+payment.on("payment.succeeded", async (event) => {
   await orders.markPaid(event.conversationId, event.paymentId);
 });
 
-payment.on('refund.succeeded', async (event) => {
+payment.on("refund.succeeded", async (event) => {
   await orders.addRefund(event.paymentId, event.amount);
 });
 
 // Every event
-const off = payment.on('*', (event) => console.log(event.type, event.provider));
+const off = payment.on("*", (event) => console.log(event.type, event.provider));
 off(); // removes the listener
 ```
 
@@ -25,36 +25,41 @@ Events are emitted for every provider, and for calls made on the payment object,
 
 ## Events
 
-| Event | Emitted when |
-| ----- | ------------ |
-| `payment.succeeded` | `createPayment`, `completeThreeDSPayment` or `capture` succeeds |
-| `payment.authorized` | `authorize` succeeds: the amount is blocked on the card |
-| `payment.pending` | `createPayment`, `completeThreeDSPayment`, `authorize` or `capture` returns `pending`, for example with `NETWORK_ERROR` |
-| `payment.failed` | a payment operation, `initThreeDSPayment` or `initThreeDSAuthorize` fails |
-| `payment.cancelled` | `cancel` or `voidAuthorization` succeeds |
-| `refund.succeeded` | `refund` succeeds |
-| `refund.failed` | `refund` fails |
+| Event                      | Emitted when                                                                                                            |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `payment.succeeded`        | `createPayment`, `completeThreeDSPayment` or `capture` succeeds                                                         |
+| `payment.authorized`       | `authorize` succeeds: the amount is blocked on the card                                                                 |
+| `payment.pending`          | `createPayment`, `completeThreeDSPayment`, `authorize` or `capture` returns `pending`, for example with `NETWORK_ERROR` |
+| `payment.failed`           | a payment operation, `initThreeDSPayment` or `initThreeDSAuthorize` fails                                               |
+| `payment.cancelled`        | `cancel` or `voidAuthorization` succeeds                                                                                |
+| `refund.succeeded`         | `refund` succeeds                                                                                                       |
+| `refund.failed`            | `refund` fails                                                                                                          |
+| `verification.pending`     | `verifyCard()` or its callback returns `pending`                                                                        |
+| `verification.succeeded`   | the card verification callback succeeds and the hold is released                                                        |
+| `verification.failed`      | `verifyCard()` or its callback fails                                                                                    |
+| `verification.void_failed` | the verification succeeded but the automatic hold release failed                                                        |
 
-A 3D Secure pre-authorization is completed with `completeThreeDSPayment`, so it emits `payment.succeeded` when the amount is blocked. Status queries (`getPayment`) and card operations emit no events.
+A 3D Secure pre-authorization is completed with `completeThreeDSPayment`, so it emits `payment.succeeded` when the amount is blocked. A `verifyCard()` session uses the same callback but emits `verification.*` events instead. Status queries (`getPayment`) and card operations emit no events.
 
 <Callout type="info">
-  Events are emitted only for results the provider verified. A forged or tampered callback (`errorCode: 'INVALID_HASH'`) emits nothing.
+  Events are emitted only for results the provider verified. A forged or
+  tampered callback (`errorCode: 'INVALID_HASH'`) emits nothing.
 </Callout>
 
 ## The event
 
 ```typescript
 interface PaymentEvent {
-  type: PaymentEventType;       // 'payment.succeeded', ...
-  provider: string;             // the provider id, e.g. 'iyzico'
-  operation: PaymentOperation;  // 'createPayment', 'completeThreeDSPayment', ...
-  paymentId?: string;           // the provider's payment id, when known
-  conversationId?: string;      // your order id, when known
-  amount?: string;              // charged or refunded amount, from the request
+  type: PaymentEventType; // 'payment.succeeded', ...
+  provider: string; // the provider id, e.g. 'iyzico'
+  operation: PaymentOperation; // 'createPayment', 'completeThreeDSPayment', ...
+  paymentId?: string; // the provider's payment id, when known
+  conversationId?: string; // your order id, when known
+  amount?: string; // charged or refunded amount, from the request
   currency?: string;
-  code?: PaymentErrorCode;      // normalized error code of failures
-  result: unknown;              // the result returned to the caller
-  request: unknown;             // the request (the callback data for 3D Secure completions)
+  code?: PaymentErrorCode; // normalized error code of failures
+  result: unknown; // the result returned to the caller
+  request: unknown; // the request (the callback data for 3D Secure completions)
 }
 ```
 
@@ -67,15 +72,15 @@ The listener of a specific event gets the narrowed type: in `payment.on('payment
 Listeners run in order, after the operation, and are awaited. If one throws, the operation throws an `EventListenerError`. The payment itself went through, so the error carries the result:
 
 ```typescript
-import { EventListenerError } from 'better-payment';
+import { EventListenerError } from "better-payment";
 
 try {
   await payment.createPayment(request);
 } catch (error) {
   if (error instanceof EventListenerError) {
     error.result; // the payment result
-    error.event;  // the event whose listener failed
-    error.cause;  // what the listener threw
+    error.event; // the event whose listener failed
+    error.cause; // what the listener threw
   }
 }
 ```
@@ -92,16 +97,18 @@ Write listeners so that running them twice is harmless, for example by checking 
 A plugin declares its listeners in `events`. For each event, the listeners of that event run first, then the `*` listeners. In both groups, plugin listeners run in the order of the plugins, before the listeners added with `payment.on()`:
 
 ```typescript
-import { definePlugin } from 'better-payment';
+import { definePlugin } from "better-payment";
 
 export const slackAlerts = (webhookUrl: string) =>
   definePlugin({
-    id: 'slack-alerts',
+    id: "slack-alerts",
     events: {
-      'payment.failed': async (event) => {
+      "payment.failed": async (event) => {
         await fetch(webhookUrl, {
-          method: 'POST',
-          body: JSON.stringify({ text: `Payment failed on ${event.provider}: ${event.code}` }),
+          method: "POST",
+          body: JSON.stringify({
+            text: `Payment failed on ${event.provider}: ${event.code}`,
+          }),
         });
       },
     },

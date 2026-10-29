@@ -1,0 +1,83 @@
+---
+title: Kart doğrulama
+description: verifyCard() ile kartı doğrulayın — otomatik serbest bırakılan küçük bir 3D Secure blokesi — kaydetmeden veya abonelik başlatmadan önce.
+---
+
+`verifyCard()` bir kartın gerçek olduğunu ve tahsil edilebileceğini **tahsil etmeden** kontrol eder: küçük bir 3D Secure ön provizyonu (varsayılan 1 TRY) başlatır ve kimlik doğrulama başarılır başarılmaz blokeyi serbest bırakır. Kartı kaydetmeden ([saklanan kartlar](/docs/payments/stored-cards)), abonelik veya ücretsiz deneme başlatmadan önce kullanın.
+
+<Callout type="info">
+  Bloke asla kartta kendi kendine kalmaz: serbest bırakma (`void`) callback
+  yolunda otomatik çalışır ve hook'lar ile `payment.cancelled` olayı ona da
+  uygulanır. Serbest bırakma başarısız olursa sonuç bunu bildirir (`voided:
+  false`) ve blokeyi elle kapatmanız için bir `verification.void_failed` olayı
+  yayılır.
+</Callout>
+
+## Nasıl çalışır [#how-it-works]
+
+1. `verifyCard()` yapılandırılan tutar için bir 3D Secure ön provizyonu başlatır ve her zamanki `threeDSHtmlContent`'i döner.
+2. Alıcı 3D Secure'ı tamamlar; sağlayıcı callback'i tıpkı bir ödeme gibi handler'ınıza POST eder.
+3. Callback sonucu bir **doğrulamadır**, tahsilat değil: başarılı kimlik doğrulama blokeyi serbest bırakır ve `status: 'success'`, `voided: true` — `saveCard` verildiyse `cardToken` döner.
+
+## Kartı doğrulama [#verify-a-card]
+
+```typescript
+const init = await payment.verifyCard({
+  paymentCard: { cardHolderName, cardNumber, expireMonth, expireYear, cvc },
+  buyer, // the buyer's IP is required
+  callbackUrl: "https://shop.example.com/api/payment/callback",
+  saveCard: true, // store the card when the verification succeeds
+});
+
+// render init.threeDSHtmlContent; the callback returns a VerifyCardResult:
+// result.status === 'success', result.voided === true, result.cardToken
+```
+
+`verifyCard()` `createPayment` gibi bir işlemdir: hook'lar ve olaylar uygulanır; HTTP üzerinden ve tarayıcı client'ı ile de kullanılabilir.
+
+## Tutar ve para birimi [#amount-and-currency]
+
+Varsayılan bloke `1.00 TRY`'dir. Sağlayıcı başına yapılandırın:
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    iyzico: {
+      apiKey: process.env.IYZICO_API_KEY,
+      // ...
+      verifyCard: { amount: "0.50", currency: "TRY" },
+    },
+  },
+});
+```
+
+## Sağlayıcılar [#providers]
+
+| Sağlayıcı                                      | `verifyCard()`                                                                           |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| iyzico, Parampos, Akbank, Sipay, Albaraka Türk | mevcut (ön provizyon)                                                                    |
+| PayTR                                          | henüz yok (ön provizyon yok, [#60](https://github.com/czaydev/better-payment/issues/60)) |
+| Diğerleri                                      | `NOT_SUPPORTED`                                                                          |
+
+Ön provizyonu olmayan sağlayıcılar `NOT_SUPPORTED` fırlatır; HTTP handler `400` döner.
+
+## HTTP handler
+
+| Route                                  | Action                 | `authorize` gerekir mi |
+| -------------------------------------- | ---------------------- | ---------------------- |
+| `POST /:provider/verify-card/init-3ds` | `verify-card/init-3ds` | —                      |
+
+Callback sonucu normal callback route'unuza gelir; `verification: 'card'` olarak işaretlenir, böylece `onCallback` doğrulamaları ödemelerden ayırt edebilir.
+
+## Olaylar [#events]
+
+`verifyCard()` ve callback'i `payment.*` yerine `verification.*` olayları yayar:
+
+| Olay                       | Ne zaman yayılır                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `verification.pending`     | `verifyCard()` ya da callback'i `pending` döndüğünde                                                               |
+| `verification.succeeded`   | callback başarılı olduğunda ve bloke serbest bırakıldığında                                                        |
+| `verification.failed`      | `verifyCard()` ya da callback başarısız olduğunda (başarısız kimlik doğrulamada serbest bırakılacak bloke oluşmaz) |
+| `verification.void_failed` | doğrulama başarılı oldu ama otomatik serbest bırakma başarısız olduğunda — blokeyi elle kapatın                    |
+
+Kart verisi asla olaylara ulaşmaz: bir `verification.*` olayının isteği `paymentCard` içermez.

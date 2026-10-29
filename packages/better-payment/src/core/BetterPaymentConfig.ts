@@ -2,7 +2,7 @@ import type { BetterPaymentLogger } from './logger';
 import type { RetryConfig } from './retry';
 export type { RetryConfig } from './retry';
 import type { BetterPaymentHandlerOptions } from './BetterPaymentHandler';
-import type { PaymentProvider, PaymentProviderConfig } from './PaymentProvider';
+import type { PaymentProvider, PaymentProviderConfig, VerifyCardOptions } from './PaymentProvider';
 import type { BetterPaymentPlugin } from './plugin';
 
 /**
@@ -47,6 +47,7 @@ export interface ProviderSetupContext {
   retry?: RetryConfig;
   fetch?: typeof fetch;
   validate?: boolean;
+  verifyCard?: VerifyCardOptions;
 }
 
 /**
@@ -112,6 +113,11 @@ export interface BetterPaymentOptions<
   validate?: boolean;
   /** Options for `payment.handler` */
   handler?: BetterPaymentHandlerOptions;
+  /**
+   * Amount and currency held by `verifyCard()`: `{ amount: '1.00', currency: 'TRY' }`.
+   * A provider's own `verifyCard` config takes precedence.
+   */
+  verifyCard?: VerifyCardOptions;
   /** Plugins, applied in order */
   plugins?: Plugins;
 }
@@ -220,5 +226,6 @@ export function withProviderDefaults<T extends PaymentProviderConfig>(
     retry: config.retry ?? ctx.retry,
     fetch: config.fetch ?? ctx.fetch,
     validate: config.validate ?? ctx.validate,
+    verifyCard: config.verifyCard ?? ctx.verifyCard,
   };
 }

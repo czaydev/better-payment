@@ -4,6 +4,8 @@ import {
   PaymentResponse,
   ThreeDSPaymentRequest,
   ThreeDSInitResponse,
+  VerifyCardRequest,
+  VerifyCardInitResponse,
   RefundRequest,
   RefundResponse,
   CancelRequest,
@@ -19,6 +21,7 @@ import {
   DeleteCardRequest,
   DeleteCardResponse,
   PaymentStatus,
+  Currency,
 } from '../types';
 import { BetterPaymentLogger } from './logger';
 import type { RetryConfig } from './retry';
@@ -32,6 +35,7 @@ import {
   validateRefundAmount,
   type PaymentValidationRules,
 } from './validation';
+import { randomHex } from './crypto';
 
 /**
  * Configuration fields shared by all providers.
@@ -49,6 +53,16 @@ export interface PaymentProviderConfig {
    * required fields). Default: true.
    */
   validate?: boolean;
+  /** Amount and currency held by verifyCard(). */
+  verifyCard?: VerifyCardOptions;
+}
+
+/** Amount and currency of the small pre-authorization behind verifyCard() */
+export interface VerifyCardOptions {
+  /** Amount to hold and release, as a string. Default: '1.00' */
+  amount?: string;
+  /** Currency of the hold: TRY, USD, EUR or GBP. Default: 'TRY' */
+  currency?: string;
 }
 
 /**
@@ -174,6 +188,79 @@ export abstract class PaymentProvider<
    */
   async initThreeDSAuthorize(_request: ThreeDSPaymentRequest): Promise<ThreeDSInitResponse> {
     throw this.notSupported('Pre-authorization');
+  }
+
+  /**
+   * Verifies a card with a small 3D Secure pre-authorization, held for the
+   * configured amount (`verifyCard: { amount, currency }`, default 1 TRY) and
+   * released automatically once the authentication succeeds. Complete it with
+   * completeThreeDSPayment() as usual. Providers without pre-authorization
+   * throw NOT_SUPPORTED.
+   */
+  async verifyCard(request: VerifyCardRequest): Promise<VerifyCardInitResponse> {
+    const base = PaymentProvider.prototype;
+    if (
+      this.initThreeDSAuthorize === base.initThreeDSAuthorize ||
+      this.voidAuthorization === base.voidAuthorization
+    ) {
+      throw this.notSupported('Card verification', 'no pre-authorization');
+    }
+
+    let amount: string;
+    let currency: string;
+    try {
+      amount = this.config.verifyCard?.amount ?? '1.00';
+      currency = this.config.verifyCard?.currency ?? Currency.TRY;
+      if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || !(currency in Currency)) {
+        throw new ValidationError('Invalid verifyCard configuration');
+      }
+      // The verification subset: a card, the buyer IP and the callback URL
+      validatePaymentRequest(
+        { ...request, price: amount } as PaymentRequest,
+        { card: true, saveCard: true, required: ['callbackUrl', 'buyer.ip'] },
+        this.constructor.name
+      );
+    } catch (error) {
+      return {
+        status: PaymentStatus.FAILURE,
+        verification: 'card',
+        code: PaymentErrorCode.INVALID_REQUEST,
+        errorCode: PaymentErrorCode.INVALID_REQUEST,
+        errorMessage: error instanceof Error ? error.message : 'Invalid verifyCard request',
+      };
+    }
+
+    const conversationId = request.conversationId || `VC${randomHex(8).toUpperCase()}`;
+    const address = {
+      contactName: `${request.buyer.name} ${request.buyer.surname}`.trim(),
+      city: request.buyer.city,
+      country: request.buyer.country,
+      address: request.buyer.registrationAddress,
+    };
+    const init = await this.initThreeDSAuthorize({
+      price: amount,
+      paidPrice: amount,
+      currency,
+      basketId: conversationId,
+      paymentCard: request.paymentCard,
+      buyer: request.buyer,
+      saveCard: request.saveCard,
+      conversationId,
+      callbackUrl: request.callbackUrl,
+      shippingAddress: address,
+      billingAddress: address,
+      basketItems: [
+        {
+          id: conversationId,
+          name: 'Card verification',
+          category1: 'Card verification',
+          itemType: 'VIRTUAL',
+          price: amount,
+        },
+      ],
+      installment: 1,
+    });
+    return { ...init, verification: 'card', amount, currency };
   }
 
   /** Charges (all or part of) a pre-authorized amount */

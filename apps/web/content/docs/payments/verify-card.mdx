@@ -1,0 +1,83 @@
+---
+title: Card verification
+description: Verify a card with verifyCard() — a small 3D Secure hold that is released automatically — before saving it or starting a subscription.
+---
+
+`verifyCard()` checks that a card is real and can be charged **without charging it**: it starts a small 3D Secure pre-authorization (1 TRY by default) and releases the hold as soon as the authentication succeeds. Use it before saving a card ([stored cards](/docs/payments/stored-cards)), starting a subscription or a free trial.
+
+<Callout type="info">
+  The hold never stays on the card by itself: the release (`void`) runs
+  automatically on the callback path, and hooks and the `payment.cancelled`
+  event apply to it. If the release fails, the result says so (`voided: false`)
+  and a `verification.void_failed` event is emitted so you can void the hold
+  manually.
+</Callout>
+
+## How it works
+
+1. `verifyCard()` starts a 3D Secure pre-authorization for the configured amount and returns the usual `threeDSHtmlContent`.
+2. The buyer completes 3D Secure; the provider posts the callback to your handler, exactly like a payment.
+3. The callback result is a **verification**, not a charge: a successful authentication releases the hold and then returns `status: 'success'`, `voided: true` — and `cardToken` when `saveCard` was set.
+
+## Verify a card
+
+```typescript
+const init = await payment.verifyCard({
+  paymentCard: { cardHolderName, cardNumber, expireMonth, expireYear, cvc },
+  buyer, // the buyer's IP is required
+  callbackUrl: "https://shop.example.com/api/payment/callback",
+  saveCard: true, // store the card when the verification succeeds
+});
+
+// render init.threeDSHtmlContent; the callback returns a VerifyCardResult:
+// result.status === 'success', result.voided === true, result.cardToken
+```
+
+`verifyCard()` is an operation like `createPayment`: hooks and events apply, and it is also available over HTTP and through the browser client.
+
+## Amount and currency
+
+The default hold is `1.00 TRY`. Configure it per provider:
+
+```typescript
+const payment = betterPayment({
+  providers: {
+    iyzico: {
+      apiKey: process.env.IYZICO_API_KEY,
+      // ...
+      verifyCard: { amount: "0.50", currency: "TRY" },
+    },
+  },
+});
+```
+
+## Providers
+
+| Provider                                       | `verifyCard()`                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| iyzico, Parampos, Akbank, Sipay, Albaraka Türk | available (pre-authorization)                                                              |
+| PayTR                                          | not yet (no pre-authorization, [#60](https://github.com/czaydev/better-payment/issues/60)) |
+| Others                                         | `NOT_SUPPORTED`                                                                            |
+
+Providers without pre-authorization throw `NOT_SUPPORTED`; the HTTP handler answers `400`.
+
+## HTTP handler
+
+| Route                                  | Action                 | Needs `authorize` |
+| -------------------------------------- | ---------------------- | ----------------- |
+| `POST /:provider/verify-card/init-3ds` | `verify-card/init-3ds` | —                 |
+
+The callback result is delivered to your normal callback route; it is marked `verification: 'card'`, so your `onCallback` can tell verifications and payments apart.
+
+## Events
+
+`verifyCard()` and its callback emit the `verification.*` events instead of `payment.*`:
+
+| Event                      | Emitted when                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `verification.pending`     | `verifyCard()` or its callback returns `pending`                                         |
+| `verification.succeeded`   | the callback succeeds and the hold is released                                           |
+| `verification.failed`      | `verifyCard()` or the callback fails (a failed authentication leaves no hold to release) |
+| `verification.void_failed` | the verification succeeded but the automatic release failed — void the hold manually     |
+
+Card data never reaches events: the request of a `verification.*` event carries no `paymentCard`.
